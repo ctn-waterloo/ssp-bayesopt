@@ -7,7 +7,7 @@ def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 setup(
-        name = 'ssp-bayesopt',
+        name = 'ssp_bayes_opt',
         version = '0.1',
         author='Michael Furlong', # TODO: look up multiple authors
         author_email='michael.furlong@uwaterloo.ca',
@@ -15,8 +15,8 @@ setup(
         license = 'TBD',
         keywords = '',
         url='http://github.com/ctn-waterloo/ssp-bayesopt',
-        packages=['bayes_opt','examples','tests'],
-        long_description=read('README'),
+        packages=['ssp_bayes_opt','examples','tests'],
+        long_description=read('README.md'),
         classifiers=[
             'Development Status :: 2 - Pre-Alpha',
             'Programming Language :: Python :: 3',
