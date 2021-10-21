@@ -1,9 +1,68 @@
 '''
-Hand utils for spatial semantic pointers
+Handy utils for spatial semantic pointers implemented in 
 '''
 
 import numpy as np
+
+from typing import Any, List
 import numpy.typing as npt
+
+
+def fractional_bind(basis:np.ndarray, position:np.ndarray):
+    return np.fft.ifft(np.prod(np.fft.fft(basis, axis=0)**position, axis=1), axis=0)
+    
+# Given your axis vectors (as a matrix) and an array of positions, compute SSP rep for all positions
+def ssp_vectorized(basis, positions):
+    positions = positions.reshape(-1,basis.shape[1])
+    S_list = np.zeros((basis.shape[0],positions.shape[0]),dtype=complex)
+    for i in np.arange(positions.shape[0]):
+        S_list[:,i] = np.fft.ifft(np.prod(np.fft.fft(basis, axis=0)**positions[i,:], axis=1), axis=0)  
+    return S_list
+    
+
+# Using a matrix of phases to generate axis vectors
+def PlaneWaveBasis(K):
+    # K is a matrix of phases
+    d = K.shape[0]
+    n = K.shape[1]
+    axes = []
+    for i in range(n):
+        F = np.ones((d*2 + 1,), dtype="complex")
+        F[0:d] = np.exp(1.j*K[:,i])
+        F[-d:] = np.flip(np.conj(F[0:d]))
+        F = np.fft.ifftshift(F)
+#         axis = ssp.SpatialSemanticPointer(data=np.fft.ifft(F).real)
+        axis = data=np.fft.ifft(F).real
+        # or spa.SemanticPointer if not using nengo_ssp (see github.com/nsdumont/nengo_ssp)
+        axes.append(axis)
+    return axes
+
+def RandomBasis(dim,d):
+    K = np.random.rand(d//2,dim)*2*np.pi - np.pi
+    basis = PlaneWaveBasis(K)
+    return basis, K
+
+def HexagonalBasis(dim=2,n_rotates=8,n_scales=8,scale_min=0.8, scale_max=3):
+    # Create dim axis vectors consisting of multiple sets of hexagonal bases
+    K_hex = np.hstack([np.sqrt(1+ 1/dim)*np.identity(dim) - (dim**(-3/2))*(np.sqrt(dim+1) + 1),
+                     (dim**(-1/2))*np.ones((dim,1))]).T
+
+    scales = np.linspace(scale_min,scale_max,n_scales)
+    K_scales = np.vstack([K_hex*i for i in scales])
+    if (dim == 2) and (n_rotates > 1):
+        angles = np.linspace(0,2*np.pi/3,n_rotates)
+        R_mats = np.stack([np.stack([np.cos(angles), -np.sin(angles)],axis=1),
+                    np.stack([np.sin(angles), np.cos(angles)], axis=1)], axis=1)
+        K_scale_rotates = (R_mats @ K_scales.T).transpose(0,2,1).reshape(-1,dim)
+    elif (dim>1) and (n_rotates>1):
+        R_mats = scipy.stats.special_ortho_group.rvs(dim, size=n_rotates)
+        K_scale_rotates = (R_mats @ K_scales.T).transpose(0,2,1).reshape(-1,dim)
+    else: 
+        K_scale_rotates = K_scales
+    basis = PlaneWaveBasis(K_scale_rotates)
+    return basis, K_scale_rotates
+
+
 
 def make_rand_ssp(data_dim : int, ptr_dim : int) -> np.ndarray:
     '''
@@ -52,8 +111,7 @@ def to_unitary(v : np.ndarray) -> np.ndarray:
     fft_unit = fft_val / fft_norms
     return np.array((np.fft.ifft(fft_unit, n=len(v))).real)
 
-
-def make_good_unitary(dim : int, eps=1e-3 : float, rng=np.random) -> np.ndarray:
+def make_good_unitary(dim : int, eps: float=1e-3 , rng: Any =np.random ) -> np.ndarray:
     a = rng.rand((dim - 1) // 2)
     sign = rng.choice((-1, +1), len(a))
     phi = sign * np.pi * (eps + a * (1 - 2 * eps))
@@ -92,7 +150,7 @@ def PlaneWaveBasis(K : np.ndarray) -> List:
         axes.append(axis)
     return axes
 
-def make_hex_unitary(data_dim : int, n_scales=1 : int, n_rotates=1 : int, scale_min=0.8 : float, scale_max = 3.4 : float) -> np.ndarray:
+def make_hex_unitary(data_dim : int, n_scales: int =1, n_rotates: int =1, scale_min : float=0.8, scale_max : float= 3.4) -> np.ndarray:
     assert data_dim > 0, f'Must have positive data dimension, received {data_dim}.'
 
     scales = np.linspace(scale_min, scale_max, n_scales)
