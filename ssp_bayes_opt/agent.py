@@ -20,7 +20,8 @@ class Agent:
 
 class SSPAgent:
     def __init__(self, init_xs, init_ys, n_scales=1, n_rotates=1, scale_min=0.8, scale_max=3.4):
-   
+  
+        self.num_restarts = 10
         (num_pts, data_dim) = init_xs.shape
 
 
@@ -30,7 +31,7 @@ class SSPAgent:
 #                     scale_min=scale_min, scale_max=scale_max)
 
 
-        # TODO: Create the simplex.
+        # Create the simplex.
         self.ptrs, K_scale_rotates = ssp.HexagonalBasis(dim=data_dim)
         self.ptrs = np.vstack(self.ptrs)
         self.ssp_dim = self.ptrs.shape[1]
@@ -40,10 +41,11 @@ class SSPAgent:
         print('Selected Lengthscale: ', self.length_scale)
 
         # Encode the initial sample points 
-        init_phis = self._encode(self.ptrs, init_xs, length_scale=self.length_scale)
+        init_phis = self.encode(init_xs)
 
         self.blr = blr.BayesianLinearRegression(self.ssp_dim)
-        self.blr.update(init_phis, init_ys)
+
+        self.blr.update(init_phis, np.array(init_ys))
 
         # MI params
         self.gamma_t = 0
@@ -53,6 +55,9 @@ class SSPAgent:
         self.phis = None
 
     ### end __init__
+
+    def encode(self, xs):
+        return self._encode(self.ptrs, xs, length_scale=self.length_scale)
 
     def _optimize_lengthscale(self, init_xs, init_ys):
 
@@ -73,78 +78,80 @@ class SSPAgent:
 
     def eval(self, xs):
         if self.phis is None:
-            self.phis = self._encode(self.ptrs, xs)
+            self.phis = self.encode(xs)
         ### end if
         mu, var = self.blr.predict(self.phis)
         phi = self.sqrt_alpha * (np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t)) 
         return mu, var, phi
 
-    def select_optimal(self, samples=None):
+    def select_optimal(self, bounds):
         '''
-        return x, mu(x), var(x), phi(x)
+        return ssp(x), var(x), phi(x)
         '''
 
-
-        def optim_func(ptr, m=self.blr.m,
+        def optim_func(x, m=self.blr.m,
                        sigma=self.blr.S,
                        gamma=self.gamma_t,
                        beta_inv=self.blr.beta):
-            val = ptr.T @ m
-            mi = np.sqrt(gamma + beta_inv + ptr.T @ sigma @ ptr) - np.sqrt(gamma)
-            return -(val + mi)
+            ptr = self.encode(x.reshape(1,-1))
+            val = ptr @ m
+            mi = np.sqrt(gamma + beta_inv + ptr @ sigma @ ptr.T) - np.sqrt(gamma)
+
+            return -(val + mi).flatten()
         ### end optim_func
 
-        def gradient(ptr, m=self.blr.m,
+        def gradient(x, m=self.blr.m,
                      sigma=self.blr.S,
                      gamma=self.gamma_t,
                      beta_inv=self.blr.beta):
-            sqr = (ptr.T @ sigma @ ptr) 
+            ptr = self.encode(x.reshape(1,-1))
+            sqr = (ptr @ sigma @ ptr.T) 
             scale = np.sqrt(sqr + gamma + beta_inv)
-            retval = -(m.flatten() + sigma @ ptr / scale)
+            retval = -(m.flatten() + sigma @ ptr.T / scale)
             return retval
         ### end gradient
 
         # Optimize the function.
-
         solns = []
         vals = []
         phis = []
         for _ in range(self.num_restarts):
             ## Create initial Guess
-            try:
-                phi_int = np.random.multivariate_normal(self.blr.m.flatten(), self.blr.S).reshape(-1,1)
-            except np.linalg.LinAlgError as e:
-                print(e)
-                phi_int = -self.blr.S_inv @ self.blr.m
+#             try:
+#                 phi_init = np.random.multivariate_normal(self.blr.m.flatten(), self.blr.S).reshape(-1,1)
+#             except np.linalg.LinAlgError as e:
+#                 print(e)
+#                 phi_init = -self.blr.S_inv @ self.blr.m
+            phi_init = np.random.uniform(low=-5, high=5, size=(2,))
 
-            soln = minimize(optim_func, phi_init, jac=gradient, method='L-BFGS-B')
+#             soln = minimize(optim_func, phi_init, jac=gradient, method='L-BFGS-B')
+            soln = minimize(optim_func, phi_init, method='L-BFGS-B', bounds=bounds)
             vals.append(-soln.fun)
             solns.append(np.copy(soln.x))
-            phis.append(-soln.fun - np.inner(soln.x.flatten(), self.blr.m.flatten()))
 
         best_val_idx = np.argmax(vals)
         best_soln = solns[best_val_idx]
         best_score = vals[best_val_idx]
-        best_phi = phis[best_val_idx]
 
-        x_t = self.decode(best_soln)
+        best_soln
 
-        return x_t, best_soln, best_score, best_phi
-    
+        return best_soln.reshape(1,-1), best_score, 0#best_phi
     ### end select_optimal
-       
 
-
-    def update(self, x_t, y_t, sigma_t):
+    def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float):
+        '''
+        Updates the state of the Bayesian Linear Regression.
+        '''
     
         x_val = x_t
+        y_val = y_t
         if len(x_t.shape) < 2:
             x_val = x_t.reshape(1, x_t.shape[0])
             y_val = y_t.reshape(1, y_t.shape[0])
         ### end if
     
         # Update BLR
-        phi = self._encode(self.ptrs, x_val)
+        phi = self.encode(x_val)
         self.blr.update(phi, y_val)
         
         # Update gamma
@@ -154,18 +161,10 @@ class SSPAgent:
     def _encode(self, ptrs, x, length_scale=None):
         (num_pts, x_dim) = x.shape
 
-        if not length_scale is None:
-            assert len(length_scale) == 1 or len(length_scale) == x_dim, f'Expected 1 or {x_dim} length scales, got {len(length_scale)}'
-        assert x_dim == len(ptrs), f'Expected {len(ptrs)}-d data, got {x_dim}-d'
-    
         outputs = np.zeros((num_pts, self.ssp_dim))
-        ls = self.length_scale if length_scale is None else length_scale
 
         for i in range(num_pts):
-            if len(ls) == 1:
-                vs = [ssp.encode(p,x[i,p_idx] / ls) for p_idx, p in enumerate(ptrs)]
-            if len(ls) > 1:
-                vs = [ssp.encode(p,x[i,p_idx] / ls[p_idx]) for p_idx, p in enumerate(ptrs)]
+            vs = [ssp.encode(p,x[i,p_idx] / length_scale[p_idx]) for p_idx, p in enumerate(ptrs)]
             outputs[i,:] = functools.reduce(ssp.bind, vs)
         ### end for
         return outputs
