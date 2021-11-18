@@ -10,6 +10,13 @@ function_maximum_value = {
     'branin-hoo': -0.397887, # Because the function is negated to make it a maximization problem.
     'goldstein-price': -3/1e5, # Because the true function is scaled and negated.
     'colville': 0,
+    'rastrigin': 0,
+    'ackley': 0,
+    'rosenbrock': 0,
+    'beale': 0,
+    'easom': 1,
+    'mccormick': 1.9133,
+    'styblinski-tang3': 39.16599*3 #1 dim ****
 }
 
 import ssp_bayes_opt
@@ -19,8 +26,8 @@ importlib.reload(ssp_bayes_opt)
 
 class SSPBayesOptTrial(pytry.Trial):
     def params(self):
-        self.param('function', function_name='himmelblau')
-        self.param('algorithm one of (ucb|ei|poi)', algorithm='ucb')
+        self.param('function', function_name='branin-hoo')
+        #self.param('algorithm one of (ucb|ei|poi)', algorithm='ucb')
         self.param('num initial samples', num_init_samples=10)
     
     def evaluate(self, p):

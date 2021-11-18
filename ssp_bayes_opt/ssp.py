@@ -3,7 +3,7 @@ Handy utils for spatial semantic pointers implemented in
 '''
 
 import numpy as np
-
+import scipy
 from typing import Any, List
 import numpy.typing as npt
 

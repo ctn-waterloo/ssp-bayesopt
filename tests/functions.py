@@ -1,5 +1,6 @@
 import numpy as np
 import pickle
+import re
 from scipy.interpolate import griddata
 #from util.generate_gp import sample_gp2, sample_gp4, sample_gmm
 
@@ -49,6 +50,29 @@ def factory(function_name: str) -> Tuple[Callable, dict, int]:
     elif function_name == 'tsunamis':
         raise NotImplemented('Need to implement the tsunami function')
         return None, None, 500
+    elif re.match('rastrigin', function_name): ## Looking for names like rastrigin1, rastrigin3 etc
+        num = re.search('\d+', function_name)
+        assert num is not None
+        dim = int(num[0])
+        return rastrigin, {'x'+str(i): (-5.12,5.12) for i in range(dim)}, 500
+    elif function_name=='ackley':
+        return ackley, {'x0': (-5,5), 'x1' : (-5,5)}, 500
+    elif re.match('rosenbrock', function_name):
+        num = re.search('\d+', function_name)
+        assert num is not None
+        dim = int(num[0])
+        return rosenbrock, {'x'+str(i): (-10,10) for i in range(dim)}, 500 # actually theres no range, just need to cover 1,1,..,1
+    elif function_name=='beale':
+        return beale, {'x0': (-4.5,4.5), 'x1': (-4.5,4.5)}, 500
+    elif function_name=='easom':
+        return easom, {'x0': (-10,10), 'x1': (-10,10)}, 500
+    elif function_name=='mccormick':
+        return mccormick, {'x0':(-1.5,4), 'x1': (-3,4)}, 500
+    elif re.match('styblinski-tang', function_name):
+        num = re.search('\d+', function_name)
+        assert num is not None
+        dim = int(num[0])
+        return styblinski_tang, {'x'+str(i): (-5,5) for i in range(dim)}, 500
     else:
         raise RuntimeError(f'Unknown function {function_name}')
 
@@ -138,7 +162,37 @@ def colville(x0=None, x1=None, x2=None, x3=None):
 
     return -fval
 
+def rastrigin(**kwargs):
+    A = 10
+    xs = np.fromiter(kwargs.values(), dtype=float)
+    return -(A*len(xs) + sum(xs**2 - A*np.cos(2*np.pi*xs)))
 
+def ackley(x0=None, x1=None):
+    fval = -20*np.exp(-0.2*np.sqrt(0.5*(x0**2 + x1**2))) - np.exp(0.5*(np.cos(2*np.pi*x0) + np.cos(2*np.pi*x1))) + np.exp(1) + 20
+    return -fval
+    
+def rosenbrock(**kwargs):
+    xs = np.fromiter(kwargs.values(), dtype=float)
+    return -np.sum(100*(x[1:] - xs[:-1]**2)**2 + (1-x[:-1])**2)
+    
+def beale(x0=None, x1=None):
+    fval = (1.5 - x0 + x0*x1)**2 + (2.25 - x0 + x0*x1**2)**2 + (2.625 - x0 + x0*x1**3)**2
+    return -fval
+
+def easom(x0=None, x1=None):
+    # scaled by 10
+    x0 = x0/10
+    x1 = x1/10
+    fval = -np.cos(x0)*np.cos(x1)*np.exp(-(x0-np.pi)**2 - (x1-np.pi)**2)
+    return -fval
+
+def mccormick(x0=None, x1=None):
+    fval = np.sin(x0 + x1) + (x0 - x1)**2 - 1.5*x0 + 2.5*x1 + 1
+    return -fval
+
+def styblinski_tang(**kwargs):
+    xs = np.fromiter(kwargs.values(), dtype=float)
+    return -np.sum(xs**4 - 16*xs**2 + 5*xs)/2
 
 if __name__=='__main__':
     import matplotlib.pyplot as plt

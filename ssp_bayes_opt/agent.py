@@ -122,7 +122,7 @@ class SSPAgent:
 #             except np.linalg.LinAlgError as e:
 #                 print(e)
 #                 phi_init = -self.blr.S_inv @ self.blr.m
-            phi_init = np.random.uniform(low=-5, high=5, size=(2,))
+            phi_init = np.random.uniform(low=[b[0] for b in bounds], high=[b[1] for b in bounds], size=(len(bounds),))
 
 #             soln = minimize(optim_func, phi_init, jac=gradient, method='L-BFGS-B')
             soln = minimize(optim_func, phi_init, method='L-BFGS-B', bounds=bounds)
