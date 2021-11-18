@@ -61,3 +61,6 @@ class SSPBayesOptTrial(pytry.Trial):
         )
     
 r = SSPBayesOptTrial().run()
+
+plt.plot(np.divide(np.cumsum(r['regret']), np.arange(1, len(r['regret'])+1)))
+plt.show()
