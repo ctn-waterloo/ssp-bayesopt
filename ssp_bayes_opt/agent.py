@@ -84,58 +84,63 @@ class SSPAgent:
         phi = self.sqrt_alpha * (np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t)) 
         return mu, var, phi
 
-    def select_optimal(self, bounds):
+    def select_optimal(self):
         '''
-        return ssp(x), var(x), phi(x)
+        return objective_func, jacobian_func
         '''
 
         def optim_func(x, m=self.blr.m,
                        sigma=self.blr.S,
                        gamma=self.gamma_t,
-                       beta_inv=self.blr.beta):
-            ptr = self.encode(x.reshape(1,-1))
+                       beta_inv=self.blr.beta,
+                       ptrs = self.ptrs,
+                       ):
+#             ptr = self.encode(x.reshape(1,-1))
+            ptr = ssp.vector_encode(ptrs, x.reshape(1,-1))
             val = ptr @ m
             mi = np.sqrt(gamma + beta_inv + ptr @ sigma @ ptr.T) - np.sqrt(gamma)
-
             return -(val + mi).flatten()
         ### end optim_func
 
-        def gradient(x, m=self.blr.m,
+        def jac_func(x, m=self.blr.m,
                      sigma=self.blr.S,
                      gamma=self.gamma_t,
-                     beta_inv=self.blr.beta):
-            ptr = self.encode(x.reshape(1,-1))
+                     beta_inv=self.blr.beta,
+                     ptrs=self.ptrs,
+                     ):
+#             ptr = self.encode(x.reshape(1,-1))
+            ptr = ssp.vector_encode(ptrs, x.reshape(1,-1))
             sqr = (ptr @ sigma @ ptr.T) 
             scale = np.sqrt(sqr + gamma + beta_inv)
             retval = -(m.flatten() + sigma @ ptr.T / scale)
             return retval
         ### end gradient
+        return optim_func, jac_func 
 
         # Optimize the function.
-        solns = []
-        vals = []
-        phis = []
-        for _ in range(self.num_restarts):
-            ## Create initial Guess
-#             try:
-#                 phi_init = np.random.multivariate_normal(self.blr.m.flatten(), self.blr.S).reshape(-1,1)
-#             except np.linalg.LinAlgError as e:
-#                 print(e)
-#                 phi_init = -self.blr.S_inv @ self.blr.m
-            phi_init = np.random.uniform(low=-5, high=5, size=(2,))
-
-#             soln = minimize(optim_func, phi_init, jac=gradient, method='L-BFGS-B')
-            soln = minimize(optim_func, phi_init, method='L-BFGS-B', bounds=bounds)
-            vals.append(-soln.fun)
-            solns.append(np.copy(soln.x))
-
-        best_val_idx = np.argmax(vals)
-        best_soln = solns[best_val_idx]
-        best_score = vals[best_val_idx]
-
-        best_soln
-
-        return best_soln.reshape(1,-1), best_score, 0#best_phi
+#         solns = []
+#         vals = []
+#         phis = []
+#         for _ in range(self.num_restarts):
+#             ## Create initial Guess
+# #             try:
+# #                 phi_init = np.random.multivariate_normal(self.blr.m.flatten(), self.blr.S).reshape(-1,1)
+# #             except np.linalg.LinAlgError as e:
+# #                 print(e)
+# #                 phi_init = -self.blr.S_inv @ self.blr.m
+#             phi_init = np.random.uniform(low=-5, high=5, size=(2,))
+# 
+# #             soln = minimize(optim_func, phi_init, jac=gradient, method='L-BFGS-B')
+#             soln = minimize(optim_func, phi_init, method='L-BFGS-B', bounds=bounds)
+#             vals.append(-soln.fun)
+#             solns.append(np.copy(soln.x))
+# 
+#         best_val_idx = np.argmax(vals)
+#         best_soln = solns[best_val_idx]
+#         best_score = vals[best_val_idx]
+# 
+# 
+#         return best_soln.reshape(1,-1), best_score, 0#best_phi
     ### end select_optimal
 
     def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float):

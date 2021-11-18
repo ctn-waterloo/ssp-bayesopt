@@ -4,10 +4,12 @@ import time
 from . import agent
 
 from scipy.stats import qmc
+from scipy.optimize import minimize
 from typing import Callable
 
 class BayesianOptimization:
-    def __init__(self, f: Callable[...,float] =None, pbounds: dict =None, random_state: int =None, verbose: bool=False):
+    def __init__(self, f: Callable[...,float] =None, pbounds: dict =None, 
+                 random_state: int =None, verbose: bool=False):
         assert not f is None, 'Must specify a callable target function'
         assert not pbounds is None, 'Must dictionary of input bounds'
 
@@ -24,7 +26,8 @@ class BayesianOptimization:
         self.ys = None
 
 
-    def maximize(self, init_points: int =10, n_iter: int =100) -> np.ndarray:
+    def maximize(self, init_points: int =10, n_iter: int =100, 
+                 num_restarts: int = 5) -> np.ndarray:
 
 
         init_xs = self._sample_domain(num_points=init_points)
@@ -35,19 +38,6 @@ class BayesianOptimization:
         # Initialize the agent
         agt = agent.SSPAgent(init_xs, init_ys) 
 
-        # Determine decoding matrix
-        ## TODO: how do we make sure that this stays within the bounds?
-#         sample_xs = self._sample_domain(num_points=self.num_decoding)
-        # Select domain sample locations.
-        sample_xs = self._sample_domain(num_points=128 * 128) #self.num_decoding)
-        sample_ssps = agt.encode(sample_xs)
-        assert sample_ssps.shape[0] == sample_xs.shape[0]
-
-        self.ssp_to_domain_mat = np.linalg.pinv(sample_ssps) @ sample_xs
-
-        print(np.mean(np.linalg.norm(sample_xs - (sample_ssps @ self.ssp_to_domain_mat),axis=1)))
-
-
         self.times = np.zeros((n_iter,))
         self.xs = []
         self.ys = []
@@ -57,36 +47,45 @@ class BayesianOptimization:
             self.ys.append(y)
 
 
+        # Extract the upper and lower bounds of domain for sampling.
+        lbounds, ubounds = list(zip(*[self.bounds[k] for k in self.bounds.keys()]))
+
         print('| iter\t | target\t | x\t |')
         print('-------------------------------')
         for t in range(n_iter):
+            solns = []
+            vals = []
+
+            ## Begin timing section
+            start = time.thread_time_ns()
+            # get the functions to optimize
+            ### TODO fix jacobian so it returns dx in x space
+            optim_func, jac_func = agt.select_optimal()
 
             # Use optimization to find a sample location
-            start = time.thread_time_ns()
-            x_t, var, phi  = agt.select_optimal([self.bounds[k] for k in self.bounds.keys()])
+            for _ in range(num_restarts):
+                x_init = np.random.uniform(low=lbounds, high=ubounds, size=(2,))
+
+                # Do bounded optimization to ensure x stays in bound
+                soln = minimize(optim_func, x_init,
+                                jac=None, 
+                                method='L-BFGS-B', 
+                                bounds=[self.bounds[k] for k in self.bounds.keys()])
+                vals.append(-soln.fun)
+                solns.append(np.copy(soln.x))
             self.times[t] = time.thread_time_ns() - start
+            ## END timing section
+
+            best_val_idx = np.argmax(vals)
+            x_t = solns[best_val_idx].reshape((1,-1))
+            mu_t, var_t, phi_t = agt.eval(x_t)
 
             # Log actions
-#             assert x_t_ssp.shape[0] == 1 
-#             print(sample_ssps.shape, x_t_ssp.shape)
-#             similarities = np.maximum(np.einsum('ij,kj->ik', sample_ssps, x_t_ssp/np.linalg.norm(x_t_ssp)),0)
-#             x_t = sample_xs[np.argmax(similarities),:]
-#             x_t = np.average(sample_xs, weights=similarities.flatten(), axis=0)
-
-#             weights = similarities / np.sum(similarities)
-#             print(similarities)
-#             weights = np.exp(similarities) / np.sum(np.exp(similarities))
-#             print(weights)
-#             x_t = np.sum(sample_xs * weights, axis=0)
-#             x_t = x_t_ssp @ self.ssp_to_domain_mat / np.linalg.norm(x_t_ssp)
-
-#             sample_locs[t,:] = np.copy(x_t)
-
             query_point = dict(zip(arg_names, x_t.flatten()))
             y_t = np.array([[self.target(**query_point)]])
 
             print(f'| {t}\t | {y_t}\t | {query_point}\t |')
-            agt.update(x_t, y_t, var)
+            agt.update(x_t, y_t, var_t)
 
             # Log actions
             self.xs.append(x_t)
