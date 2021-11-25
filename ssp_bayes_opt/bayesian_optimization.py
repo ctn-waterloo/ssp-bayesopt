@@ -7,7 +7,8 @@ from scipy.stats import qmc
 from typing import Callable
 
 class BayesianOptimization:
-    def __init__(self, f: Callable[...,float] =None, pbounds: dict =None, random_state: int =None, verbose: bool=False):
+    def __init__(self, f: Callable[...,float] =None, pbounds: dict =None, random_state: int =None, 
+                 verbose: bool=False,agent_caller=None,agent_type='hex',ssp_dim=385):
         assert not f is None, 'Must specify a callable target function'
         assert not pbounds is None, 'Must dictionary of input bounds'
 
@@ -22,6 +23,11 @@ class BayesianOptimization:
 
         self.xs = None
         self.ys = None
+        
+        self.agent_caller = agent_caller
+        self.agent_type=agent_type
+        self.ssp_dim=ssp_dim
+
 
 
     def maximize(self, init_points: int =10, n_iter: int =100) -> np.ndarray:
@@ -33,7 +39,8 @@ class BayesianOptimization:
         init_ys = np.array([self.target(**dict(zip(arg_names, x))) for x in init_xs]).reshape((init_points,-1))
 
         # Initialize the agent
-        agt = agent.SSPAgent(init_xs, init_ys) 
+        agt = agent.SSPAgent(init_xs, init_ys, axis_dim=self.ssp_dim, axis_type=self.agent_type) 
+
 
         # Determine decoding matrix
         ## TODO: how do we make sure that this stays within the bounds?

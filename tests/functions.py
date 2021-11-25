@@ -76,17 +76,15 @@ def factory(function_name: str) -> Tuple[Callable, dict, int]:
     else:
         raise RuntimeError(f'Unknown function {function_name}')
 
-def sample_points(func, num_pts):
-    if not (func.name(), num_pts) in sample_points_cache:
-        doms = [np.linspace(d[0], d[1], num_pts) for d in func.domain()]
-        grids = np.meshgrid(*doms)
-        sample_points = np.array([x.flatten() for x in grids]).T
-        vals = np.expand_dims(func(sample_points.T), axis=1)
+def sample_points(func, num_pts, pbounds):
+    doms = [np.linspace(d[0], d[1], num_pts) for d in pbounds.values()]
+    grids = np.meshgrid(*doms)
+    sample_points = np.array([x.flatten() for x in grids]).T
+    
+    dict_points = dict(zip(pbounds.keys(), sample_points.T))
+    vals = np.array([[func(**dict_points)]])
+    return sample_points, vals
 
-        sample_points_cache[(func.name(), num_pts)] = (sample_points, vals)
-        return sample_points, vals
-    else:
-        return sample_points_cache[(func.name(), num_pts)]
 
 class Function:
 

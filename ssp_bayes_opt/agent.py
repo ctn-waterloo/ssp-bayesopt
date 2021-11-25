@@ -19,22 +19,27 @@ class Agent:
         pass
 
 class SSPAgent:
-    def __init__(self, init_xs, init_ys, n_scales=1, n_rotates=1, scale_min=0.8, scale_max=3.4):
+    def __init__(self, init_xs, init_ys, axis_type = 'hex', axis_dim=385, 
+                 n_scales=8, n_rotates=8, scale_min=2*np.pi/np.sqrt(6) - 0.5, scale_max=2*np.pi/np.sqrt(6) + 0.5):
   
         self.num_restarts = 10
         (num_pts, data_dim) = init_xs.shape
 
 
         # Create the SSP axis vectors
-#         self.ptrs = ssp.make_hex_unitary(data_dim, 
-#                     n_scales=n_scales, n_rotates=n_rotates, 
-#                     scale_min=scale_min, scale_max=scale_max)
-
-
-        # Create the simplex.
-        self.ptrs, K_scale_rotates = ssp.HexagonalBasis(dim=data_dim)
-        self.ptrs = np.vstack(self.ptrs)
-        self.ssp_dim = self.ptrs.shape[1]
+        if axis_type == "hex":
+            if (n_rotates==8) & (n_scales==8) & (axis_dim!=385): # user wants to define ssp with total dim, not number of simplex rotates and scales
+                n_rotates = int(np.sqrt((axis_dim-1)/6))
+                n_scales = n_rotates
+            # Create the simplex.
+            self.ptrs, _ = ssp.HexagonalBasis(dim=data_dim,n_rotates=n_rotates,
+                                              n_scales=n_scales,scale_min=scale_min, scale_max=scale_max)
+            self.ptrs = np.vstack(self.ptrs)
+            self.ssp_dim = self.ptrs.shape[1]
+        else: #random
+            self.ptrs, _ = ssp.RandomBasis(data_dim, axis_dim)
+            self.ptrs = np.vstack(self.ptrs)
+            self.ssp_dim = axis_dim
 
         # Optimize the length scales
         self.length_scale = self._optimize_lengthscale(init_xs, init_ys)
