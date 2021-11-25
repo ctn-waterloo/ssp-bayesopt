@@ -19,8 +19,8 @@ class Agent:
         pass
 
 class SSPAgent:
-    def __init__(self, init_xs, init_ys, axis_type = 'hex', axis_dim=385, 
-                 n_scales=8, n_rotates=8, scale_min=2*np.pi/np.sqrt(6) - 0.5, scale_max=2*np.pi/np.sqrt(6) + 0.5):
+    def __init__(self, init_xs, init_ys, axis_type = 'hex', axis_dim: int=385, 
+                 n_scales: int=8, n_rotates:int=8, scale_min=2*np.pi/np.sqrt(6) - 0.5, scale_max=2*np.pi/np.sqrt(6) + 0.5):
   
         self.num_restarts = 10
         (num_pts, data_dim) = init_xs.shape
