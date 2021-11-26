@@ -27,7 +27,8 @@ class BayesianOptimization:
 
 
     def maximize(self, init_points: int =10, n_iter: int =100, 
-                 num_restarts: int = 5) -> np.ndarray:
+                 num_restarts: int = 5,
+                 agent_type='ssp-mi') -> np.ndarray:
 
 
         init_xs = self._sample_domain(num_points=init_points)
@@ -36,7 +37,12 @@ class BayesianOptimization:
         init_ys = np.array([self.target(**dict(zip(arg_names, x))) for x in init_xs]).reshape((init_points,-1))
 
         # Initialize the agent
-        agt = agent.SSPAgent(init_xs, init_ys) 
+        if agent_type == 'ssp-mi':
+            agt = agent.SSPAgent(init_xs, init_ys) 
+        elif agent_type == 'gp-mi':
+            agt = agent.GPAgent(init_xs, init_ys)
+        else:
+            raise RuntimeWarning(f'Undefined agent type {agent_type}')
 
         self.times = np.zeros((n_iter,))
         self.xs = []
@@ -60,7 +66,7 @@ class BayesianOptimization:
             start = time.thread_time_ns()
             # get the functions to optimize
             ### TODO fix jacobian so it returns dx in x space
-            optim_func, jac_func = agt.select_optimal()
+            optim_func, jac_func = agt.acquisition_func()
 
             # Use optimization to find a sample location
             for _ in range(num_restarts):
@@ -68,7 +74,7 @@ class BayesianOptimization:
 
                 # Do bounded optimization to ensure x stays in bound
                 soln = minimize(optim_func, x_init,
-                                jac=None, 
+                                jac=jac_func, 
                                 method='L-BFGS-B', 
                                 bounds=[self.bounds[k] for k in self.bounds.keys()])
                 vals.append(-soln.fun)

@@ -1,8 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
+import warnings
 
-# import GPy
+# import GP modules
+from sklearn.gaussian_process.kernels import Matern
+from sklearn.gaussian_process import GaussianProcessRegressor 
+
 from . import ssp
 from . import blr
 
@@ -18,21 +22,71 @@ class Agent:
     def update(self, x_t, y_t, sigma_t):
         pass
 
+    def acquisition_func(self):
+        pass
+
+class GPAgent:
+    def __init__(self, init_xs, init_ys):
+
+        # Store observations
+        self.xs = init_xs
+        self.ys = init_ys
+        # create the gp
+        ## TODO instantiate scikitlearn regressor.
+        self.gp = GaussianProcessRegressor(
+                kernel=Matern(nu=2.5),
+                alpha=1e-6,
+                normalize_y=True,
+                n_restarts_optimizer=5,
+                random_state=None,
+                )
+
+        # fit to the initial values
+        self.gp.fit(self.xs, self.ys)
+        self.gamma_t = 0
+        self.sqrt_alpha = np.log(2/1e-6)
+
+        self._params = self.gp.get_params()
+
+    def eval(self, xs):
+        mu, std = self.gp.predict(xs, return_std=True)
+        var = std**2
+        phi = self.sqrt_alpha * (np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t))
+        return mu, var, phi 
+
+    def update(self, x_t, y_t, sigma_t):
+        self.xs = np.vstack((self.xs, x_t))
+        self.ys = np.vstack((self.ys, y_t))
+        self.gamma_t = self.gamma_t + sigma_t
+    
+        self.gp.fit(self.xs, self.ys)
+        
+        # Reset the parameters after an update.
+        self.gp.set_params(**(self._params))
+
+    def acquisition_func(self):
+        def min_func(x,
+                     gp=self.gp,
+                     gamma_t=self.gamma_t,
+                     sqrt_alpha=self.sqrt_alpha):
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                mu, std = gp.predict(x.reshape([1,-1]), return_std=True)
+                var = std**2
+                phi = sqrt_alpha * (np.sqrt(var + gamma_t) - np.sqrt(gamma_t))
+                return -(mu + phi).flatten()
+
+        return min_func, None
+
 class SSPAgent:
-    def __init__(self, init_xs, init_ys, n_scales=1, n_rotates=1, scale_min=0.8, scale_max=3.4):
+    def __init__(self, init_xs, init_ys, n_scales=3, n_rotates=2, scale_min=0.8, scale_max=3.4):
   
         self.num_restarts = 10
         (num_pts, data_dim) = init_xs.shape
 
-
-        # Create the SSP axis vectors
-#         self.ptrs = ssp.make_hex_unitary(data_dim, 
-#                     n_scales=n_scales, n_rotates=n_rotates, 
-#                     scale_min=scale_min, scale_max=scale_max)
-
-
         # Create the simplex.
-        self.ptrs, K_scale_rotates = ssp.HexagonalBasis(dim=data_dim)
+#         self.ptrs, K_scale_rotates = ssp.HexagonalBasis(dim=data_dim)
+        self.ptrs, K_scale_rotates = ssp.RandomBasis(dim=data_dim, d=128)
         self.ptrs = np.vstack(self.ptrs)
         self.ssp_dim = self.ptrs.shape[1]
 
@@ -84,10 +138,12 @@ class SSPAgent:
         phi = self.sqrt_alpha * (np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t)) 
         return mu, var, phi
 
-    def select_optimal(self):
+    def acquisition_func(self):
         '''
         return objective_func, jacobian_func
         '''
+        # TODO: Currently returning (objective_func, None) to be fixed when 
+        # I finish the derivation
 
         def optim_func(x, m=self.blr.m,
                        sigma=self.blr.S,
@@ -115,32 +171,7 @@ class SSPAgent:
             retval = -(m.flatten() + sigma @ ptr.T / scale)
             return retval
         ### end gradient
-        return optim_func, jac_func 
-
-        # Optimize the function.
-#         solns = []
-#         vals = []
-#         phis = []
-#         for _ in range(self.num_restarts):
-#             ## Create initial Guess
-# #             try:
-# #                 phi_init = np.random.multivariate_normal(self.blr.m.flatten(), self.blr.S).reshape(-1,1)
-# #             except np.linalg.LinAlgError as e:
-# #                 print(e)
-# #                 phi_init = -self.blr.S_inv @ self.blr.m
-#             phi_init = np.random.uniform(low=-5, high=5, size=(2,))
-# 
-# #             soln = minimize(optim_func, phi_init, jac=gradient, method='L-BFGS-B')
-#             soln = minimize(optim_func, phi_init, method='L-BFGS-B', bounds=bounds)
-#             vals.append(-soln.fun)
-#             solns.append(np.copy(soln.x))
-# 
-#         best_val_idx = np.argmax(vals)
-#         best_soln = solns[best_val_idx]
-#         best_score = vals[best_val_idx]
-# 
-# 
-#         return best_soln.reshape(1,-1), best_score, 0#best_phi
+        return optim_func, None #jac_func 
     ### end select_optimal
 
     def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float):
@@ -156,6 +187,8 @@ class SSPAgent:
         ### end if
     
         # Update BLR
+        # TODO: use vector encode
+#         ptr = ssp.vector_encode(ptrs, x.reshape(1,-1))
         phi = self.encode(x_val)
         self.blr.update(phi, y_val)
         
