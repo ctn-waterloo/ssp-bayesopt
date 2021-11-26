@@ -20,7 +20,7 @@ importlib.reload(ssp_bayes_opt)
 class SSPBayesOptTrial(pytry.Trial):
     def params(self):
         self.param('function', function_name='himmelblau')
-        self.param('algorithm one of (ucb|ei|poi)', algorithm='ucb')
+        self.param('algorithm one of (ssp-mi|gp-mi)', algorithm='ssp-mi')
         self.param('num initial samples', num_init_samples=10)
     
     def evaluate(self, p):
@@ -29,7 +29,9 @@ class SSPBayesOptTrial(pytry.Trial):
         optimizer = ssp_bayes_opt.BayesianOptimization(f=target, pbounds=pbounds, verbose=p.verbose)
         
         start = time.thread_time_ns()
-        optimizer.maximize(init_points=p.num_init_samples, n_iter=budget)
+        optimizer.maximize(init_points=p.num_init_samples,
+                    n_iter=budget,
+                    agent_type=p.algorithm)
         elapsed_time = time.thread_time_ns() - start
 
         vals = np.zeros((p.num_init_samples + budget,))
@@ -53,7 +55,7 @@ class SSPBayesOptTrial(pytry.Trial):
             acquisition=None,
         )
     
-r = SSPBayesOptTrial().run()
+r = SSPBayesOptTrial().run(**{'function_name':'branin-hoo', 'algorithm':'ssp-mi'})
 
 plt.plot(np.divide(np.cumsum(r['regret']), np.arange(1, len(r['regret'])+1)))
 plt.show()
