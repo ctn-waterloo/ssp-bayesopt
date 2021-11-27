@@ -81,12 +81,11 @@ class GPAgent:
 class SSPAgent:
     def __init__(self, init_xs, init_ys, n_scales=3, n_rotates=2, scale_min=0.8, scale_max=3.4):
   
-        self.num_restarts = 10
         (num_pts, data_dim) = init_xs.shape
 
         # Create the simplex.
-#         self.ptrs, K_scale_rotates = ssp.HexagonalBasis(dim=data_dim)
-        self.ptrs, K_scale_rotates = ssp.RandomBasis(dim=data_dim, d=128)
+        self.ptrs, K_scale_rotates = ssp.HexagonalBasis(dim=data_dim)
+#         self.ptrs, K_scale_rotates = ssp.RandomBasis(dim=data_dim, d=128)
         self.ptrs = np.vstack(self.ptrs)
         self.ssp_dim = self.ptrs.shape[1]
 
@@ -115,13 +114,16 @@ class SSPAgent:
 
     def _optimize_lengthscale(self, init_xs, init_ys):
 
-        ls_0 = 4. * np.ones((init_xs.shape[1],))
+        ls_0 = 20. * np.ones((init_xs.shape[1],))
 
         def min_func(length_scale):
             init_phis = self._encode(self.ptrs, init_xs, np.abs(length_scale))
-            W = np.linalg.pinv(init_phis) @ init_ys
-            mu = np.dot(init_phis,W)
-            diff = init_ys - mu.T
+            b = blr.BayesianLinearRegression(self.ssp_dim)
+            b.update(init_phis, init_ys)
+            mu, var = b.predict(init_phis)
+            
+            diff = init_ys.flatten() - mu.flatten()
+#             err = np.sum(np.divide(np.power(diff, 2), var**2))
             err = np.sum(np.power(diff, 2))
             return err
         ### end min_func
