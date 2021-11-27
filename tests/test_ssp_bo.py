@@ -22,6 +22,7 @@ class SSPBayesOptTrial(pytry.Trial):
         self.param('function', function_name='himmelblau')
         self.param('algorithm one of (ssp-mi|gp-mi)', algorithm='ssp-mi')
         self.param('num initial samples', num_init_samples=10)
+        self.param('num restarts', num_restarts=5)
     
     def evaluate(self, p):
         target, pbounds, budget = functions.factory(p.function_name)
@@ -31,7 +32,8 @@ class SSPBayesOptTrial(pytry.Trial):
         start = time.thread_time_ns()
         optimizer.maximize(init_points=p.num_init_samples,
                     n_iter=budget,
-                    agent_type=p.algorithm)
+                    agent_type=p.algorithm,
+                    num_restarts=p.num_restarts)
         elapsed_time = time.thread_time_ns() - start
 
         vals = np.zeros((p.num_init_samples + budget,))
@@ -54,8 +56,18 @@ class SSPBayesOptTrial(pytry.Trial):
             variances=None,
             acquisition=None,
         )
-    
-r = SSPBayesOptTrial().run(**{'function_name':'branin-hoo', 'algorithm':'ssp-mi'})
 
-plt.plot(np.divide(np.cumsum(r['regret']), np.arange(1, len(r['regret'])+1)))
+cum_regrets = []
+num_trials = 30
+for trial in range(num_trials):
+    r = SSPBayesOptTrial().run(**{'function_name':'branin-hoo', 'algorithm':'ssp-mi'})
+#     r = SSPBayesOptTrial().run(**{'function_name':'himmelblau', 'algorithm':'ssp-mi'})
+    cum_reg = np.divide(np.cumsum(r['regret']), np.arange(1, len(r['regret'])+1))
+    cum_regrets.append(cum_reg)
+
+mu_reg = np.mean(cum_regrets, axis=0)
+std_reg = np.std(cum_regrets, axis=0) / np.sqrt(num_trials)
+plt.plot(mu_reg)
+plt.plot(mu_reg - 1.96 * std_reg, ls='--')
+plt.plot(mu_reg + 1.96 * std_reg, ls='--')
 plt.show()
