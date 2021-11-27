@@ -69,8 +69,14 @@ class BayesianOptimization:
             optim_func, jac_func = agt.acquisition_func()
 
             # Use optimization to find a sample location
-            for _ in range(num_restarts):
+            for res_idx in range(num_restarts):
+               
                 x_init = np.random.uniform(low=lbounds, high=ubounds, size=(2,))
+#                 if res_idx == 0 and len(self.xs) > 0:
+                if len(self.xs) > 0:
+                    alpha = 0.9**t
+                    x_init =  alpha * x_init + (1-alpha) * self.xs[np.argmax(self.ys)].flatten()
+
 
                 # Do bounded optimization to ensure x stays in bound
                 soln = minimize(optim_func, x_init,
@@ -102,9 +108,9 @@ class BayesianOptimization:
         pass
 
     def _sample_domain(self, num_points: int=10) -> np.ndarray:
-        sampler = qmc.Sobol(d=self.num_dims) 
-
         lbounds, ubounds = zip(*[self.bounds[x] for x in self.bounds.keys()])
+
+        sampler = qmc.Sobol(d=self.num_dims) 
         u_sample_points = sampler.random(num_points)
         sample_points = qmc.scale(u_sample_points, lbounds, ubounds)
         return sample_points
