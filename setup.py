@@ -24,7 +24,7 @@ setup(
             'Topic :: Scientific/Engineering :: Artificial Intelligence'
             ],
         install_requires=[
-            'numpy',
+            'numpy>=1.21.2',
             'scipy',
             'pytest',
             'mypy',
