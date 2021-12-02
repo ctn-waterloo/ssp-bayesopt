@@ -20,7 +20,13 @@ class BayesianLinearRegression:
         if self.beta is None:
             self.beta = 1. / np.var(ts)
         S_inv = self.S_inv + self.beta * np.dot(phis.T, phis)
-        S = np.linalg.pinv(S_inv)
+        
+        S = np.copy(self.S)
+        for i in range(phis.shape[0]):
+            phi = np.atleast_2d(phis[i,:])
+            scale = (1 + phi @ S @ phi.T)
+            S = S - (S @ phi.T @ phi @ S) / scale
+#         S = np.linalg.pinv(S_inv)
 #         x = self.beta * np.dot(self.S, np.dot(phis.T, ts))
 #         self.m += x
         x = self.beta * np.dot(phis.T, ts)
