@@ -71,7 +71,7 @@ class BayesianOptimization:
             # Use optimization to find a sample location
             for res_idx in range(num_restarts):
                
-                x_init = np.random.uniform(low=lbounds, high=ubounds, size=(2,))
+                x_init = np.random.uniform(low=lbounds, high=ubounds, size=(len(ubounds),))
 #                 if res_idx == 0 and len(self.xs) > 0:
                 if len(self.xs) > 0:
                     alpha = 0.9**t
