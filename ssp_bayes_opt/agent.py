@@ -80,6 +80,9 @@ class GPAgent:
 
 class SSPAgent:
     def __init__(self, init_xs, init_ys, n_scales=3, n_rotates=2, scale_min=0.8, scale_max=3.4):
+        # TODO: add scale_y parameters
+        # TODO: refactor out the ptr generation to the agent factory.
+        # TODO: Add assertion to check the parameters are scaled properly.
   
         (num_pts, data_dim) = init_xs.shape
 
