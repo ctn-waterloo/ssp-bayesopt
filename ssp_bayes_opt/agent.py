@@ -12,6 +12,27 @@ from . import blr
 
 import functools
 
+def factory(agent_type, init_xs, init_ys):
+
+    data_dim = init_xs.shape[1]
+
+    agt = None
+    if agent_type == 'ssp-mi':
+        ptrs, K_scale_rotates = ssp.RandomBasis(dim=data_dim, d=128)
+        agt = SSPAgent(init_xs, init_ys, ptrs, K_scale_rotates) 
+    elif agent_type == 'hex-mi':
+        ptrs, K_scale_rotates = ssp.HexagonalBasis(dim=data_dim,
+                                                   n_rotates=2,
+                                                   n_scales=3,
+                                                   scale_min=0.8,
+                                                   scale_max=3.4)
+        agt = SSPAgent(init_xs, init_ys, ptrs, K_scale_rotates) 
+    elif agent_type == 'gp-mi':
+        agt = GPAgent(init_xs, init_ys)
+    else:
+        raise RuntimeWarning(f'Undefined agent type {agent_type}')
+    return agt
+
 class Agent:
     def __init__(self):
         pass
@@ -79,19 +100,21 @@ class GPAgent:
         return min_func, None
 
 class SSPAgent:
-    def __init__(self, init_xs, init_ys, n_scales=3, n_rotates=2, scale_min=0.8, scale_max=3.4):
+    def __init__(self, init_xs, init_ys, ptrs, K_scale_rotates):
   
         (num_pts, data_dim) = init_xs.shape
 
-        # Create the simplex.
-        self.ptrs, K_scale_rotates = ssp.HexagonalBasis(dim=data_dim)
-#         self.ptrs, K_scale_rotates = ssp.RandomBasis(dim=data_dim, d=128)
-        self.ptrs = np.vstack(self.ptrs)
+        self.ptrs = np.vstack(ptrs)
+#         self.ptrs = np.vstack(self.ptrs)
+        self.K_scale_rotates = K_scale_rotates
+
+
         self.ssp_dim = self.ptrs.shape[1]
 
         # Optimize the length scales
         self.length_scale = self._optimize_lengthscale(init_xs, init_ys)
         print('Selected Lengthscale: ', self.length_scale)
+#         exit()
 
         # Encode the initial sample points 
         init_phis = self.encode(init_xs)
@@ -105,19 +128,25 @@ class SSPAgent:
         self.sqrt_alpha = np.log(2/1e-6)
 
         # Cache for the input xs.
-        self.phis = None
+#         self.phis = None
 
     ### end __init__
 
     def encode(self, xs):
         return self._encode(self.ptrs, xs, length_scale=self.length_scale)
 
+
     def _optimize_lengthscale(self, init_xs, init_ys):
 
-        ls_0 = 20. * np.ones((init_xs.shape[1],))
+#         ls_0 = 20. * np.ones((init_xs.shape[1],))
+        ls_0 = 8. * np.ones((init_xs.shape[1],))
 
         def min_func(length_scale):
             init_phis = self._encode(self.ptrs, init_xs, np.abs(length_scale))
+
+#             W = np.linalg.pinv(init_phis) @ init_ys
+#             mu = np.dot(init_phis,W)
+
             b = blr.BayesianLinearRegression(self.ssp_dim)
             b.update(init_phis, init_ys)
             mu, var = b.predict(init_phis)
@@ -133,10 +162,11 @@ class SSPAgent:
 
 
     def eval(self, xs):
-        if self.phis is None:
-            self.phis = self.encode(xs)
-        ### end if
-        mu, var = self.blr.predict(self.phis)
+#         if self.phis is None:
+#             self.phis = self.encode(xs)
+#         ### end if
+        phis = self.encode(xs)
+        mu, var = self.blr.predict(phis)
         phi = self.sqrt_alpha * (np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t)) 
         return mu, var, phi
 
@@ -150,30 +180,32 @@ class SSPAgent:
         def optim_func(x, m=self.blr.m,
                        sigma=self.blr.S,
                        gamma=self.gamma_t,
-                       beta_inv=self.blr.beta,
+                       beta_inv=1/self.blr.beta,
                        ptrs = self.ptrs,
+                       length_scale = self.length_scale,
                        ):
-#             ptr = self.encode(x.reshape(1,-1))
-            ptr = ssp.vector_encode(ptrs, x.reshape(1,-1))
+            ptr = ssp.vector_encode(ptrs, x.reshape(1,-1) @ np.diag(1/length_scale))
             val = ptr @ m
             mi = np.sqrt(gamma + beta_inv + ptr @ sigma @ ptr.T) - np.sqrt(gamma)
             return -(val + mi).flatten()
         ### end optim_func
 
+
         def jac_func(x, m=self.blr.m,
                      sigma=self.blr.S,
                      gamma=self.gamma_t,
-                     beta_inv=self.blr.beta,
+                     beta_inv=1/self.blr.beta,
                      ptrs=self.ptrs,
+                     length_scale=self.length_scale,
                      ):
-#             ptr = self.encode(x.reshape(1,-1))
-            ptr = ssp.vector_encode(ptrs, x.reshape(1,-1))
+            ptr, grad_ptr = ssp.vector_encode(ptrs, x.reshape(1,-1) @ np.diag(1/length_scale), do_grad=True)
             sqr = (ptr @ sigma @ ptr.T) 
             scale = np.sqrt(sqr + gamma + beta_inv)
-            retval = -(m.flatten() + sigma @ ptr.T / scale)
+            retval = grad_ptr.squeeze().T @ -(m + sigma @ ptr.T / scale) 
+#             retval = -(m + sigma @ ptr.T / scale) 
             return retval
         ### end gradient
-        return optim_func, None #jac_func 
+        return optim_func, jac_func 
     ### end select_optimal
 
     def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float):
@@ -191,7 +223,7 @@ class SSPAgent:
         # Update BLR
         # TODO: use vector encode
 #         ptr = ssp.vector_encode(ptrs, x.reshape(1,-1))
-        phi = self.encode(x_val)
+        phi = np.atleast_2d(self.encode(x_val).squeeze())
         self.blr.update(phi, y_val)
         
         # Update gamma
