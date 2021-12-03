@@ -22,7 +22,7 @@ class SSPBayesOptTrial(pytry.Trial):
         self.param('function', function_name='himmelblau')
         self.param('algorithm one of (ssp-mi|gp-mi)', algorithm='ssp-mi')
         self.param('num initial samples', num_init_samples=10)
-        self.param('num restarts', num_restarts=5)
+        self.param('num restarts', num_restarts=10)
     
     def evaluate(self, p):
         target, pbounds, budget = functions.factory(p.function_name)
