@@ -11,7 +11,7 @@ pbounds = {'x':(-1,1), 'y':(-1,1)}
 def test_init():
     optimizer = BayesianOptimization(f=target_func,bounds=pbounds,random_state=1)
 
-    optimizer.maximize(init_points = 0, n_iter=0)
+    optimizer.maximize(init_points = 0, n_iter=0, num_restarts=10)
 
     print(optimizer.max())
 
