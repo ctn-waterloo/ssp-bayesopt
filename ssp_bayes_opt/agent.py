@@ -6,6 +6,7 @@ import warnings
 # import GP modules
 from sklearn.gaussian_process.kernels import Matern
 from sklearn.gaussian_process import GaussianProcessRegressor 
+from sklearn.preprocessing import StandardScaler 
 
 from . import ssp
 from . import blr
@@ -107,12 +108,17 @@ class SSPAgent:
         self.ptrs = np.vstack(ptrs)
 #         self.ptrs = np.vstack(self.ptrs)
         self.K_scale_rotates = K_scale_rotates
+        self.transformer = StandardScaler()
+        self.transformer.fit(init_ys)
+
+#         normed_init_ys = self.transformer.transform(init_ys)
+        normed_init_ys = init_ys
 
 
         self.ssp_dim = self.ptrs.shape[1]
 
         # Optimize the length scales
-        self.length_scale = self._optimize_lengthscale(init_xs, init_ys)
+        self.length_scale = self._optimize_lengthscale(init_xs, normed_init_ys)
         print('Selected Lengthscale: ', self.length_scale)
 #         exit()
 
@@ -142,7 +148,10 @@ class SSPAgent:
         ls_0 = 8. * np.ones((init_xs.shape[1],))
 
         def min_func(length_scale):
-            init_phis = self._encode(self.ptrs, init_xs, np.abs(length_scale))
+            ls = np.abs(length_scale * np.ones((init_xs.shape[1],)))
+            print(ls.shape)
+            init_phis = self._encode(self.ptrs, init_xs, length_scale=ls)
+#             init_phis = self._encode(self.ptrs, init_xs, np.abs(length_scale))
 
 #             W = np.linalg.pinv(init_phis) @ init_ys
 #             mu = np.dot(init_phis,W)
@@ -156,9 +165,10 @@ class SSPAgent:
             err = np.sum(np.power(diff, 2))
             return err
         ### end min_func
-
+    
+        ls_0 = 8.
         retval = minimize(min_func, x0=ls_0, method='L-BFGS-B')
-        return np.abs(retval.x)
+        return np.abs(retval.x * np.ones((init_xs.shape[1],)))
 
 
     def eval(self, xs):
@@ -168,6 +178,7 @@ class SSPAgent:
         phis = self.encode(xs)
         mu, var = self.blr.predict(phis)
         phi = self.sqrt_alpha * (np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t)) 
+#         return self.transformer.inverse_transform(mu), var, phi
         return mu, var, phi
 
     def acquisition_func(self):
@@ -215,6 +226,7 @@ class SSPAgent:
     
         x_val = x_t
         y_val = y_t
+#         y_val = self.transformer.transform(y_t)
         if len(x_t.shape) < 2:
             x_val = x_t.reshape(1, x_t.shape[0])
             y_val = y_t.reshape(1, y_t.shape[0])
