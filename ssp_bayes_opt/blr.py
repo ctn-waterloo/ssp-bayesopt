@@ -11,9 +11,13 @@ class BayesianLinearRegression:
         self.m = np.zeros((size_in,1))
         self.beta = beta
         self.S = np.linalg.pinv(self.S_inv)
+        self.rank_one_updates = True 
     ### end __init__
 
     def update(self, phis:np.ndarray, ts:np.ndarray):
+        '''
+        Compute one-step update of bayesian linear regression
+        '''
         assert phis.shape[1] == self.input_dim, f'Expected input shape ({ts.shape[0]}, {self.input_dim}), got {phis.shape}'
         assert len(ts.shape) > 1 and ts.shape[1] == self.output_dim, f'Expected output shape ({phis.shape[0]}, 1), got {ts.shape}'
 
@@ -22,11 +26,13 @@ class BayesianLinearRegression:
         S_inv = self.S_inv + self.beta * np.dot(phis.T, phis)
         
         S = np.copy(self.S)
-        for i in range(phis.shape[0]):
-            phi = np.atleast_2d(phis[i,:])
-            scale = (1 + phi @ S @ phi.T)
-            S = S - (S @ phi.T @ phi @ S) / scale
-#         S = np.linalg.pinv(S_inv)
+        if self.rank_one_updates:
+            for i in range(phis.shape[0]):
+                phi = np.atleast_2d(phis[i,:])  * np.sqrt(self.beta)
+                scale = (1 + phi @ S @ phi.T)
+                S = S - (S @ phi.T @ phi @ S) / scale
+        else:
+            S = np.linalg.pinv(S_inv)
 #         x = self.beta * np.dot(self.S, np.dot(phis.T, ts))
 #         self.m += x
         x = self.beta * np.dot(phis.T, ts)
@@ -34,7 +40,6 @@ class BayesianLinearRegression:
 
         
         self.m = S @ (self.S_inv @ self.m + x)
-
         self.S_inv = S_inv
         self.S = S
 
