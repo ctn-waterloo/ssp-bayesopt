@@ -133,19 +133,23 @@ class SSPAgent:
     ### end __init__
 
     def encode(self, xs):
-        return self._encode(self.ptrs, xs, length_scale=self.length_scale)
+        # TODO: Test with uncommented.
+        assert xs.shape[1] == len(self.length_scale), f'Expected xs to have {len(self.lengthscale)} features, has {xs.shape[1]}'
+        ptr = ssp.vector_encode(self.ptrs, xs @ np.diag(1/self.length_scale))
+        return ptr
+#         return self._encode(self.ptrs, xs, length_scale=self.length_scale)
 
 
     def _optimize_lengthscale(self, init_xs, init_ys):
 
 #         ls_0 = 20. * np.ones((init_xs.shape[1],))
-        ls_0 = 8. * np.ones((init_xs.shape[1],))
+#         ls_0 = 8. * np.ones((init_xs.shape[1],))
+        ls_0 = np.array([8.])
 
         def min_func(length_scale):
-            init_phis = self._encode(self.ptrs, init_xs, np.abs(length_scale))
-
-#             W = np.linalg.pinv(init_phis) @ init_ys
-#             mu = np.dot(init_phis,W)
+#             init_phis = self._encode(self.ptrs, init_xs, np.abs(length_scale))
+            ls_mat = np.diag(np.ones((init_xs.shape[1],))/length_scale)
+            init_phis = ssp.vector_encode(self.ptrs, init_xs @ ls_mat)
 
             b = blr.BayesianLinearRegression(self.ssp_dim)
             b.update(init_phis, init_ys)
@@ -158,7 +162,7 @@ class SSPAgent:
         ### end min_func
 
         retval = minimize(min_func, x0=ls_0, method='L-BFGS-B')
-        return np.abs(retval.x)
+        return np.abs(retval.x) * np.ones((init_xs.shape[1],))
 
 
     def eval(self, xs):
@@ -228,16 +232,3 @@ class SSPAgent:
         
         # Update gamma
         self.gamma_t = self.gamma_t + sigma_t
-
-
-    def _encode(self, ptrs, x, length_scale=None):
-        (num_pts, x_dim) = x.shape
-
-        outputs = np.zeros((num_pts, self.ssp_dim))
-
-        for i in range(num_pts):
-            vs = [ssp.encode(p,x[i,p_idx] / length_scale[p_idx]) for p_idx, p in enumerate(ptrs)]
-            outputs[i,:] = functools.reduce(ssp.bind, vs)
-        ### end for
-        return outputs
-
