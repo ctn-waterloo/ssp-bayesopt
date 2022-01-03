@@ -90,16 +90,23 @@ def bind(s1 : np.ndarray, s2 : np.ndarray) -> np.ndarray:
     return np.fft.irfft(np.fft.rfft(s1)*np.fft.rfft(s2), n=n)
 
 # Does the two part of binding x dimensions together
-def vector_encode(ptrs : np.ndarray, xs : npt.ArrayLike) -> np.ndarray:
+def vector_encode(ptrs : np.ndarray, xs : npt.ArrayLike, do_grad:bool = False) -> np.ndarray:
     (data_dim, ptr_dim) = ptrs.shape
     (num_data, data_dim) = xs.shape
 
     S_list = np.zeros((num_data, ptr_dim))
+    S_grad = np.zeros((num_data, ptr_dim, data_dim)) if do_grad else None
+
     for x_idx, x in enumerate(xs):
-        ps = np.fft.fft(ptrs,axis=1)
-        S_list[x_idx,:] = np.fft.ifft(np.prod(np.fft.fft(ptrs.T, axis=0) ** x, axis=1), axis=0).T
+        ps = np.fft.fft(ptrs.T, axis=0) # (ptr_dim, data_dim)
+        x_freq = np.prod(ps ** x, axis=1) #(1, ptr_dim)
+
+        S_list[x_idx,:] = np.fft.ifft(x_freq, axis=0).T
+        if do_grad:
+            S_grad[x_idx,:,:] = np.fft.ifft((np.log(ps).T * x_freq).T, axis=0)
+#         S_list[x_idx,:] = np.fft.ifft(np.prod(np.fft.fft(ptrs.T, axis=0) ** x, axis=1), axis=0).T
     # end for
-    return S_list
+    return (S_list, S_grad) if do_grad else S_list
 
 def to_unitary(v : np.ndarray) -> np.ndarray:
     fft_val = np.fft.fft(v)
