@@ -1,15 +1,15 @@
 import pytest
 import numpy as np
 
-from bayes_opt import BayesianOptimization
+import ssp_bayes_opt 
 
 def target_func(**kwargs):
     return sum(kwargs.values())
 
-pbounds = {'x':(-1,1), 'y':(-1,1)}
+bounds = np.array([[-5, 5], [-5, 5]])
 
 def test_init():
-    optimizer = BayesianOptimization(f=target_func,bounds=pbounds,random_state=1)
+    optimizer = ssp_bayes_opt.BayesianOptimization(f=target_func,bounds=bounds,random_state=1)
 
     optimizer.maximize(init_points = 0, n_iter=0)
 

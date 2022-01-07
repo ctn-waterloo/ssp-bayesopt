@@ -24,12 +24,12 @@ class SSPBayesOptTrial(pytry.Trial):
         self.param('num initial samples', num_init_samples=10)
     
     def evaluate(self, p):
-        target, pbounds, budget = functions.factory(p.function_name)
+        target, bounds, budget = functions.factory(p.function_name)
         
-        optimizer = ssp_bayes_opt.BayesianOptimization(f=target, pbounds=pbounds, verbose=p.verbose)
+        optimizer = ssp_bayes_opt.BayesianOptimization(f=target, bounds=bounds, verbose=p.verbose)
         
         start = time.thread_time_ns()
-        optimizer.maximize(init_points=p.num_init_samples, n_iter=budget)
+        optimizer.maximize(init_points=p.num_init_samples, n_iter=budget, agent_type='ssp-hex')
         elapsed_time = time.thread_time_ns() - start
 
         vals = np.zeros((p.num_init_samples + budget,))

@@ -11,37 +11,35 @@ sample_points_cache = {}
 def factory(function_name: str) -> Tuple[Callable, dict, int]:
     '''
     Returns the target functions for testing the SSP Bayes optimization algorithm.
-
     @param function_name the name of the function.  One of:
         himmelblau | branin-hoo | goldstein-price | colville | gp_2d | gp_4d | gmm | mackey-glass | tsunamis
-
     @return The function as a callable object, 
             The dictionary specifying the bounds of the algorithm, 
             The budget (number of samples) allowed for this function.
     '''
 
     if function_name == 'himmelblau':
-        return himmelblau, {'x0': (-5, 5), 'x1':(-5, 5)}, 250
+        return himmelblau, np.array([[-5, 5], [-5, 5]]), 250
     elif function_name == 'branin-hoo':
-        return branin_hoo, {'x0':(-5, 10), 'x1':(0, 15)}, 250
+        return branin_hoo, np.array([[-5, 10],[0, 15]]), 250
     elif function_name == 'goldstein-price':
-        return goldstein_price, {'x0':(-2, 2), 'x1':(-2, 2)}, 250
+        return goldstein_price, np.array([[-2, 2], [-2, 2]]), 250
     elif function_name == 'colville':
-        return colville, {'x0':(-10,10), 'x1':(-10,10), 'x2':(-10,10), 'x3':(-10,10)}, 500
+        return colville, np.array([[-10,10], [-10,10], [-10,10], [-10,10]]), 500
     elif function_name == 'gp_2d':
         raise NotImplemented('TODO: fix location of cached values')
         domain = np.array([[-1, 1], [-1,1]])
         data = pickle.load(open('./gp2d.pkl', 'rb')) 
-        return InterpolatedFunction('gp_2d', data['xs'], data['ys'], domain), {'x0':(-1,1),'x1':(-1,1)}, 250
+        return InterpolatedFunction('gp_2d', data['xs'], data['ys'], domain), domain, 250
     elif function_name == 'gp_4d':
         raise NotImplemented('TODO: fix location of cached values')
         domain = np.array([[-1, 1], [-1,1], [-1, 1], [-1, 1]])
-        return Function('gp_4d', sample_gp4, domain), {'x0':(-1,1), 'x1':(-1,1), 'x2':(-1,1), 'x3':(-1,1)}, 500
+        return Function('gp_4d', sample_gp4, domain), domain, 500
     elif function_name == 'gmm':
         raise NotImplemented('TODO: fix location of cached values')
         domain = np.array([[0, 1], [0,1]])
         data = pickle.load(open('./gmm2d.pkl', 'rb')) 
-        return InterpolatedFunction('gmm', data['xs'], data['ys'], domain), {'x0':(0,1), 'x1':(0,1)}, 1000
+        return InterpolatedFunction('gmm', data['xs'], data['ys'], domain), domain, 1000
 #         return Function('gmm', sample_gmm, domain)
     elif function_name == 'mackey-glass':
         raise NotImplemented('TODO: Implement the Mackey Glass function')
@@ -101,14 +99,14 @@ class InterpolatedFunction:
         return self._name
 
 
-def himmelblau(x0=None, x1=None):
+def himmelblau(x):
     '''
     Himmelblau function, scaled by -1/100.  Negative to make it a minimzation problem, 100 to let the GP algorithm
     converge when optimizing the parameters.
     '''
-    return - ((x0**2 + x1 - 11)**2 + (x0 + x1**2 - 7)**2 + x0 + x1) / 100
+    return - ((x[:,0]**2 + x[:,1] - 11)**2 + (x[:,0] + x[:,1]**2 - 7)**2 + x[:,0] + x[:,1]) / 100
 
-def branin_hoo(x0=None, x1=None):
+def branin_hoo(x):
     '''
     Branin-Hoo function scaled by -1 to make it a minimization function.
     '''
@@ -118,23 +116,22 @@ def branin_hoo(x0=None, x1=None):
     r = 6.
     s = 10.
     t = 1 / (8. * np.pi)
-    return -(a * (x1 - b * x0**2 + c * x0 - r)**2 + s * (1 - t) * np.cos(x0) + s)
+    return -(a * (x[:,1] - b * x[:,0]**2 + c * x[:,0] - r)**2 + s * (1 - t) * np.cos(x[:,0]) + s)
 
-def goldstein_price(x0=None, x1=None):
+def goldstein_price(x):
     '''
     Scaled Goldstein-Price function.  It is scalled to be roughly in the range [-10,0].  Negative to make it 
     a minimization function and by 1/1e5 to let the GP solution converge.
-
     Function definition from http://www.sfu.ca/~ssurjano/goldpr.html
     '''
-    term_a = 1 + (x0 + x1 + 1)**2 * (19 - 14*x0 + 3*x0**2  - 14*x1 + 6*x0*x1 + 3*x1**2)
-    term_b = 30 + (2*x0 - 3*x1)**2 * (18 - 32*x0 + 12*x0**2 + 48*x1 - 36*x0*x1 + 27*x1**2)
+    term_a = 1 + (x[:,0] + x[:,1] + 1)**2 * (19 - 14*x[:,0] + 3*x[:,0]**2  - 14*x[:,1] + 6*x[:,0]*x[:,1] + 3*x[:,1]**2)
+    term_b = 30 + (2*x[:,0] - 3*x[:,1])**2 * (18 - 32*x[:,0] + 12*x[:,0]**2 + 48*x[:,1] - 36*x[:,0]*x[:,1] + 27*x[:,1]**2)
     return -(term_a * term_b) / 1e5
 
-def colville(x0=None, x1=None, x2=None, x3=None):
-    fval = 100 * (x0**2 - x1)**2 + (x0 - 1)**2
-    fval += 90 * (x2**2 - x3)**2 + 10.1 * ((x1-1)**2 + (x3-1)**2)
-    fval += 19.8 * (x1 - 1) * (x3 - 1)
+def colville(x):
+    fval = 100 * (x[:,0]**2 - x[:,1])**2 + (x[:,0] - 1)**2
+    fval += 90 * (x[:,2]**2 - x[:,3])**2 + 10.1 * ((x[:,1]-1)**2 + (x[:,3]-1)**2)
+    fval += 19.8 * (x[:,1] - 1) * (x[:,3] - 1)
 
     return -fval
 
@@ -175,6 +172,3 @@ if __name__=='__main__':
     surf = ax.plot_surface(X, Y, -zs)
     fig.colorbar(surf)
     plt.show()
-
-
-

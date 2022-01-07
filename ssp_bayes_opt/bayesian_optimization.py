@@ -2,52 +2,60 @@ import numpy as np
 import time
 
 from . import agent
+from . import sspspace
 
 from scipy.stats import qmc
+from scipy.optimize import minimize
 from typing import Callable
 
 class BayesianOptimization:
-    def __init__(self, f: Callable[...,float] =None, pbounds: dict =None, random_state: int =None, verbose: bool=False):
+    def __init__(self, f: Callable[...,float] =None, bounds: np.ndarray=None, 
+                 random_state: int =None, verbose: bool=False):
         assert not f is None, 'Must specify a callable target function'
-        assert not pbounds is None, 'Must dictionary of input bounds'
+        assert not bounds is None, 'Must array of input bounds'
 
         if not random_state is None:
             np.random.seed(random_state)
 
         self.target = f
-        self.bounds = pbounds
+        self.bounds = bounds
 
-        self.num_dims = len(self.bounds.keys())
+        self.data_dim = bounds.shape[0]
         self.num_decoding = 10000
 
         self.xs = None
         self.ys = None
-
-
-    def maximize(self, init_points: int =10, n_iter: int =100) -> np.ndarray:
-
-
+        
+        
+    def initialize_agent(self,init_points: int =10,agent_type='ssp-hex',**kwargs):
         init_xs = self._sample_domain(num_points=init_points)
-        arg_names = self.bounds.keys()
-
-        init_ys = np.array([self.target(**dict(zip(arg_names, x))) for x in init_xs]).reshape((init_points,-1))
+        init_ys = np.array([self.target(np.atleast_2d(x)) for x in init_xs]).reshape((init_points,-1))
 
         # Initialize the agent
-        agt = agent.SSPAgent(init_xs, init_ys) 
-
-        # Determine decoding matrix
-        ## TODO: how do we make sure that this stays within the bounds?
-#         sample_xs = self._sample_domain(num_points=self.num_decoding)
-        # Select domain sample locations.
-        sample_xs = self._sample_domain(num_points=128 * 128) #self.num_decoding)
-        sample_ssps = agt.encode(sample_xs)
-        assert sample_ssps.shape[0] == sample_xs.shape[0]
-
-        self.ssp_to_domain_mat = np.linalg.pinv(sample_ssps) @ sample_xs
-
-        print(np.mean(np.linalg.norm(sample_xs - (sample_ssps @ self.ssp_to_domain_mat),axis=1)))
+        if agent_type=='ssp-hex':
+            ssp_space = sspspace.HexagonalSSPSpace(self.data_dim, **kwargs)
+            agt = agent.SSPAgent(init_xs, init_ys,ssp_space) 
+        elif agent_type=='ssp-rand':
+            ssp_space = sspspace.RandomSSPSpace(self.data_dim, **kwargs)
+            agt = agent.SSPAgent(init_xs, init_ys,ssp_space) 
+        elif agent_type=='gp':
+            agt = agent.GPAgent(init_xs, init_ys,**kwargs) 
+        else:
+            raise NotImplementedError()
+        return agt, init_xs, init_ys
 
 
+    def maximize(self, init_points: int =10, n_iter: int =100,num_restarts: int = 5,
+                 agent_type='ssp-hex',**kwargs) -> np.ndarray:
+        # sample_xs = self._sample_domain(num_points=128 * 128) #self.num_decoding)
+        # sample_ssps = self.agt.encode(sample_xs)
+        # assert sample_ssps.shape[0] == sample_xs.shape[0]
+
+        # self.ssp_to_domain_mat = np.linalg.pinv(sample_ssps) @ sample_xs
+
+        # print(np.mean(np.linalg.norm(sample_xs - (sample_ssps @ self.ssp_to_domain_mat),axis=1)))
+
+        agt, init_xs, init_ys = self.initialize_agent(init_points,agent_type,domain_bounds=self.bounds,**kwargs)
         self.times = np.zeros((n_iter,))
         self.xs = []
         self.ys = []
@@ -57,51 +65,61 @@ class BayesianOptimization:
             self.ys.append(y)
 
 
+        # Extract the upper and lower bounds of domain for sampling.
+        lbounds = self.bounds[:,0]
+        ubounds = self.bounds[:,1]
+
         print('| iter\t | target\t | x\t |')
         print('-------------------------------')
         for t in range(n_iter):
+            ## Begin timing section
+            start = time.thread_time_ns()
+            # get the functions to optimize
+            ### TODO fix jacobian so it returns dx in x space
+            optim_func, jac_func = agt.acquisition_func()
 
             # Use optimization to find a sample location
-            start = time.thread_time_ns()
-            x_t, var, phi  = agt.select_optimal([self.bounds[k] for k in self.bounds.keys()])
+            solns = []
+            vals = []
+            for _ in range(num_restarts):
+               
+                x_init = np.random.uniform(low=lbounds, high=ubounds, size=(len(ubounds),))
+
+                if agent_type=='gp':
+                    # Do bounded optimization to ensure x stays in bound
+                    soln = minimize(optim_func, x_init,
+                                    jac=jac_func, 
+                                    method='L-BFGS-B', 
+                                    bounds=self.bounds)
+                    solnx = np.copy(soln.x)
+                else: ## ssp agent
+                    phi_init = agt.encode(x_init)
+                    soln = minimize(optim_func, phi_init,
+                                    jac=jac_func, 
+                                    method='L-BFGS-B')
+                    solnx = agt.decode(np.copy(soln.x))
+                vals.append(-soln.fun)
+                solns.append(solnx)
             self.times[t] = time.thread_time_ns() - start
+            ## END timing section
 
-            # Log actions
-#             assert x_t_ssp.shape[0] == 1 
-#             print(sample_ssps.shape, x_t_ssp.shape)
-#             similarities = np.maximum(np.einsum('ij,kj->ik', sample_ssps, x_t_ssp/np.linalg.norm(x_t_ssp)),0)
-#             x_t = sample_xs[np.argmax(similarities),:]
-#             x_t = np.average(sample_xs, weights=similarities.flatten(), axis=0)
+            best_val_idx = np.argmax(vals)
+            x_t = np.atleast_2d(solns[best_val_idx].flatten())
+            y_t = np.atleast_2d(self.target(x_t))
+            
+            mu_t, var_t, phi_t = agt.eval(x_t)
 
-#             weights = similarities / np.sum(similarities)
-#             print(similarities)
-#             weights = np.exp(similarities) / np.sum(np.exp(similarities))
-#             print(weights)
-#             x_t = np.sum(sample_xs * weights, axis=0)
-#             x_t = x_t_ssp @ self.ssp_to_domain_mat / np.linalg.norm(x_t_ssp)
-
-#             sample_locs[t,:] = np.copy(x_t)
-
-            query_point = dict(zip(arg_names, x_t.flatten()))
-            y_t = np.array([[self.target(**query_point)]])
-
-            print(f'| {t}\t | {y_t}\t | {query_point}\t |')
-            agt.update(x_t, y_t, var)
+            print(f'| {t}\t | {y_t}\t | {x_t}\t |')
+            agt.update(x_t, y_t, var_t)
 
             # Log actions
             self.xs.append(x_t)
             self.ys.append(y_t)
 
-        ### end for t in range(num_iters)
-
-        pass
-
     def _sample_domain(self, num_points: int=10) -> np.ndarray:
-        sampler = qmc.Sobol(d=self.num_dims) 
-
-        lbounds, ubounds = zip(*[self.bounds[x] for x in self.bounds.keys()])
+        sampler = qmc.Sobol(d=self.data_dim) 
         u_sample_points = sampler.random(num_points)
-        sample_points = qmc.scale(u_sample_points, lbounds, ubounds)
+        sample_points = qmc.scale(u_sample_points, self.bounds[:,0], self.bounds[:,1])
         return sample_points
 
     @property 

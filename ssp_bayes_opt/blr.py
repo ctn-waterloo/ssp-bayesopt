@@ -19,11 +19,9 @@ class BayesianLinearRegression:
 
         if self.beta is None:
             self.beta = 1. / np.var(ts)
-        S_inv = self.S_inv + self.beta * np.dot(phis.T, phis)
+        S_inv = self.S_inv + self.beta * phis.T @ phis
         S = np.linalg.pinv(S_inv)
-#         x = self.beta * np.dot(self.S, np.dot(phis.T, ts))
-#         self.m += x
-        x = self.beta * np.dot(phis.T, ts)
+        x = self.beta * phis.T @ ts
         assert x.shape == (self.input_dim, 1), f'Mean update should be shape {self.input_dim, 1} was {x.shape}'
 
         
