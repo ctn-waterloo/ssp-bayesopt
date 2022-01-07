@@ -60,8 +60,8 @@ class SSPBayesOptTrial(pytry.Trial):
 cum_regrets = []
 num_trials = 4
 for trial in range(num_trials):
-    r = SSPBayesOptTrial().run(**{'function_name':'branin-hoo', 'algorithm':'ssp-mi'})
-#     r = SSPBayesOptTrial().run(**{'function_name':'himmelblau', 'algorithm':'ssp-mi'})
+#     r = SSPBayesOptTrial().run(**{'function_name':'branin-hoo', 'algorithm':'ssp-mi'})
+    r = SSPBayesOptTrial().run(**{'function_name':'himmelblau', 'algorithm':'ssp-mi'})
     cum_reg = np.divide(np.cumsum(r['regret']), np.arange(1, len(r['regret'])+1))
     cum_regrets.append(cum_reg)
 
