@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
+from sklearn.model_selection import KFold
 import warnings
 
 # import GP modules
@@ -143,26 +144,59 @@ class SSPAgent:
     def _optimize_lengthscale(self, init_xs, init_ys):
 
 #         ls_0 = 20. * np.ones((init_xs.shape[1],))
-#         ls_0 = 8. * np.ones((init_xs.shape[1],))
-        ls_0 = np.array([8.])
+        ls_0 = 8. * np.ones((init_xs.shape[1],))
+#         ls_0 = np.array([8.])
 
-        def min_func(length_scale):
+        def min_func(length_scale, xs=init_xs, ys=init_ys):
+            errors = []
+            kfold = KFold(n_splits=xs.shape[1])
+            ls_mat = np.diag(np.ones((xs.shape[1],))/length_scale)
+#             ls_mat = np.diag(1/length_scale)
+            scaled_xs = xs @ ls_mat
+
+            for train_idx, test_idx in kfold.split(xs):
+                train_x, test_x = scaled_xs[train_idx], scaled_xs[test_idx]
+                train_y, test_y = ys[train_idx], ys[test_idx]
+
+                train_phis = ssp.vector_encode(self.ptrs, train_x)
+                test_phis = ssp.vector_encode(self.ptrs, test_x)
+
+
+                W = np.linalg.pinv(train_phis) @ train_y
+                mu = np.dot(test_phis, W)
+                diff = test_y.flatten() - mu.flatten()
+                errors.append(np.mean(np.power(diff, 2)))
+
+#                 b = blr.BayesianLinearRegression(self.ssp_dim)
+#                 b.update(train_phis, train_y)
+#                 mu, var = b.predict(test_phis)
+#                 diff = test_y.flatten() - mu.flatten()
+#                 loss = -0.5*np.log(var) - np.divide(np.power(diff,2),var)
+#                 errors.append(loss)
+#                 errors.append(np.sum(np.divide(np.power(diff, 2), var)))
+            ### end for
+            return np.sum(errors)
+
 #             init_phis = self._encode(self.ptrs, init_xs, np.abs(length_scale))
-            ls_mat = np.diag(np.ones((init_xs.shape[1],))/length_scale)
-            init_phis = ssp.vector_encode(self.ptrs, init_xs @ ls_mat)
+#             ls_mat = np.diag(np.ones((init_xs.shape[1],))/length_scale)
+#             init_phis = ssp.vector_encode(self.ptrs, init_xs @ ls_mat)
+# 
+#             W = np.linalg.pinv(init_phis) @ init_ys
+#             mu = np.dot(init_phis, W)
 
-            b = blr.BayesianLinearRegression(self.ssp_dim)
-            b.update(init_phis, init_ys)
-            mu, var = b.predict(init_phis)
+#             b = blr.BayesianLinearRegression(self.ssp_dim)
+#             b.update(init_phis, init_ys)
+#             mu, var = b.predict(init_phis)
             
-            diff = init_ys.flatten() - mu.flatten()
+#             diff = init_ys.flatten() - mu.flatten()
 #             err = np.sum(np.divide(np.power(diff, 2), var**2))
-            err = np.sum(np.power(diff, 2))
-            return err
+#             err = np.sum(np.power(diff, 2))
+#             return err
         ### end min_func
 
         retval = minimize(min_func, x0=ls_0, method='L-BFGS-B')
         return np.abs(retval.x) * np.ones((init_xs.shape[1],))
+#         return min(8, np.abs(retval.x)) * np.ones((init_xs.shape[1],))
 
 
     def eval(self, xs):
