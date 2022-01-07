@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
+from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import KFold
 import warnings
 
@@ -100,6 +101,16 @@ class GPAgent:
 
         return min_func, None
 
+class PassthroughScaler:
+    def __init__(self):
+        pass
+    def fit(self, x):
+        pass
+    def transform(self, x):
+        return x
+    def inverse_transform(self, x):
+        return x
+
 class SSPAgent:
     def __init__(self, init_xs, init_ys, ptrs, K_scale_rotates):
   
@@ -112,6 +123,8 @@ class SSPAgent:
 
         self.ssp_dim = self.ptrs.shape[1]
 
+#         self.scaler = StandardScaler()
+        self.scaler = PassthroughScaler()
         # Optimize the length scales
         self.length_scale = self._optimize_lengthscale(init_xs, init_ys)
         print('Selected Lengthscale: ', self.length_scale)
@@ -143,13 +156,13 @@ class SSPAgent:
 
     def _optimize_lengthscale(self, init_xs, init_ys):
 
-#         ls_0 = 20. * np.ones((init_xs.shape[1],))
-        ls_0 = 8. * np.ones((init_xs.shape[1],))
-#         ls_0 = np.array([8.])
+#         ls_0 = 8. * np.ones((init_xs.shape[1],))
+        ls_0 = np.array([[8.]]) 
+        self.scaler.fit(init_ys)
 
-        def min_func(length_scale, xs=init_xs, ys=init_ys):
+        def min_func(length_scale, xs=init_xs, ys=self.scaler.transform(init_ys)):
             errors = []
-            kfold = KFold(n_splits=xs.shape[1])
+            kfold = KFold(n_splits=xs.shape[0])
             ls_mat = np.diag(np.ones((xs.shape[1],))/length_scale)
 #             ls_mat = np.diag(1/length_scale)
             scaled_xs = xs @ ls_mat
@@ -162,51 +175,32 @@ class SSPAgent:
                 test_phis = ssp.vector_encode(self.ptrs, test_x)
 
 
-                W = np.linalg.pinv(train_phis) @ train_y
-                mu = np.dot(test_phis, W)
-                diff = test_y.flatten() - mu.flatten()
-                errors.append(np.mean(np.power(diff, 2)))
-
-#                 b = blr.BayesianLinearRegression(self.ssp_dim)
-#                 b.update(train_phis, train_y)
-#                 mu, var = b.predict(test_phis)
+#                 W = np.linalg.pinv(train_phis) @ train_y
+#                 mu = np.dot(test_phis, W)
 #                 diff = test_y.flatten() - mu.flatten()
-#                 loss = -0.5*np.log(var) - np.divide(np.power(diff,2),var)
-#                 errors.append(loss)
-#                 errors.append(np.sum(np.divide(np.power(diff, 2), var)))
+#                 errors.append(np.mean(np.power(diff, 2)))
+
+                b = blr.BayesianLinearRegression(self.ssp_dim)
+                b.update(train_phis, train_y)
+                mu, var = b.predict(test_phis)
+                diff = test_y.flatten() - mu.flatten()
+                loss = -0.5*np.log(var) - np.divide(np.power(diff,2),var)
+                errors.append(loss)
             ### end for
             return np.sum(errors)
-
-#             init_phis = self._encode(self.ptrs, init_xs, np.abs(length_scale))
-#             ls_mat = np.diag(np.ones((init_xs.shape[1],))/length_scale)
-#             init_phis = ssp.vector_encode(self.ptrs, init_xs @ ls_mat)
-# 
-#             W = np.linalg.pinv(init_phis) @ init_ys
-#             mu = np.dot(init_phis, W)
-
-#             b = blr.BayesianLinearRegression(self.ssp_dim)
-#             b.update(init_phis, init_ys)
-#             mu, var = b.predict(init_phis)
-            
-#             diff = init_ys.flatten() - mu.flatten()
-#             err = np.sum(np.divide(np.power(diff, 2), var**2))
-#             err = np.sum(np.power(diff, 2))
-#             return err
         ### end min_func
 
-        retval = minimize(min_func, x0=ls_0, method='L-BFGS-B')
+        retval = minimize(min_func, x0=ls_0, method='L-BFGS-B',
+                          bounds=[(1/np.sqrt(init_xs.shape[0]),None)],
+                          )
         return np.abs(retval.x) * np.ones((init_xs.shape[1],))
-#         return min(8, np.abs(retval.x)) * np.ones((init_xs.shape[1],))
 
 
     def eval(self, xs):
-#         if self.phis is None:
-#             self.phis = self.encode(xs)
-#         ### end if
         phis = self.encode(xs)
         mu, var = self.blr.predict(phis)
         phi = self.sqrt_alpha * (np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t)) 
-        return mu, var, phi
+        return self.scaler.inverse_transform(mu), var, phi
 
     def acquisition_func(self):
         '''
@@ -239,8 +233,7 @@ class SSPAgent:
             ptr, grad_ptr = ssp.vector_encode(ptrs, x.reshape(1,-1) @ np.diag(1/length_scale), do_grad=True)
             sqr = (ptr @ sigma @ ptr.T) 
             scale = np.sqrt(sqr + gamma + beta_inv)
-            retval = grad_ptr.squeeze().T @ -(m + sigma @ ptr.T / scale) 
-#             retval = -(m + sigma @ ptr.T / scale) 
+            retval = -grad_ptr.squeeze().T @ (m + sigma @ ptr.T / scale) 
             return retval
         ### end gradient
         return optim_func, jac_func 
@@ -257,6 +250,7 @@ class SSPAgent:
             x_val = x_t.reshape(1, x_t.shape[0])
             y_val = y_t.reshape(1, y_t.shape[0])
         ### end if
+        y_val = self.scaler.transform(y_val)
     
         # Update BLR
         # TODO: use vector encode
