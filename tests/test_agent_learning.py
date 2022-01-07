@@ -28,7 +28,8 @@ if __name__ == '__main__':
     rng = default_rng()
 
 
-    func, bounds, T = functions.factory('himmelblau')
+#     func, bounds, T = functions.factory('himmelblau')
+    func, bounds, T = functions.factory('branin-hoo')
     init_xs, init_ys, X, Y = make_data(func, bounds)
     num_init = 10
     shuffled_idxs = np.arange(0,init_xs.shape[0])
@@ -70,7 +71,7 @@ if __name__ == '__main__':
             plt.title('Learning')
 
             plt.subplot(2,2,3)
-            plt.matshow(all_data_phi_s.reshape(X.shape), fignum=False)
+            plt.matshow(init_ys.reshape(X.shape), fignum=False)
             plt.ylabel('Phi')
 
             plt.subplot(2,2,4)
