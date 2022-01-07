@@ -70,11 +70,6 @@ class BayesianOptimization:
             for res_idx in range(num_restarts):
                
                 x_init = np.random.uniform(low=lbounds, high=ubounds, size=(len(ubounds),))
-#                 if res_idx == 0 and len(self.xs) > 0:
-#                 if len(self.xs) > 0:
-#                     alpha = 0.9**t
-#                     x_init =  alpha * x_init + (1-alpha) * self.xs[np.argmax(self.ys)].flatten()
-
 
                 # Do bounded optimization to ensure x stays in bound
                 soln = minimize(optim_func, x_init,
@@ -83,21 +78,20 @@ class BayesianOptimization:
                                 bounds=self.bounds)
                 vals.append(-soln.fun)
                 solns.append(np.copy(soln.x))
+                print(x_init, soln.x, -soln.fun)
             self.times[t] = time.thread_time_ns() - start
             ## END timing section
 
             best_val_idx = np.argmax(vals)
-#             x_t = solns[best_val_idx].reshape((1,-1))
-            x_t = np.atleast_2d(solns[best_val_idx].flatten())#.reshape((1,-1))
+            x_t = np.atleast_2d(solns[best_val_idx].flatten())
 
             mu_t, var_t, phi_t = agt.eval(x_t)
 
             # Log actions
             query_point = np.atleast_2d(x_t.flatten())
-#             y_t = np.array([[self.target(query_point)]])
             y_t = np.atleast_2d(self.target(query_point))
 
-            print(f'| {t}\t | {y_t}\t | {query_point}\t |')
+            print(f'| {t}\t | {y_t}, {phi_t}\t | {query_point}\t |')
             agt.update(x_t, y_t, var_t)
 
             # Log actions
