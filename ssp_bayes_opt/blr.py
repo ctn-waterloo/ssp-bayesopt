@@ -11,7 +11,7 @@ class BayesianLinearRegression:
         self.m = np.zeros((size_in,1))
         self.beta = beta
         self.S = np.linalg.pinv(self.S_inv)
-        self.rank_one_updates = True 
+        self.rank_one_updates = True
     ### end __init__
 
     def update(self, phis:np.ndarray, ts:np.ndarray):
