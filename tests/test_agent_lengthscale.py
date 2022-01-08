@@ -43,13 +43,13 @@ if __name__ == '__main__':
 #         print(shuffled_idxs[:num_init])
         # Create an agent
         ## TODO: use random subset of shuffled_idxs
-        agt = agent.factory('ssp-mi', 
+        agt = agent.factory('ssp-hex', 
                             init_xs[shuffled_idxs[:num_init],:], 
                             np.atleast_2d(
                                 init_ys[shuffled_idxs[:num_init],0]).T
                             )
         # Evaluate the quality of the lengthscale parameter.
-        length_scales[t,:] = agt.length_scale
+        length_scales[t,:] = agt.ssp_space.length_scale
         mus, var_s, phi_s = agt.eval(init_xs)
         rmse = np.sqrt(np.mean(np.power(init_ys.flatten() - mus.flatten(),2)))
         print(rmse)
@@ -63,7 +63,7 @@ if __name__ == '__main__':
                 vmin=np.min(init_ys),vmax=np.max(init_ys),
                 origin='lower', label='True Values')
         plt.subplot(1,3,2)
-        plt.imshow(mus.reshape(X.shape) + phi_s.reshape(X.shape), 
+        plt.imshow(mus.reshape(X.shape),# + phi_s.reshape(X.shape), 
 #                 vmin=np.min(init_ys),vmax=np.max(init_ys),
                 origin='lower', label='Predicted')
 

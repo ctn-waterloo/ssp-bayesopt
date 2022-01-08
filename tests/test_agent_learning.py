@@ -35,11 +35,13 @@ if __name__ == '__main__':
     shuffled_idxs = np.arange(0,init_xs.shape[0])
     rng.shuffle(shuffled_idxs)
     
-    agt_all_data = agent.factory('ssp-mi', init_xs[:,:], np.atleast_2d(init_ys[:,0]).T)
+    agt_all_data = agent.factory('ssp-rand', init_xs[:,:], np.atleast_2d(init_ys[:,0]).T)
     all_data_mus, all_data_var_s, all_data_phi_s = agt_all_data.eval(init_xs)
 
 
-    agt_learning = agent.factory('ssp-mi', init_xs[shuffled_idxs[:10],:], np.atleast_2d(init_ys[shuffled_idxs[:10],0]).T)
+    agt_learning = agent.factory('ssp-rand', 
+                                 init_xs[shuffled_idxs[:10],:],
+                                 np.atleast_2d(init_ys[shuffled_idxs[:10],0]).T)
 
     avg_func_errors = np.zeros((len(shuffled_idxs[10:]),))
     phi_func_errors = np.zeros((len(shuffled_idxs[10:]),))
