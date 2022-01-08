@@ -15,7 +15,7 @@ setup(
         license = 'TBD',
         keywords = '',
         url='http://github.com/ctn-waterloo/ssp-bayesopt',
-        packages=['ssp_bayes_opt','examples','tests'],
+        packages=['ssp_bayes_opt','tests'],
         long_description=read('README.md'),
         classifiers=[
             'Development Status :: 2 - Pre-Alpha',

@@ -33,11 +33,8 @@ class BayesianLinearRegression:
                 S = S - (S @ phi.T @ phi @ S) / scale
         else:
             S = np.linalg.pinv(S_inv)
-#         x = self.beta * np.dot(self.S, np.dot(phis.T, ts))
-#         self.m += x
         x = self.beta * np.dot(phis.T, ts)
         assert x.shape == (self.input_dim, 1), f'Mean update should be shape {self.input_dim, 1} was {x.shape}'
-
         
         self.m = S @ (self.S_inv @ self.m + x)
         self.S_inv = S_inv
@@ -46,7 +43,5 @@ class BayesianLinearRegression:
         assert self.m.shape[0] == self.input_dim and self.m.shape[1] == 1
 
     def predict(self, phi):
-#         var = (1. / self.beta) + np.dot(phi, np.dot(self.S, phi.T))
-#         return np.dot(self.m.T, phi.T), np.diag(var)
         var = (1. / self.beta) + np.einsum('ij,ij->i', phi, np.dot(phi, self.S.T))
         return np.dot(self.m.T, phi.T), var
