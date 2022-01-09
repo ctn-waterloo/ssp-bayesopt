@@ -20,20 +20,20 @@ importlib.reload(ssp_bayes_opt)
 class SSPBayesOptTrial(pytry.Trial):
     def params(self):
         self.param('function', function_name='himmelblau')
-        self.param('algorithm one of (ssp-mi|gp-mi)', algorithm='ssp-mi')
+        self.param('algorithm one of (ssp-hex|ssp-rand|gp-mi)', algorithm='ssp-hex')
         self.param('num initial samples', num_init_samples=10)
         self.param('num restarts', num_restarts=10)
     
     def evaluate(self, p):
-        target, pbounds, budget = functions.factory(p.function_name)
+        target, bounds, budget = functions.factory(p.function_name)
         
-        optimizer = ssp_bayes_opt.BayesianOptimization(f=target, pbounds=pbounds, verbose=p.verbose)
+        optimizer = ssp_bayes_opt.BayesianOptimization(f=target, bounds=bounds, verbose=p.verbose)
         
         start = time.thread_time_ns()
-        optimizer.maximize(init_points=p.num_init_samples,
-                    n_iter=budget,
-                    agent_type=p.algorithm,
-                    num_restarts=p.num_restarts)
+        optimizer.maximize(init_points=p.num_init_samples, 
+                           n_iter=budget, 
+                           agent_type=p.algorithm,
+                           num_restarts=p.num_restarts)
         elapsed_time = time.thread_time_ns() - start
 
         vals = np.zeros((p.num_init_samples + budget,))

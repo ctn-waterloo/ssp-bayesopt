@@ -11,10 +11,8 @@ sample_points_cache = {}
 def factory(function_name: str) -> Tuple[Callable, dict, int]:
     '''
     Returns the target functions for testing the SSP Bayes optimization algorithm.
-
     @param function_name the name of the function.  One of:
         himmelblau | branin-hoo | goldstein-price | colville | gp_2d | gp_4d | gmm | mackey-glass | tsunamis
-
     @return The function as a callable object, 
             The dictionary specifying the bounds of the algorithm, 
             The budget (number of samples) allowed for this function.
@@ -124,7 +122,6 @@ def goldstein_price(x):
     '''
     Scaled Goldstein-Price function.  It is scalled to be roughly in the range [-10,0].  Negative to make it 
     a minimization function and by 1/1e5 to let the GP solution converge.
-
     Function definition from http://www.sfu.ca/~ssurjano/goldpr.html
     '''
     term_a = 1 + (x[:,0] + x[:,1] + 1)**2 * (19 - 14*x[:,0] + 3*x[:,0]**2  - 14*x[:,1] + 6*x[:,0]*x[:,1] + 3*x[:,1]**2)
@@ -175,6 +172,3 @@ if __name__=='__main__':
     surf = ax.plot_surface(X, Y, -zs)
     fig.colorbar(surf)
     plt.show()
-
-
-
