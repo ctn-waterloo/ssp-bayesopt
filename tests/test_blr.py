@@ -67,9 +67,9 @@ if __name__=='__main__':
     else:
         if rand_ssp:
             ssp_dim = 256
-            ptrs = np.array([ssp.make_good_unitary(ssp_dim) for i in range(train_xs.shape[1])]).squeeze()
+            ptrs = np.array([old_ssp.make_good_unitary(ssp_dim) for i in range(train_xs.shape[1])]).squeeze()
         else:
-            ptrs = np.array([ssp.make_hex_unitary(train_xs.shape[1], 
+            ptrs = np.array([old_ssp.make_hex_unitary(train_xs.shape[1], 
                                     n_scales=30, 
                                     scale_min=0.1, 
                                     scale_max=3.4) for i in range(train_xs.shape[1])]
@@ -78,8 +78,8 @@ if __name__=='__main__':
         ### end if
 
         length_scale = 20
-        train_ssps = np.array([ssp.encode(ptrs, x * length_scale) for x in train_xs]).squeeze()
-        test_ssps = np.array([ssp.encode(ptrs, x * length_scale) for x in test_xs]).squeeze()
+        train_ssps = np.array([old_ssp.encode(ptrs, x * length_scale) for x in train_xs]).squeeze()
+        test_ssps = np.array([old_ssp.encode(ptrs, x * length_scale) for x in test_xs]).squeeze()
         print(train_ssps.shape)
         print(test_ssps.shape)
 
