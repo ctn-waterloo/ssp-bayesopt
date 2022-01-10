@@ -174,8 +174,6 @@ class HexagonalSSPSpace(SSPSpace):
                  scale_min=2*np.pi/np.sqrt(6) - 0.5, scale_max=2*np.pi/np.sqrt(6) + 0.5,
                  domain_bounds=None, length_scale=1):
         #if (n_rotates==5) & (n_scales==5) & (ssp_dim!=151): # user wants to define ssp with total dim, not number of simplex rotates and scales
-        n_rotates = np.max([1,int(np.sqrt((ssp_dim-1)/6))])
-        n_scales = n_rotates
             
         phases_hex = np.hstack([np.sqrt(1+ 1/domain_dim)*np.identity(domain_dim) - (domain_dim**(-3/2))*(np.sqrt(domain_dim+1) + 1),
                          (domain_dim**(-1/2))*np.ones((domain_dim,1))]).T
