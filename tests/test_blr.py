@@ -5,7 +5,7 @@ import functions
 from ssp_bayes_opt import blr, sspspace
 import matplotlib.pyplot as plt
 
-import ssp
+import old_ssp
 
 def generate_signal(T, dt, rms, limit, seed=1):
     np.random.seed(seed)
@@ -25,6 +25,26 @@ def generate_signal(T, dt, rms, limit, seed=1):
     scale = rms / integral_val
 
     return x * scale, power * scale, freqs
+
+def train_ssp_space(ssp_space, train_xs, train_ys, test_xs):
+    train_ssps = ssp_space.encode(train_xs).T
+    test_ssps = ssp_space.encode(test_xs).T
+
+    pred = blr.BayesianLinearRegression(ssp_space.ssp_dim)
+    pred.update(train_ssps, train_ys)
+    mu, var = pred.predict(test_ssps)
+    return mu, var
+
+def train_old_ssp(ptrs, train_xs, train_ys, test_xs, length_scale=1/12):
+
+    train_ssps = np.array([old_ssp.encode(ptrs, x / length_scale) for x in train_xs]).squeeze()
+    test_ssps = np.array([old_ssp.encode(ptrs, x / length_scale) for x in test_xs]).squeeze()
+
+    pred = blr.BayesianLinearRegression(train_ssps.shape[1])
+    pred.update(train_ssps, train_ys)
+    mu, var = pred.predict(test_ssps)
+
+    return mu, var
 
 
 if __name__=='__main__':
@@ -46,69 +66,108 @@ if __name__=='__main__':
 
     test_xs = np.copy(time)
     # encode them as ssps
-    using_ssp_space = False 
-    rand_ssp = False
-    if using_ssp_space:
-        length_scale = 1/12
-        if rand_ssp:
-            ssp_space = sspspace.RandomSSPSpace(1, 127,  domain_bounds=np.array([[0,T]]), length_scale=length_scale)
-        else:
-            ssp_space = sspspace.HexagonalSSPSpace(1, length_scale=length_scale, 
-                                        n_scales=60,
-                                        scale_min=0.1,
-                                        scale_max=3.4)
-        ### end if
-        train_ssps = ssp_space.encode(train_xs).T
-        test_ssps = ssp_space.encode(test_xs).T
 
-        blr = blr.BayesianLinearRegression(ssp_space.ssp_dim)
-        blr.update(train_ssps, train_ys)
-        mu, var = blr.predict(test_ssps)
-    else:
-        if rand_ssp:
-            ssp_dim = 256
-            ptrs = np.array([old_ssp.make_good_unitary(ssp_dim) for i in range(train_xs.shape[1])]).squeeze()
-        else:
-            ptrs = np.array([old_ssp.make_hex_unitary(train_xs.shape[1], 
+    # Using ssp_space
+    length_scale = 1/12
+    rand_ssp_space = sspspace.RandomSSPSpace(1, 127,  
+                                domain_bounds=np.array([[0,T]]),
+                                length_scale=length_scale)
+    hex_ssp_space = sspspace.HexagonalSSPSpace(1, length_scale=length_scale, 
+                                    n_scales=30,
+                                    scale_min=0.1,
+                                    scale_max=3.4)
+
+    rand_mu, rand_var = train_ssp_space(rand_ssp_space, train_xs, train_ys, test_xs)
+    hex_mu, hex_var = train_ssp_space(hex_ssp_space, train_xs, train_ys, test_xs)
+
+    # Using old SSP
+    rand_ssp_dim = 256
+    rand_ptrs = np.array([old_ssp.make_good_unitary(rand_ssp_dim) for i in range(train_xs.shape[1])]).squeeze()
+    hex_ptrs = np.array([old_ssp.make_hex_unitary(train_xs.shape[1], 
                                     n_scales=30, 
                                     scale_min=0.1, 
                                     scale_max=3.4) for i in range(train_xs.shape[1])]
-                ).squeeze(axis=0)
-            ssp_dim = ptrs.shape[1]
-        ### end if
+        ).squeeze(axis=0)
 
-        length_scale = 20
-        train_ssps = np.array([old_ssp.encode(ptrs, x * length_scale) for x in train_xs]).squeeze()
-        test_ssps = np.array([old_ssp.encode(ptrs, x * length_scale) for x in test_xs]).squeeze()
-        print(train_ssps.shape)
-        print(test_ssps.shape)
 
-        blr = blr.BayesianLinearRegression(ssp_dim)
-        blr.update(train_ssps, train_ys)
-        mu, var = blr.predict(test_ssps)
 
-    sim_mat = np.zeros((num_samples, num_samples))
-    for i in range(num_samples):
-        for j in range(num_samples):
-            sim_mat[i,j] = np.dot(train_ssps[i,:], train_ssps[j,:])
-    plt.matshow(sim_mat)
-    plt.show()
+    old_rand_mu, old_rand_var = train_old_ssp(rand_ptrs, train_xs, train_ys, test_xs)
+    old_hex_mu, old_hex_var = train_old_ssp(hex_ptrs, train_xs, train_ys, test_xs)
+
+#     sim_mat = np.zeros((num_samples, num_samples))
+#     for i in range(num_samples):
+#         for j in range(num_samples):
+#             sim_mat[i,j] = np.dot(train_ssps[i,:], train_ssps[j,:])
+#     plt.matshow(sim_mat)
+#     plt.show()
 
 
 
     # display the BLR prediction.
 
+    plt.subplot(2,2,1)
+
     plt.fill_between(time.flatten(),
-            (mu - np.sqrt(var)).flatten(),
-            (mu + np.sqrt(var)).flatten(),
+            (rand_mu - np.sqrt(rand_var)).flatten(),
+            (rand_mu + np.sqrt(rand_var)).flatten(),
             alpha=0.4
     )
-    plt.plot(time.flatten(), mu.flatten(), label='Pred')
+    plt.plot(time.flatten(), rand_mu.flatten(), label='Pred')
 
     plt.plot(time.flatten(), x.flatten(), ls='--', label='True')
     plt.scatter(train_xs.flatten(), train_ys.flatten())
 
     plt.legend()
-    plt.title(f'Rand SSP, lengthscale = {ssp_space.length_scale}')
+    plt.title('ssp_space')
+    plt.ylabel('Rand')
+
+
+    plt.subplot(2,2,3)
+
+    plt.fill_between(time.flatten(),
+            (hex_mu - np.sqrt(hex_var)).flatten(),
+            (hex_mu + np.sqrt(hex_var)).flatten(),
+            alpha=0.4
+    )
+    plt.plot(time.flatten(), hex_mu.flatten(), label='Pred')
+
+    plt.plot(time.flatten(), x.flatten(), ls='--', label='True')
+    plt.scatter(train_xs.flatten(), train_ys.flatten())
+
+    plt.legend()
+    plt.ylabel('Hex')
+
+
+    plt.subplot(2,2,2)
+
+    plt.fill_between(time.flatten(),
+            (old_rand_mu - np.sqrt(old_rand_var)).flatten(),
+            (old_rand_mu + np.sqrt(old_rand_var)).flatten(),
+            alpha=0.4
+    )
+    plt.plot(time.flatten(), old_rand_mu.flatten(), label='Pred')
+
+    plt.plot(time.flatten(), x.flatten(), ls='--', label='True')
+    plt.scatter(train_xs.flatten(), train_ys.flatten())
+
+    plt.legend()
+    plt.title('old_ssp')
+
+
+    plt.subplot(2,2,4)
+
+    plt.fill_between(time.flatten(),
+            (old_hex_mu - np.sqrt(old_hex_var)).flatten(),
+            (old_hex_mu + np.sqrt(old_hex_var)).flatten(),
+            alpha=0.4
+    )
+    plt.plot(time.flatten(), old_hex_mu.flatten(), label='Pred')
+
+    plt.plot(time.flatten(), x.flatten(), ls='--', label='True')
+    plt.scatter(train_xs.flatten(), train_ys.flatten())
+
+    plt.legend()
+
+
     plt.show()
 
