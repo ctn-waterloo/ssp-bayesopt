@@ -19,7 +19,7 @@ class SSPSpace:
         if (axis_matrix is None) & (phase_matrix is None):
             raise RuntimeError("SSP spaces must be defined by either a axis matrix or phase matrix. Use subclasses to construct spaces with predefined axes.")
         elif (phase_matrix is None):
-            assert axis_matrix.shape[0] == ssp_dim
+            assert axis_matrix.shape[0] == ssp_dim, f'Expected ssp_dim {axis_matrix.shape[0]}, got {ssp_dim}.'
             assert axis_matrix.shape[1] == domain_dim
             self.axis_matrix = axis_matrix
             self.phase_matrix = (-1.j*np.log(np.fft.fft(axis_matrix,axis=0))).real
@@ -164,7 +164,7 @@ class SSPSpace:
 class RandomSSPSpace(SSPSpace):
     def __init__(self, domain_dim: int, ssp_dim: int,  domain_bounds=None, length_scale=1, rng=np.random.default_rng()):
 #         partial_phases = rng.random.rand(ssp_dim//2,domain_dim)*2*np.pi - np.pi
-        partial_phases = rng.random((ssp_dim//2,domain_dim))*2*np.pi - np.pi
+        partial_phases = rng.random((ssp_dim // 2, domain_dim)) * 2 * np.pi - np.pi
         axis_matrix = _constructaxisfromphases(partial_phases)
         super().__init__(domain_dim,ssp_dim,axis_matrix=axis_matrix,
                        domain_bounds=domain_bounds,length_scale=length_scale)
