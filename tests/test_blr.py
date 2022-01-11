@@ -27,8 +27,8 @@ def generate_signal(T, dt, rms, limit, seed=1):
     return x * scale, power * scale, freqs
 
 def train_ssp_space(ssp_space, train_xs, train_ys, test_xs):
-    train_ssps = ssp_space.encode(train_xs).T
-    test_ssps = ssp_space.encode(test_xs).T
+    train_ssps = ssp_space.encode(train_xs)
+    test_ssps = ssp_space.encode(test_xs)
 
     pred = blr.BayesianLinearRegression(ssp_space.ssp_dim)
     pred.update(train_ssps, train_ys)
@@ -64,7 +64,7 @@ if __name__=='__main__':
     train_xs = np.atleast_2d(time[sample_idxs[:num_samples]]).T
     train_ys = np.atleast_2d(x[sample_idxs[:num_samples]]).T
 
-    test_xs = np.copy(time)
+    test_xs = np.atleast_2d(np.copy(time)).T
     # encode them as ssps
 
     # Using ssp_space

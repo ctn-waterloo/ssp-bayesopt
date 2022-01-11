@@ -48,20 +48,36 @@ class SSPSpace:
         self.length_scale = retval.x.reshape(-1,1)
     
     def encode(self,x):
-        x= x.reshape(self.domain_dim, -1)
-        data = np.fft.ifft( np.exp( 1.j * self.phase_matrix @ (x / self.length_scale) ), axis=0 ).real
-        return data
+        assert x.ndim == 2, f'Expected 2d data (samples, features), got {x.ndim}d data.'
+        assert x.shape[1] == self.phase_matrix.shape[1], (f'Expected data to have '
+                                                          f'{self.phase_matrix.shape[1]} '
+                                                          f'features, got {x.shape[1]}.')
+        scaled_x = x / self.length_scale if isinstance(self.length_scale, int) else x @ np.diag(1/self.length_scale.flatten())
+        data = np.fft.ifft( np.exp( 1.j * self.phase_matrix @ scaled_x.T), axis=0 ).real
+        return data.T
     
     def encode_and_deriv(self,x):
-        x= x.reshape(self.domain_dim, -1)
-        data = np.fft.ifft( np.exp( 1.j * self.phase_matrix @ (x / self.length_scale) ), axis=0 ).real
-        ddata = np.fft.ifft( 1.j * (self.phase_matrix / self.length_scale) @ np.exp( 1.j * self.phase_matrix @ (x / self.length_scale) ), axis=0 ).real
-        return data, ddata
+        assert x.ndim == 2, f'Expected 2d data (samples, features), got {x.ndim}d data.'
+        assert x.shape[1] == self.phase_matrix.shape[1], (f'Expected data to have ' 
+                                                         f'{self.phase_matrix.shape[1]} '
+                                                         f'features, got {x.shape[1]}.')
+
+#         x= x.reshape(self.domain_dim, -1)
+#         len_scale_mat = np.diag(1 / self.length_scale.flatten()) 
+#         scaled_x = x @ len_scale_mat
+        scaled_x = x / self.length_scale if isinstance(self.length_scale, int) else x @ np.diag(1/self.length_scale.flatten())
+        data = np.fft.ifft( np.exp( 1.j * self.phase_matrix @ scaled_x.T ), axis=0 ).real
+        ddata = np.fft.ifft( 1.j * (self.phase_matrix @ len_scale_mat) @ np.exp( 1.j * self.phase_matrix @ scaled_x.T ), axis=0 ).real
+        return data.T, ddata.T
     
     def encode_fourier(self,x):
-        x= x.reshape(self.domain_dim, -1)
-        data =  np.exp( 1.j * self.phase_matrix @ (x / self.length_scale) )
-        return data
+        assert x.ndim == 2, f'Expected 2d data (samples, features), got {x.ndim} data.'
+        assert x.shape[1] == self.phase_matrix.shape[1], (f'Expected data to have ' 
+                                                         f'{self.phase_matrix.shape[1]} '
+                                                         f'features, got {x.shape[1]}.')
+#         x= x.reshape(self.domain_dim, -1)
+        data =  np.exp( 1.j * self.phase_matrix @ (x / self.length_scale).T )
+        return data.T
     
     # def encode_as_SSP(self,x):
     #     assert x.shape[0] == self.domain_dim
@@ -80,8 +96,10 @@ class SSPSpace:
             return x
         elif method=='from-set': ## ONLY ONE THAT WORKS WELL
             sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_sample_pts,from_set_method)
-            sims = sample_ssps.T @ ssp
-            return sample_points[:,np.argmax(sims)]
+            assert sample_ssps.shape[1] == ssp.shape[1]
+
+            sims = sample_ssps @ ssp.T
+            return sample_points[np.argmax(sims),:]
         elif method=='grad_descent':
             sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_init_pts) 
             sims = sample_ssps.T @ ssp
@@ -126,7 +144,7 @@ class SSPSpace:
             n_per_dim = int(num_points**(1/self.domain_dim))
             xs = np.linspace(bounds[:,0],bounds[:,1],n_per_dim)
             xxs = np.meshgrid(*[xs[:,i] for i in range(self.domain_dim)])
-            return np.array([x.reshape(-1) for x in xxs])
+            return np.array([x.reshape(-1) for x in xxs]).T
         elif method=='sobol':
             sampler = qmc.Sobol(d=self.domain_dim) 
             lbounds = bounds[:,0]
@@ -145,7 +163,11 @@ class SSPSpace:
     
     def get_sample_pts_and_ssps(self,num_points,method='grid'): 
         sample_points = self.get_sample_points(num_points,method)
+        assert sample_points.shape[0] == num_points
+
         sample_ssps = self.encode(sample_points)
+        assert sample_ssps.shape[0] == num_points
+
         return sample_ssps, sample_points
     
     def normalize(self,ssp):

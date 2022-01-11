@@ -84,7 +84,7 @@ class SSPAgent(Agent):
         print('Selected Lengthscale: ', self.ssp_space.length_scale)
 
         # Encode the initial sample points 
-        init_phis = self.ssp_space.encode(init_xs.T).T
+        init_phis = self.ssp_space.encode(init_xs)
 
         self.blr = blr.BayesianLinearRegression(self.ssp_space.ssp_dim)
 
@@ -100,6 +100,7 @@ class SSPAgent(Agent):
     ### end __init__
 
     def _optimize_lengthscale(self, init_xs, init_ys):
+        return 3
 
 #         ls_0 = 8. * np.ones((init_xs.shape[1],))
         ls_0 = np.array([[8.]]) 
@@ -142,7 +143,7 @@ class SSPAgent(Agent):
 
     def eval(self, xs):
         phis = self.encode(xs)
-        mu, var = self.blr.predict(phis.T)
+        mu, var = self.blr.predict(phis)
         phi = self.sqrt_alpha * (np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t)) 
         return self.scaler.inverse_transform(mu), var, phi
 
