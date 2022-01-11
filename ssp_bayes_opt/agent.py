@@ -144,6 +144,14 @@ class SSPAgent(Agent):
         phi = self.sqrt_alpha * (np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t)) 
         return self.scaler.inverse_transform(mu), var, phi
 
+    def initial_guess(self):
+        '''
+        The initial guess for optimizing the acquisition function.
+        '''
+        # Return an initial guess from either the distribution or
+        # From the approximate solution of dot(m,x) + x^T Sigma x
+        return self.blr.sample()
+
     def acquisition_func(self):
         '''
         return objective_func, jacobian_func

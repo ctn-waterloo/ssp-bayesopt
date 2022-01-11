@@ -9,11 +9,11 @@ from scipy.optimize import minimize
 from typing import Callable
 
 class BayesianOptimization:
-    def __init__(self, f: Callable[...,float] =None, pbounds: np.ndarray=None, 
+    def __init__(self, f: Callable[...,float] =None, bounds: np.ndarray=None, 
                  random_state: int =None, verbose: bool=False):
         assert not f is None, 'Must specify a callable target function'
-        assert not pbounds is None, 'Must dictionary of input bounds'
-        assert pbounds.shape[1] == 2, 'Must specify bounds of form [lower, upper] for each data dimension'
+        assert not bounds is None, 'Must dictionary of input bounds'
+        assert bounds.shape[1] == 2, 'Must specify bounds of form [lower, upper] for each data dimension'
 
         if not random_state is None:
             np.random.seed(random_state)
@@ -98,11 +98,12 @@ class BayesianOptimization:
                                     bounds=self.bounds)
                     solnx = np.copy(soln.x)
                 else: ## ssp agent
-                    phi_init = agt.encode(x_init)
+#                     phi_init = agt.encode(x_init)
+                    phi_init = agt.initial_guess()
                     soln = minimize(optim_func, phi_init,
                                     jac=jac_func, 
                                     method='L-BFGS-B')
-                    solnx = agt.decode(np.copy(soln.x))
+                    solnx = agt.decode(np.copy(np.atleast_2d(soln.x)))
                 vals.append(-soln.fun)
                 solns.append(solnx)
             self.times[t] = time.thread_time_ns() - start
@@ -114,7 +115,7 @@ class BayesianOptimization:
             
             mu_t, var_t, phi_t = agt.eval(x_t)
 
-            print(f'| {t}\t | {y_t}, {phi_t}\t | {query_point}\t |')
+            print(f'| {t}\t | {y_t}, {phi_t}\t | {x_t}\t |')
             agt.update(x_t, y_t, var_t)
 
             # Log actions

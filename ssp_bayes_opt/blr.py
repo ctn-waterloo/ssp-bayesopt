@@ -45,3 +45,18 @@ class BayesianLinearRegression:
     def predict(self, phi):
         var = (1. / self.beta) + np.einsum('ij,ij->i', phi, np.dot(phi, self.S.T))
         return np.dot(self.m.T, phi.T), var
+
+    def sample(self):
+        phi_init = None
+        try:
+            phi_init = np.atleast_2d(np.random.multivariate_normal(self.m.flatten(), 
+                                                                   self.S).reshape(-1,1)
+                                    )
+        except np.linalg.LinAlgError as e:
+            print(e)
+            phi_init = (-self.S_inv @ self.m).reshape(-1,1)
+        assert phi_init.ndim == 2
+        assert phi_init.shape[1]
+        return phi_init
+    ### end sample
+### end class BayesianLinearRegression
