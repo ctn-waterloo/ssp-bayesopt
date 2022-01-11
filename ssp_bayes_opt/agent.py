@@ -79,7 +79,7 @@ class SSPAgent(Agent):
         self.ssp_space = ssp_space
         # Optimize the length scales
         #self.ssp_space.optimize_lengthscale(init_xs, init_ys)
-        self.ssp_space.length_scale=self._optimize_lengthscale(init_xs, init_ys)
+        self.ssp_space.update_lengthscale(self._optimize_lengthscale(init_xs, init_ys))
 #         self.ssp_space.length_scale=5
         print('Selected Lengthscale: ', self.ssp_space.length_scale)
 
@@ -100,17 +100,14 @@ class SSPAgent(Agent):
     ### end __init__
 
     def _optimize_lengthscale(self, init_xs, init_ys):
-        return 3
-
-#         ls_0 = 8. * np.ones((init_xs.shape[1],))
         ls_0 = np.array([[8.]]) 
         self.scaler.fit(init_ys)
 
         def min_func(length_scale, xs=init_xs, ys=self.scaler.transform(init_ys),
                         ssp_space=self.ssp_space):
             errors = []
-            kfold = KFold(n_splits=min(xs.shape[0], 10))
-            ssp_space.length_scale=length_scale
+            kfold = KFold(n_splits=min(xs.shape[0], 50))
+            ssp_space.update_lengthscale(length_scale)
 
             for train_idx, test_idx in kfold.split(xs):
                 train_x, test_x = xs[train_idx], xs[test_idx]
@@ -126,8 +123,8 @@ class SSPAgent(Agent):
 #                 errors.append(np.mean(np.power(diff, 2)))
 
                 b = blr.BayesianLinearRegression(ssp_space.ssp_dim)
-                b.update(train_phis.T, train_y)
-                mu, var = b.predict(test_phis.T)
+                b.update(train_phis, train_y)
+                mu, var = b.predict(test_phis)
                 diff = test_y.flatten() - mu.flatten()
                 loss = -0.5*np.log(var) - np.divide(np.power(diff,2),var)
                 errors.append(np.sum(loss))

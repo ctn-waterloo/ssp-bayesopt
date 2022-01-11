@@ -30,7 +30,13 @@ class SSPSpace:
             self.axis_matrix = np.fft.ifft(np.exp(1.j*phase_matrix), axis=0).real
             
     def update_lengthscale(self, scale):
-        self.length_scale = scale
+        if not isinstance(scale, np.ndarray) or scale.size == 1:
+            self.length_scale = scale * np.ones((self.domain_dim,))
+        else:
+            assert scale.size == self.domain_dim
+            self.length_scale = scale
+        assert self.length_scale.size == self.domain_dim
+        ### end if
         
     def optimize_lengthscale(self, init_xs, init_ys):
         ls_0 = self.length_scale
@@ -52,7 +58,13 @@ class SSPSpace:
         assert x.shape[1] == self.phase_matrix.shape[1], (f'Expected data to have '
                                                           f'{self.phase_matrix.shape[1]} '
                                                           f'features, got {x.shape[1]}.')
-        scaled_x = x / self.length_scale if isinstance(self.length_scale, int) else x @ np.diag(1/self.length_scale.flatten())
+
+        assert self.length_scale.size == self.domain_dim, (f'Expected {self.domain_dim} '
+                                                           f'lengthscale params got '
+                                                           f' {self.length_scale.size}')
+        ls_mat = np.diag(1/self.length_scale)
+        assert ls_mat.shape == (self.domain_dim, self.domain_dim)
+        scaled_x = x @ ls_mat
         data = np.fft.ifft( np.exp( 1.j * self.phase_matrix @ scaled_x.T), axis=0 ).real
         return data.T
     
@@ -63,9 +75,8 @@ class SSPSpace:
                                                          f'features, got {x.shape[1]}.')
 
 #         x= x.reshape(self.domain_dim, -1)
-#         len_scale_mat = np.diag(1 / self.length_scale.flatten()) 
-#         scaled_x = x @ len_scale_mat
-        scaled_x = x / self.length_scale if isinstance(self.length_scale, int) else x @ np.diag(1/self.length_scale.flatten())
+        len_scale_mat = np.diag(1 / self.length_scale.flatten()) 
+        scaled_x = x @ len_scale_mat
         data = np.fft.ifft( np.exp( 1.j * self.phase_matrix @ scaled_x.T ), axis=0 ).real
         ddata = np.fft.ifft( 1.j * (self.phase_matrix @ len_scale_mat) @ np.exp( 1.j * self.phase_matrix @ scaled_x.T ), axis=0 ).real
         return data.T, ddata.T

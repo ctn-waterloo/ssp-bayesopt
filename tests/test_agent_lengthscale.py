@@ -29,8 +29,8 @@ if __name__ == '__main__':
 
 
     # Select a test function
-#     func, bounds, T = functions.factory('himmelblau')
-    func, bounds, T = functions.factory('branin-hoo')
+    func, bounds, T = functions.factory('himmelblau')
+#     func, bounds, T = functions.factory('branin-hoo')
     init_xs, init_ys, X, Y = make_data(func, bounds)
     num_init = 10
     shuffled_idxs = np.arange(0,init_xs.shape[0])
@@ -64,7 +64,7 @@ if __name__ == '__main__':
                 origin='lower', label='True Values')
         plt.subplot(1,3,2)
         plt.imshow(mus.reshape(X.shape),# + phi_s.reshape(X.shape), 
-#                 vmin=np.min(init_ys),vmax=np.max(init_ys),
+                vmin=np.min(init_ys),vmax=np.max(init_ys),
                 origin='lower', label='Predicted')
 
         plt.subplot(1,3,3)
