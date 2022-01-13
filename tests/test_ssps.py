@@ -36,11 +36,55 @@ def test_from_set_decode():
     ### Note: Set the absolute tolerance high because of the doding method we are using
     assert np.all(np.isclose(test_x, recov_x, atol=1e-1))
 
+def test_direct_optim_decode():
+    test_x = np.atleast_2d(np.array([1.3,-3.4]))
+    ssp_space = make_hex_space()
+    S0 = ssp_space.encode(test_x)
+    assert S0.shape == (1, ssp_space.ssp_dim)
+    recov_x = ssp_space.decode(S0, method='direct-optim')
+    ### Note: Set the absolute tolerance high because of the doding method we are using
+    assert np.all(np.isclose(test_x, recov_x, atol=1e-1))
+
+@pytest.mark.skip(reason='known bad')
+def test_scaled_set_decode():
+    test_x = np.atleast_2d(np.array([1.3,-3.4]))
+    ssp_space = make_hex_space()
+    S0 = ssp_space.encode(test_x)
+    assert S0.shape == (1, ssp_space.ssp_dim)
+    recov_x = ssp_space.decode(S0, method='weighted-from-set')
+    ### Note: Set the absolute tolerance high because of the doding method we are using
+    assert np.all(np.isclose(test_x, recov_x, atol=1e-1))
 
 
-# ssp_space = ssp_bayes_opt.sspspace.HexagonalSSPSpace(domain_dim,ssp_dim=151, 
-#                  scale_min=2*np.pi/np.sqrt(6) - 0.5, scale_max=2*np.pi/np.sqrt(6) + 0.5,
-#                  domain_bounds=bounds, length_scale=1)
-# S0 = ssp_space.encode(np.array([1.3,-3.4]))
+@pytest.mark.skip(reason='known bad')
+def test_lst_sqs_decode():
+    test_x = np.atleast_2d(np.array([1.3,-3.4]))
+    ssp_space = make_hex_space()
+    S0 = ssp_space.encode(test_x)
+    assert S0.shape == (1, ssp_space.ssp_dim)
+    recov_x = ssp_space.decode(S0, method='least-squares')
+    ### Note: Set the absolute tolerance high because of the doding method we are using
+    assert np.all(np.isclose(test_x, recov_x, atol=1e-4))
 
-# print(ssp_space.decode(S0, method='from-set'))
+@pytest.mark.skip(reason='known bad')
+def test_grad_descent_decode():
+    test_x = np.atleast_2d(np.array([1.3,-3.4]))
+    ssp_space = make_hex_space()
+    S0 = ssp_space.encode(test_x)
+    assert S0.shape == (1, ssp_space.ssp_dim)
+    recov_x = ssp_space.decode(S0, method='grad_descent')
+    ### Note: Set the absolute tolerance high because of the doding method we are using
+    assert np.all(np.isclose(test_x, recov_x, atol=1e-4))
+
+
+
+
+@pytest.mark.skip(reason='known bad')
+def test_grad_descent_decode():
+    test_x = np.atleast_2d(np.array([1.3,-3.4]))
+    ssp_space = make_hex_space()
+    S0 = ssp_space.encode(test_x)
+    assert S0.shape == (1, ssp_space.ssp_dim)
+    recov_x = ssp_space.decode(S0, method='nonlin-reg')
+    ### Note: Set the absolute tolerance high because of the doding method we are using
+    assert np.all(np.isclose(test_x, recov_x, atol=1e-4))
