@@ -3,6 +3,8 @@ from scipy.stats import qmc
 from scipy.stats import special_ortho_group
 from scipy.optimize import minimize
 
+import warnings
+
 class SSPSpace:
     def __init__(self, domain_dim: int, ssp_dim: int, axis_matrix=None, phase_matrix=None,
                  domain_bounds=None, length_scale=1):
@@ -62,8 +64,9 @@ class SSPSpace:
         assert self.length_scale.size == self.domain_dim, (f'Expected {self.domain_dim} '
                                                            f'lengthscale params got '
                                                            f' {self.length_scale.size}')
-        ls_mat = np.diag(1/self.length_scale)
-        assert ls_mat.shape == (self.domain_dim, self.domain_dim)
+
+        ls_mat = np.atleast_2d(np.diag(1/self.length_scale.flatten()))
+        assert ls_mat.shape == (self.domain_dim, self.domain_dim), f'Expected Len Scale mat with dimensions {(self.domain_dim, self.domain_dim)}, got {ls_mat.shape}'
         scaled_x = x @ ls_mat
         data = np.fft.ifft( np.exp( 1.j * self.phase_matrix @ scaled_x.T), axis=0 ).real
         return data.T
@@ -75,8 +78,8 @@ class SSPSpace:
                                                          f'features, got {x.shape[1]}.')
 
 #         x= x.reshape(self.domain_dim, -1)
-        len_scale_mat = np.diag(1 / self.length_scale.flatten()) 
-        scaled_x = x @ len_scale_mat
+        ls_mat = np.atleast_2d(np.diag(1 / self.length_scale))
+        scaled_x = x @ ls_mat
         data = np.fft.ifft( np.exp( 1.j * self.phase_matrix @ scaled_x.T ), axis=0 ).real
         ddata = np.fft.ifft( 1.j * (self.phase_matrix @ len_scale_mat) @ np.exp( 1.j * self.phase_matrix @ scaled_x.T ), axis=0 ).real
         return data.T, ddata.T
@@ -100,7 +103,7 @@ class SSPSpace:
                num_sample_pts=10000,from_set_method='grid',num_init_pts =10): # other args for specfic methods
         if method=='least-squares':
             # problems due to complex log
-            x = np.linalg.lstsq(self.phase_matrix, (1.j*np.log(np.fft.fft(ssp,axis=0))).real)[0]
+            x = np.linalg.lstsq(self.phase_matrix, (1.j*np.log(np.fft.fft(ssp,axis=1))).real.T)[0]
             #raise NotImplementedError()
             #fssp = np.fft.fft(ssp,axis=0)
             #x = np.linalg.lstsq(np.tile(self.phase_matrix,(2,1)), np.hstack([np.arccos(fssp.real), np.arcsin(fssp.imag)]))
@@ -111,24 +114,39 @@ class SSPSpace:
 
             sims = sample_ssps @ ssp.T
             return sample_points[np.argmax(sims),:]
+        elif method=='direct-optim':
+            sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_init_pts) 
+            sims = sample_ssps @ ssp.T
+            x0 = sample_points[np.argmax(sims),:]
+            def min_func(x,target=ssp):
+                x_ssp = self.encode(np.atleast_2d(x).T)
+                return -np.inner(x_ssp, target)
+            soln = minimize(min_func, x0, method='L-BFGS-B')
+            return soln.x
         elif method=='grad_descent':
             sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_init_pts) 
-            sims = sample_ssps.T @ ssp
-            x = sample_points[:,np.argmax(sims)]
-            fssp = np.fft.fft(ssp,axis=0)
+            sims = sample_ssps @ ssp.T
+            x = sample_points[np.argmax(sims),:]
+            fssp = np.fft.fft(ssp,axis=1)
+            ls_mat = np.diag(1/self.length_scale.flatten())
             for j in range(10):
-                grad = (1.j * self.phase_matrix.T * np.exp(1.j * self.phase_matrix @ x)) @ fssp
+                scaled_x = x @ ls_mat
+                x_enc = np.exp(1.j * self.phase_matrix @ scaled_x)
+                grad_mat = (1.j * (self.phase_matrix @ ls_mat).T * x_enc)
+                grad =  (grad_mat @ fssp.T).flatten()
                 x = x - 0.1*grad.real
             return x
         elif method=='nonlin-reg':
             sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_init_pts) 
-            sims = sample_ssps.T @ ssp
-            x = sample_points[:,np.argmax(sims)]
-            fssp = np.fft.fft(ssp,axis=0)
+            sims = sample_ssps @ ssp.T
+            x = sample_points[np.argmax(sims),:]
+            fssp = np.fft.fft(ssp,axis=1)
             dy = np.hstack([fssp.real, fssp.imag])
+
+            ls_mat = np.diag(1/self.length_scale.flatten())
             for j in range(10):
-                J = np.vstack([self.phase_matrix * np.sin(self.phase_matrix @ x).reshape(-1,1),
-                               -self.phase_matrix * np.cos(self.phase_matrix @ x).reshape(-1,1)])
+                J = np.vstack([self.phase_matrix * np.sin(self.phase_matrix @ x @ ls_mat).reshape(1,-1),
+                               -self.phase_matrix * np.cos(self.phase_matrix @ x @ ls_mat).reshape(1,-1)])
                 soln = np.linalg.pinv(J.T @ J) @ J.T @ dy
                 x = x + soln
             return x
@@ -153,9 +171,18 @@ class SSPSpace:
             bounds = self.domain_bounds
         if method=='grid':
             n_per_dim = int(num_points**(1/self.domain_dim))
+            if n_per_dim**self.domain_dim != num_points:
+                warnings.warn((f'Evenly distributing points over a '
+                               f'{self.domain_dim} grid requires numbers '
+                               f'of samples to be powers of {self.domain_dim}.'
+                               f'Requested {num_points} samples, returning '
+                               f'{n_per_dim**self.domain_dim}'), RuntimeWarning)
+            ### end if
             xs = np.linspace(bounds[:,0],bounds[:,1],n_per_dim)
             xxs = np.meshgrid(*[xs[:,i] for i in range(self.domain_dim)])
-            return np.array([x.reshape(-1) for x in xxs]).T
+            retval = np.array([x.reshape(-1) for x in xxs]).T
+            assert retval.shape[1] == self.domain_dim, f'Expected {self.domain_dim}d data, got {retval.shape[1]}d data'
+            return retval
         elif method=='sobol':
             sampler = qmc.Sobol(d=self.domain_dim) 
             lbounds = bounds[:,0]
@@ -174,10 +201,11 @@ class SSPSpace:
     
     def get_sample_pts_and_ssps(self,num_points,method='grid'): 
         sample_points = self.get_sample_points(num_points,method)
-        assert sample_points.shape[0] == num_points
+        expected_points = (int(num_points**(1/self.domain_dim))**self.domain_dim)
+        assert sample_points.shape[0] == expected_points, f'Expected {expected_points} samples, got {sample_points.shape[0]}.'
 
         sample_ssps = self.encode(sample_points)
-        assert sample_ssps.shape[0] == num_points
+        assert sample_ssps.shape[0] == expected_points
 
         return sample_ssps, sample_points
     
