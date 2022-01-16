@@ -47,8 +47,32 @@ def factory(function_name: str) -> Tuple[Callable, dict, int]:
     elif function_name == 'tsunamis':
         raise NotImplemented('Need to implement the tsunami function')
         return None, None, 500
+    elif re.match('rastrigin', function_name): ## Looking for names like rastrigin1, rastrigin3 etc
+        num = re.search('\d+', function_name)
+        assert num is not None
+        dim = int(num[0])
+        return rastrigin, np.array([[-5.12,5.12] for i in range(dim)]), 500
+    elif function_name=='ackley':
+        return ackley, np.array([[-5,5], [-5,5]]), 500
+    elif re.match('rosenbrock', function_name):
+        num = re.search('\d+', function_name)
+        assert num is not None
+        dim = int(num[0])
+        return rosenbrock, np.array([[-10,10] for i in range(dim)]), 500 # actually theres no range, just need to cover 1,1,..,1
+    elif function_name=='beale':
+        return beale, np.array([[-4.5,4.5], [-4.5,4.5]]), 500
+    elif function_name=='easom':
+        return easom, np.aray([[-10,10], [-10,10]]), 500
+    elif function_name=='mccormick':
+        return mccormick, np.array([[-1.5,4],[-3,4]]), 500
+    elif re.match('styblinski-tang', function_name):
+        num = re.search('\d+', function_name)
+        assert num is not None
+        dim = int(num[0])
+        return styblinski_tang, np.array([[-5,5] for i in range(dim)]), 500
     else:
         raise RuntimeError(f'Unknown function {function_name}')
+
 
 def sample_points(func, num_pts):
     if not (func.name(), num_pts) in sample_points_cache:
@@ -135,6 +159,33 @@ def colville(x):
 
     return -fval
 
+def rastrigin(xs):
+    A = 10
+    return -(A*len(xs) + sum(xs**2 - A*np.cos(2*np.pi*xs), axis=1))
+
+def ackley(xs):
+    fval = -20*np.exp(-0.2*np.sqrt(0.5*(xs[:,0]**2 + xs[:,1]**2))) - np.exp(0.5*(np.cos(2*np.pi*xs[:,0]) + np.cos(2*np.pi*xs[:,1]))) + np.exp(1) + 20
+    return -fval
+    
+def rosenbrock(xs):
+    return -np.sum(100*(xs[:,1:] - xs[:,:-1]**2)**2 + (1-xs[:,:-1])**2, axis=1)
+    
+def beale(xs):
+    fval = (1.5 - xs[:,0] + xs[:,0]*xs[:,1])**2 + (2.25 - xs[:,0] + xs[:,0]*xs[:,1]**2)**2 + (2.625 - xs[:,0] + xs[:,0]*xs[:,1]**3)**2
+    return -fval
+
+def easom(xs):
+    # scaled by 10
+    xs = xs/10
+    fval = -np.cos(xs[:,0])*np.cos(xs[:,1])*np.exp(-(xs[:,0]-np.pi)**2 - (xs[:,1]-np.pi)**2)
+    return -fval
+
+def mccormick(xs):
+    fval = np.sin(xs[:,0] + xs[:,1]) + (xs[:,0] - xs[:,1])**2 - 1.5*xs[:,0] + 2.5*xs[:,1] + 1
+    return -fval
+
+def styblinski_tang(xs):
+    return -np.sum(xs**4 - 16*xs**2 + 5*xs, axis=1)/2
 
 
 if __name__=='__main__':
