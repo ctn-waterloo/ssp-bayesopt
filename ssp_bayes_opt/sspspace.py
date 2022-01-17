@@ -115,18 +115,20 @@ class SSPSpace:
             sims = sample_ssps @ ssp.T
             return sample_points[np.argmax(sims),:]
         elif method=='direct-optim':
-            sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_init_pts) 
-            sims = sample_ssps @ ssp.T
-            x0 = sample_points[np.argmax(sims),:]
+#             sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_init_pts) 
+#             sims = sample_ssps @ ssp.T
+#             x0 = sample_points[np.argmax(sims),:]
+            x0 = self.decode(ssp, method='from-set')
             def min_func(x,target=ssp):
-                x_ssp = self.encode(np.atleast_2d(x).T)
-                return -np.inner(x_ssp, target)
+                x_ssp = self.encode(np.atleast_2d(x))
+                return -np.inner(x_ssp, target).flatten()
             soln = minimize(min_func, x0, method='L-BFGS-B')
             return soln.x
         elif method=='grad_descent':
-            sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_init_pts) 
-            sims = sample_ssps @ ssp.T
-            x = sample_points[np.argmax(sims),:]
+#             sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_init_pts) 
+#             sims = sample_ssps @ ssp.T
+#             x = sample_points[np.argmax(sims),:]
+            x = self.decode(ssp, method='from-set')
             fssp = np.fft.fft(ssp,axis=1)
             ls_mat = np.diag(1/self.length_scale.flatten())
             for j in range(10):
@@ -137,9 +139,10 @@ class SSPSpace:
                 x = x - 0.1*grad.real
             return x
         elif method=='nonlin-reg':
-            sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_init_pts) 
-            sims = sample_ssps @ ssp.T
-            x = sample_points[np.argmax(sims),:]
+#             sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_init_pts) 
+#             sims = sample_ssps @ ssp.T
+#             x = sample_points[np.argmax(sims),:]
+            x = self.decode(ssp, method='from-set')
             fssp = np.fft.fft(ssp,axis=1)
             dy = np.hstack([fssp.real, fssp.imag])
 
