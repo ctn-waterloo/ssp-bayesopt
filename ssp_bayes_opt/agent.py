@@ -233,7 +233,7 @@ class SSPAgent(Agent):
         return self.ssp_space.encode(x)
     
     def decode(self,ssp):
-        return self.ssp_space.decode(ssp)
+        return self.ssp_space.decode(ssp, method='direct-optim')
 
 class GPAgent(Agent):
     def __init__(self, init_xs, init_ys):

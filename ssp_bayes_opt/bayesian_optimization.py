@@ -61,6 +61,8 @@ class BayesianOptimization:
                                                       **kwargs
                                                       )
 
+        self.lengthscale = agt.ssp_space.length_scale
+
         self.times = np.zeros((n_iter,))
         self.xs = []
         self.ys = []
