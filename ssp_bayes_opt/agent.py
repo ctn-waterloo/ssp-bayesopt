@@ -116,18 +116,12 @@ class SSPAgent(Agent):
                 train_phis = ssp_space.encode(train_x)
                 test_phis = ssp_space.encode(test_x)
 
-
-#                 W = np.linalg.pinv(train_phis) @ train_y
-#                 mu = np.dot(test_phis, W)
-#                 diff = test_y.flatten() - mu.flatten()
-#                 errors.append(np.mean(np.power(diff, 2)))
-
                 b = blr.BayesianLinearRegression(ssp_space.ssp_dim)
                 b.update(train_phis, train_y)
                 mu, var = b.predict(test_phis)
                 diff = test_y.flatten() - mu.flatten()
                 loss = -0.5*np.log(var) - np.divide(np.power(diff,2),var)
-                errors.append(np.sum(loss))
+                errors.append(np.sum(-loss))
             ### end for
             return np.sum(errors)
         ### end min_func
