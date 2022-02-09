@@ -28,6 +28,6 @@ setup(
             'scipy',
             'pytest',
             'mypy',
-            'typing-extensions'
+            'typing-extensions>=3.10'
             ]
 )
