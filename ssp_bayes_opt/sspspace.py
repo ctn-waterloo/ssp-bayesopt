@@ -122,7 +122,9 @@ class SSPSpace:
             def min_func(x,target=ssp):
                 x_ssp = self.encode(np.atleast_2d(x))
                 return -np.inner(x_ssp, target).flatten()
-            soln = minimize(min_func, x0, method='L-BFGS-B')
+            soln = minimize(min_func, x0, method='L-BFGS-B',
+                            bounds=self.domain_bounds)
+
             return soln.x
         elif method=='grad_descent':
 #             sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_init_pts) 

@@ -10,6 +10,13 @@ function_maximum_value = {
     'branin-hoo': -0.397887, # Because the function is negated to make it a maximization problem.
     'goldstein-price': -3/1e5, # Because the true function is scaled and negated.
     'colville': 0,
+    'rastrigin': 0,
+    'ackley': 0,
+    'rosenrock': 0,
+    'beale': 0,
+    'easom': 1,
+    'mccormick': 1.9133,
+    'styblinski-tang3': 39.16599*3 # 1D function
 }
 
 import ssp_bayes_opt
@@ -47,6 +54,7 @@ class SSPBayesOptTrial(pytry.Trial):
         print(optimizer.max)
         
         return dict(
+            lenscale=optimizer.lengthscale,
             regret=regrets,
             sample_locs=sample_locs,
             elapsed_time=elapsed_time,
@@ -58,11 +66,21 @@ class SSPBayesOptTrial(pytry.Trial):
         )
 
 cum_regrets = []
-num_trials = 4
+num_trials = 30
+
+func = 'goldstein-price'
+# func = 'himmelblau'
+# func = 'branin-hoo'
+alg = 'ssp-hex'
+import os.path
+data_dir = os.path.join('/run/media/furlong/Data/ssp-bayesopt/', func, alg)
+
 for trial in range(num_trials):
 #     r = SSPBayesOptTrial().run(**{'function_name':'branin-hoo', 'algorithm':'ssp-mi'})
-    r = SSPBayesOptTrial().run(**{'function_name':'himmelblau', 
-                                  'algorithm':'ssp-hex',
+    r = SSPBayesOptTrial().run(**{'data_format':'npz',
+                                  'data_dir':data_dir,
+                                  'function_name':func, 
+                                  'algorithm':alg,
                                   'num_restarts':10})
 #     cum_reg = np.divide(np.cumsum(r['regret']), np.arange(1, len(r['regret'])+1))
     cum_reg = r['regret']

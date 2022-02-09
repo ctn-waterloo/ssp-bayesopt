@@ -49,6 +49,9 @@ class Agent:
     def acquisition_func(self):
         pass
 
+    def get_lengthscale(self):
+        pass
+
 
 class PassthroughScaler:
     def __init__(self):
@@ -61,7 +64,7 @@ class PassthroughScaler:
         return x
 
 class SSPAgent(Agent):
-    def __init__(self, init_xs, init_ys, ssp_space=None):
+    def __init__(self, init_xs, init_ys, length_scale=None, ssp_space=None):
         super().__init__()
   
         self.num_restarts = 10
@@ -79,9 +82,13 @@ class SSPAgent(Agent):
         self.ssp_space = ssp_space
         # Optimize the length scales
         #self.ssp_space.optimize_lengthscale(init_xs, init_ys)
-        self.ssp_space.update_lengthscale(self._optimize_lengthscale(init_xs, init_ys))
+        if length_scale == None:
+            self.ssp_space.update_lengthscale(self._optimize_lengthscale(init_xs, init_ys))
+            print('Selected Lengthscale: ', self.ssp_space.length_scale)
+        else:
+            self.ssp_space.update_lengthscale(length_scale)
+            print('Specified Lengthscale: ', self.ssp_space.length_scale)
 #         self.ssp_space.length_scale=5
-        print('Selected Lengthscale: ', self.ssp_space.length_scale)
 
         # Encode the initial sample points 
         init_phis = self.ssp_space.encode(init_xs)
@@ -98,9 +105,12 @@ class SSPAgent(Agent):
 #         self.phis = None
 
     ### end __init__
+    def get_lengthscale(self):
+        return self.ssp_space.length_scale
 
     def _optimize_lengthscale(self, init_xs, init_ys):
-        ls_0 = np.array([[8.]]) 
+#         ls_0 = np.array([[8.]]) 
+        ls_0 = np.array([[1.]]) 
         self.scaler.fit(init_ys)
 
         def min_func(length_scale, xs=init_xs, ys=self.scaler.transform(init_ys),
@@ -127,7 +137,7 @@ class SSPAgent(Agent):
                 mu, var = b.predict(test_phis)
                 diff = test_y.flatten() - mu.flatten()
                 loss = -0.5*np.log(var) - np.divide(np.power(diff,2),var)
-                errors.append(np.sum(loss))
+                errors.append(np.sum(-loss))
             ### end for
             return np.sum(errors)
         ### end min_func
@@ -236,7 +246,7 @@ class SSPAgent(Agent):
         return self.ssp_space.decode(ssp, method='direct-optim')
 
 class GPAgent(Agent):
-    def __init__(self, init_xs, init_ys):
+    def __init__(self, init_xs, init_ys, length_scale=None, domain_bounds = None):
         super().__init__()
         # Store observations
         self.xs = init_xs
@@ -273,6 +283,12 @@ class GPAgent(Agent):
         
         # Reset the parameters after an update.
         self.gp.set_params(**(self._params))
+
+    def get_lengthscale(self):
+#         params = self.gp.get_params()
+#         self.gp.get_params()['kernel__length_scale']
+#         print(np.exp(self.gp.kernel.theta))
+        return np.exp(self.gp.kernel_.theta) 
 
     def acquisition_func(self):
         def min_func(x,
