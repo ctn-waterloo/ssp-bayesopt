@@ -85,6 +85,15 @@ def sample_points(func, num_pts):
         return sample_points, vals
     else:
         return sample_points_cache[(func.name(), num_pts)]
+    
+def rescale(func, domain):
+    dim = domain.shape[0]
+    old_min = domain[:,0].reshape(1,-1)
+    domain_new = np.array([[-5,5] for i in range(dim)])
+    new_range = (domain_new[:,1] - domain_new[:,0]).reshape(1,-1)
+    func_new = lambda x: func(new_range*(x + 5)/10 + old_min) 
+
+    return func_new, domain_new
 
 class Function:
 
