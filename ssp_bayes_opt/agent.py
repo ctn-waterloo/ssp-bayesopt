@@ -27,7 +27,7 @@ def factory(agent_type, init_xs, init_ys, **kwargs):
         ssp_space = sspspace.HexagonalSSPSpace(data_dim, **kwargs)
         agt = SSPAgent(init_xs, init_ys,ssp_space) 
     elif agent_type=='ssp-rand':
-        ssp_space = sspspace.RandomSSPSpace(data_dim, 127, **kwargs)
+        ssp_space = sspspace.RandomSSPSpace(data_dim, **kwargs)
         agt = SSPAgent(init_xs, init_ys,ssp_space) 
     elif agent_type == 'gp':
         agt = GPAgent(init_xs, init_ys)
@@ -80,9 +80,7 @@ class SSPAgent(Agent):
         
         self.ssp_space = ssp_space
         # Optimize the length scales
-        #self.ssp_space.optimize_lengthscale(init_xs, init_ys)
         self.ssp_space.update_lengthscale(self._optimize_lengthscale(init_xs, init_ys))
-#         self.ssp_space.length_scale=5
         print('Selected Lengthscale: ', self.ssp_space.length_scale)
 
         # Encode the initial sample points 
@@ -95,6 +93,8 @@ class SSPAgent(Agent):
         # MI params
         self.gamma_t = 0
         self.sqrt_alpha = np.log(2/1e-6)
+        
+        self.init_samples = self.ssp_space.get_sample_pts_and_ssps(400,'grid')
 
         # Cache for the input xs.
 #         self.phis = None
@@ -229,7 +229,7 @@ class SSPAgent(Agent):
         return self.ssp_space.encode(x)
     
     def decode(self,ssp):
-        return self.ssp_space.decode(ssp)
+        return self.ssp_space.decode(ssp,method='direct-optim',samples=self.init_samples)
 
 class GPAgent(Agent):
     def __init__(self, init_xs, init_ys, updating=True):
@@ -281,9 +281,8 @@ class GPAgent(Agent):
         self.gamma_t = self.gamma_t + sigma_t
     
         self.gp.fit(self.xs, self.ys)
+    ### end update
         
-        # Reset the parameters after an update.
-#         self.gp.set_params(**(self._params))
 
     def acquisition_func(self):
         def min_func(x,

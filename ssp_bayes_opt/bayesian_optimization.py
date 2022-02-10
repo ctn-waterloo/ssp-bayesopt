@@ -5,7 +5,7 @@ from . import agent
 from . import sspspace
 
 from scipy.stats import qmc
-from scipy.optimize import minimize
+from scipy.optimize import minimize, Bounds
 from typing import Callable
 
 class BayesianOptimization:
@@ -96,7 +96,7 @@ class BayesianOptimization:
                     # Do bounded optimization to ensure x stays in bound
                     soln = minimize(optim_func, x_init,
                                     jac=jac_func, 
-                                    method='L-BFGS-B', 
+                                    method='L-BFGS-B',
                                     bounds=self.bounds)
                     solnx = np.copy(soln.x)
                 else: ## ssp agent
@@ -123,6 +123,7 @@ class BayesianOptimization:
             # Log actions
             self.xs.append(np.copy(x_t))
             self.ys.append(np.copy(y_t))
+            self.agt = agt
 
     def _sample_domain(self, num_points: int=10) -> np.ndarray:
         sampler = qmc.Sobol(d=self.data_dim) 
