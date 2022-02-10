@@ -29,8 +29,10 @@ def factory(agent_type, init_xs, init_ys, **kwargs):
     elif agent_type=='ssp-rand':
         ssp_space = sspspace.RandomSSPSpace(data_dim, 127, **kwargs)
         agt = SSPAgent(init_xs, init_ys,ssp_space) 
-    elif agent_type == 'gp-mi':
+    elif agent_type == 'gp':
         agt = GPAgent(init_xs, init_ys)
+    elif agent_type == 'static-gp':
+        agt = GPAgent(init_xs, init_ys, updating=True, **kwargs)
     else:
         raise RuntimeWarning(f'Undefined agent type {agent_type}')
     return agt
@@ -230,27 +232,42 @@ class SSPAgent(Agent):
         return self.ssp_space.decode(ssp)
 
 class GPAgent(Agent):
-    def __init__(self, init_xs, init_ys):
+    def __init__(self, init_xs, init_ys, updating=True):
         super().__init__()
         # Store observations
         self.xs = init_xs
         self.ys = init_ys
         # create the gp
-        ## TODO instantiate scikitlearn regressor.
-        self.gp = GaussianProcessRegressor(
-                kernel=Matern(nu=2.5),
-                alpha=1e-6,
-                normalize_y=True,
-                n_restarts_optimizer=5,
-                random_state=None,
-                )
 
-        # fit to the initial values
+        ## Create the GP to use during optimization.
+        if updating:
+            kern = Matern(nu=2.5)
+        else:
+            ## fit to the initial values
+            fit_gp = GaussianProcessRegressor(
+                        kernel=Matern(nu=2.5),
+                        alpha=1e-6,
+                        normalize_y=True,
+                        n_restarts_optimizer=5,
+                        random_state=None,
+                    )
+            fit_gp.fit(self.xs, self.ys)
+            kern = Matern(nu=2.5,
+                          length_scale=np.exp(fit_gp.kernel_.theta),
+                          length_scale_bounds='fixed')
+        ### end if
+        self.gp = GaussianProcessRegressor(
+                    kernel=kern,
+                    alpha=1e-6,
+                    normalize_y=True,
+                    n_restarts_optimizer=5,
+                    random_state=None,
+                )
         self.gp.fit(self.xs, self.ys)
+
         self.gamma_t = 0
         self.sqrt_alpha = np.log(2/1e-6)
-
-        self._params = self.gp.get_params()
+    ### end __init__
 
     def eval(self, xs):
         mu, std = self.gp.predict(xs, return_std=True)
@@ -266,7 +283,7 @@ class GPAgent(Agent):
         self.gp.fit(self.xs, self.ys)
         
         # Reset the parameters after an update.
-        self.gp.set_params(**(self._params))
+#         self.gp.set_params(**(self._params))
 
     def acquisition_func(self):
         def min_func(x,
