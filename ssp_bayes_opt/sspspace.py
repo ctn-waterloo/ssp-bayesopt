@@ -99,36 +99,30 @@ class SSPSpace:
     #     return SSP(data,self)
     
  
-    def decode(self,ssp,method='from-set',
-               num_sample_pts=10000,from_set_method='grid',num_init_pts =10): # other args for specfic methods
+    def decode(self,ssp,method='from-set',sampling_method='grid',
+               num_samples =1000, samples=None): # other args for specfic methods
+        if samples is None:
+            sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_samples,sampling_method)
+        else:
+            sample_ssps, sample_points = samples
+            
+        assert sample_ssps.shape[1] == ssp.shape[1]
+        
         if method=='least-squares':
-            # problems due to complex log
             x = np.linalg.lstsq(self.phase_matrix, (1.j*np.log(np.fft.fft(ssp,axis=1))).real.T)[0]
-            #raise NotImplementedError()
-            #fssp = np.fft.fft(ssp,axis=0)
-            #x = np.linalg.lstsq(np.tile(self.phase_matrix,(2,1)), np.hstack([np.arccos(fssp.real), np.arcsin(fssp.imag)]))
             return x
         elif method=='from-set': ## ONLY ONE THAT WORKS WELL
-            sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_sample_pts,from_set_method)
-            assert sample_ssps.shape[1] == ssp.shape[1]
-
             sims = sample_ssps @ ssp.T
             return sample_points[np.argmax(sims),:]
         elif method=='direct-optim':
-#             sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_init_pts) 
-#             sims = sample_ssps @ ssp.T
-#             x0 = sample_points[np.argmax(sims),:]
-            x0 = self.decode(ssp, method='from-set')
+            x0 = self.decode(ssp, method='from-set',sampling_method=sampling_method, num_samples=num_samples, samples=samples)
             def min_func(x,target=ssp):
                 x_ssp = self.encode(np.atleast_2d(x))
                 return -np.inner(x_ssp, target).flatten()
-            soln = minimize(min_func, x0, method='L-BFGS-B')
+            soln = minimize(min_func, x0, method='L-BFGS-B',bounds=self.domain_bounds)
             return soln.x
         elif method=='grad_descent':
-#             sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_init_pts) 
-#             sims = sample_ssps @ ssp.T
-#             x = sample_points[np.argmax(sims),:]
-            x = self.decode(ssp, method='from-set')
+            x = self.decode(ssp, method='from-set',sampling_method=sampling_method, num_samples=num_samples, samples=samples)
             fssp = np.fft.fft(ssp,axis=1)
             ls_mat = np.diag(1/self.length_scale.flatten())
             for j in range(10):
@@ -139,10 +133,7 @@ class SSPSpace:
                 x = x - 0.1*grad.real
             return x
         elif method=='nonlin-reg':
-#             sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_init_pts) 
-#             sims = sample_ssps @ ssp.T
-#             x = sample_points[np.argmax(sims),:]
-            x = self.decode(ssp, method='from-set')
+            x = self.decode(ssp, method='from-set',sampling_method=sampling_method, num_samples=num_samples, samples=samples)
             fssp = np.fft.fft(ssp,axis=1)
             dy = np.hstack([fssp.real, fssp.imag])
 
@@ -282,7 +273,84 @@ class HexagonalSSPSpace(SSPSpace):
             encoders[:,i] = N * proj_mat @ sub_space.encode(sample_pts[:,i])
         return encoders
 
-    
+class RdSSPSpace(SSPSpace):
+    def __init__(self,  domain_dim:int,ssp_dim: int=151,  
+                 scale_max=1,
+                 domain_bounds=None, length_scale=1): 
+        # From nengolib
+        from scipy.special import beta, betainc, betaincinv
+        from nengo.dists import UniformHypersphere
+        from scipy.linalg import svd
+        
+        def _rd_generate(n, d, seed=0.5):
+            """Generates the first ``n`` points in the ``R_d`` sequence."""
+        
+            # http://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/
+            def gamma(d, n_iter=20):
+                """Newton-Raphson-Method to calculate g = phi_d."""
+                x = 1.0
+                for _ in range(n_iter):
+                    x -= (x**(d + 1) - x - 1) / ((d + 1) * x**d - 1)
+                return x
+        
+            g = gamma(d)
+            alpha = np.zeros(d)
+            for j in range(d):
+                alpha[j] = (1/g) ** (j + 1) % 1
+        
+            z = np.zeros((n, d))
+            z[0] = (seed + alpha) % 1
+            for i in range(1, n):
+                z[i] = (z[i-1] + alpha) % 1
+        
+            return z
+        
+        def spherical_transform(samples):
+            samples = np.asarray(samples)
+            samples = samples[:, None] if samples.ndim == 1 else samples
+            coords = np.empty_like(samples)
+            n, d = coords.shape
+        
+            # inverse transform method (section 1.5.2)
+            for j in range(d):
+                coords[:, j] = (np.pi * np.sin(np.pi * samples[:, j]) ** (d-j-1) / beta((d-j) / 2., .5))
+                
+            # spherical coordinate transform
+            mapped = np.ones((n, d+1))
+            i = np.ones(d)
+            i[-1] = 2.0
+            s = np.sin(i[None, :] * np.pi * coords)
+            c = np.cos(i[None, :] * np.pi * coords)
+            mapped[:, 1:] = np.cumprod(s, axis=1)
+            mapped[:, :-1] *= c
+            return mapped
+        
+        def random_orthogonal(d, rng=None):
+            rng = np.random if rng is None else rng
+            m = UniformHypersphere(surface=True).sample(d, d, rng=rng)
+            u, s, v = svd(m)
+            return np.dot(u, v)
+        
+        n = ssp_dim//2
+        if domain_dim == 1:
+            samples = np.linspace(1./n, 1., n)[:, None]
+        else:
+            samples = _rd_generate(n, domain_dim)
+        samples, radius = samples[:, :-1], samples[:, -1:] ** (1. / domain_dim)
+
+        mapped = spherical_transform(samples)
+
+        # radius adjustment for ball versus sphere, and a random rotation
+        rotation = random_orthogonal(domain_dim)
+        phases = np.dot(mapped * radius, rotation)
+        
+        axis_matrix = _constructaxisfromphases(phases)
+        ssp_dim = axis_matrix.shape[0]
+        super().__init__(domain_dim,ssp_dim,axis_matrix=axis_matrix,
+                       domain_bounds=domain_bounds,length_scale=length_scale)
+        
+        
+        
     
 def _constructaxisfromphases(K):
     d = K.shape[0]
