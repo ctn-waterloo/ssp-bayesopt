@@ -12,6 +12,7 @@ from sklearn.preprocessing import StandardScaler
 
 from . import sspspace
 from . import blr
+from .kernels import SincKernel
 
 import functools
 import warnings
@@ -246,7 +247,7 @@ class SSPAgent(Agent):
         return self.ssp_space.decode(ssp, method='direct-optim')
 
 class GPAgent(Agent):
-    def __init__(self, init_xs, init_ys, length_scale=None, domain_bounds = None):
+    def __init__(self, init_xs, init_ys, length_scale=None, domain_bounds = None, kernel='matern'):
         super().__init__()
         # Store observations
         self.xs = init_xs
@@ -254,7 +255,7 @@ class GPAgent(Agent):
         # create the gp
         ## TODO instantiate scikitlearn regressor.
         self.gp = GaussianProcessRegressor(
-                kernel=Matern(nu=2.5),
+                kernel=Matern(nu=2.5) if kernel == 'matern' else SincKernel(),
                 alpha=1e-6,
                 normalize_y=True,
                 n_restarts_optimizer=5,
