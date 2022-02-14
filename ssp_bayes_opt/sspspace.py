@@ -234,7 +234,8 @@ class RandomSSPSpace(SSPSpace):
         axis_matrix = _constructaxisfromphases(partial_phases)
         super().__init__(domain_dim,ssp_dim,axis_matrix=axis_matrix,
                        domain_bounds=domain_bounds,length_scale=length_scale)
-        
+
+
 class HexagonalSSPSpace(SSPSpace):
     def __init__(self,  domain_dim:int,ssp_dim: int=151, n_rotates:int=5, n_scales:int=5, 
                  scale_min=2*np.pi/np.sqrt(6) - 0.5, scale_max=2*np.pi/np.sqrt(6) + 0.5,
