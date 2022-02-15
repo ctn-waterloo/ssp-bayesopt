@@ -51,6 +51,9 @@ class Agent:
     def acquisition_func(self):
         pass
 
+    def length_scale(self):
+        raise NotImplementedError(f'{self.__class__.__name__} does not implement lengthscale.')
+
 
 class PassthroughScaler:
     def __init__(self):
@@ -232,6 +235,9 @@ class SSPAgent(Agent):
 #         return self.ssp_space.decode(ssp, method='direct-optim')
         return self.ssp_space.decode(ssp,method='direct-optim',samples=self.init_samples)
 
+    def length_scale(self):
+        return self.ssp_space.length_scale
+
 
 class GPAgent(Agent):
     def __init__(self, init_xs, init_ys, updating=True):
@@ -299,3 +305,6 @@ class GPAgent(Agent):
                 return -(mu + phi).flatten()
 
         return min_func, None
+
+    def length_scale(self):
+        return self.gp.kernel_.length_scale
