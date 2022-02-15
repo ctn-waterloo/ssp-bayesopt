@@ -39,9 +39,11 @@ class BayesianOptimization:
             ssp_space = sspspace.RandomSSPSpace(self.data_dim, **kwargs)
             agt = agent.SSPAgent(init_xs, init_ys,ssp_space) 
         elif agent_type=='gp':
-            agt = agent.GPAgent(init_xs, init_ys,**kwargs) 
+#             agt = agent.GPAgent(init_xs, init_ys,**kwargs) 
+            agt = agent.GPAgent(init_xs, init_ys) 
         elif agent_type=='static-gp':
-            agt = agent.GPAgent(init_xs, init_ys, updating=False, **kwargs) 
+#             agt = agent.GPAgent(init_xs, init_ys, updating=False, **kwargs) 
+            agt = agent.GPAgent(init_xs, init_ys, updating=False) 
         else:
             raise NotImplementedError()
         return agt, init_xs, init_ys
@@ -63,7 +65,8 @@ class BayesianOptimization:
                                                       **kwargs
                                                       )
 
-        self.lengthscale = agt.ssp_space.length_scale
+#         self.lengthscale = agt.ssp_space.length_scale
+        self.lengthscale = agt.length_scale()
 
         self.times = np.zeros((n_iter,))
         self.xs = []
@@ -94,7 +97,7 @@ class BayesianOptimization:
                
                 x_init = np.random.uniform(low=lbounds, high=ubounds, size=(len(ubounds),))
 
-                if agent_type=='gp':
+                if agent_type=='gp' or agent_type=='static-gp':
                     # Do bounded optimization to ensure x stays in bound
                     soln = minimize(optim_func, x_init,
                                     jac=jac_func, 
