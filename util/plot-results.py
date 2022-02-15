@@ -13,14 +13,19 @@ import pytry
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-mpl.use('pgf')
+display = True
+if not display:
+    mpl.use('pgf')
+    mpl.rcParams.update({
+        'pgf.texsystem': 'pdflatex',
+        'text.usetex': True,
+        'pgf.rcfonts': False,
+        'pdf.fonttype': 42,
+        'ps.fonttype': 42,
+        })
+### end if
 mpl.rcParams.update({
-    'pgf.texsystem': 'pdflatex',
     'font.family': 'serif',
-    'text.usetex': True,
-    'pgf.rcfonts': False,
-    'pdf.fonttype': 42,
-    'ps.fonttype': 42,
     'figure.autolayout': True
     })
 
@@ -30,8 +35,12 @@ import best
 
 def get_data(data_frame):
     regret = np.vstack(data_frame['regret'].values)
-    avg_regret = np.vstack(data_frame['avg_regret'].values)
-    time = np.vstack(data_frame['times'].values) * 1e-9
+#     avg_regret = np.vstack(data_frame['avg_regret'].values)
+    avg_regret = np.divide(np.cumsum(regret, axis=1), np.cumsum(np.arange(1,regret.shape[1]+1)))
+    if 'times' in data_frame.columns:
+        time = np.vstack(data_frame['times'].values) * 1e-9
+    else:
+        time = np.vstack(data_frame['elapsed_time'].values) * 1e-9
     return regret, avg_regret, time
 
 def get_stats(data):
@@ -54,10 +63,11 @@ if __name__ == '__main__':
     print('Function & Test point & Diff of Mus & HDI & Diff of Stds & HDI & Effect Size & HDI\\\\' )
     for func_name in args.folders:
 #         func_name='himmelblau'
-        gp_data = pd.DataFrame(pytry.read(f'{func_name}/gp-mi'))
+#         gp_data = pd.DataFrame(pytry.read(f'{func_name}/gp-mi'))
+        gp_data = pd.DataFrame(pytry.read(f'{func_name}/static-gp'))
         gp_regret, gp_avg_regret, gp_time = get_data(gp_data)
 
-        ssp_data = pd.DataFrame(pytry.read(f'{func_name}/ssp-mi'))
+        ssp_data = pd.DataFrame(pytry.read(f'{func_name}/ssp-hex'))
         ssp_regret, ssp_avg_regret, ssp_time = get_data(ssp_data)
 
 #         hex_data = pd.DataFrame(pytry.read(f'{func_name}/hex-mi'))
@@ -121,25 +131,27 @@ if __name__ == '__main__':
         plt.title(f'Average Regret for target: {func_name.title()}')
 #         plt.title(f'Regret vs Sample Number, {func_name.title()}, N={ssp_num_trials}', fontsize=18)
         plt.tight_layout()
-        plt.savefig(f'{func_name}-regret.{plot_filetype}')
+
+        if not display:
+            plt.savefig(f'{func_name}-regret.{plot_filetype}')
 
 #         plt.subplot(2, 1, 2)
         plt.figure()
-        N=1
+        N=0
         steps = range(N,budget+1)
 #         gp_time_mu, gp_time_ste = get_stats(np.cumsum(gp_time, axis=1))
 #         ssp_time_mu, ssp_time_ste = get_stats(np.cumsum(ssp_time, axis=1))
 #         hex_time_mu, hex_time_ste = get_stats(np.cumsum(hex_time, axis=1))
 
-        gp_time_mu, gp_time_ste = get_stats(gp_time)
-        ssp_time_mu, ssp_time_ste = get_stats(ssp_time)
-#         hex_time_mu, hex_time_ste = get_stats(hex_time)
-        
-        plt.fill_between(steps[N:], (gp_time_mu - gp_time_ste)[N:], (gp_time_mu + gp_time_ste)[N:], alpha=0.6)
-        plt.plot(steps[N:], gp_time_mu[N:], label='GP-MI', ls='--')
-
-        plt.fill_between(steps[N:], (ssp_time_mu - ssp_time_ste)[N:], (ssp_time_mu + ssp_time_ste)[N:], alpha=0.6)
-        plt.plot(steps[N:], ssp_time_mu[N:], label='Rand SSP-MI')
+#         gp_time_mu, gp_time_ste = get_stats(gp_time)
+#         ssp_time_mu, ssp_time_ste = get_stats(ssp_time)
+# #         hex_time_mu, hex_time_ste = get_stats(hex_time)
+#         
+#         plt.fill_between(steps[N+11:], (gp_time_mu - gp_time_ste)[N:], (gp_time_mu + gp_time_ste)[N:], alpha=0.6)
+#         plt.plot(steps[N+11:], gp_time_mu[N:], label='GP-MI', ls='--')
+# 
+#         plt.fill_between(steps[N:], (ssp_time_mu - ssp_time_ste)[N:], (ssp_time_mu + ssp_time_ste)[N:], alpha=0.6)
+#         plt.plot(steps[N:], ssp_time_mu[N:], label='Rand SSP-MI')
 
 #         plt.fill_between(steps[N:], (hex_time_mu - hex_time_ste)[N:], (hex_time_mu + hex_time_ste)[N:], alpha=0.6)
 #         plt.plot(steps[N:], hex_time_mu[N:], label='Hex SSP-MI')
@@ -156,6 +168,10 @@ if __name__ == '__main__':
         plt.xlabel('Sample Number')#, fontsize=24)
         plt.title(f'Query Time vs Sample Number, {func_name.title()}, N={ssp_num_trials}')#, fontsize=18)
         plt.tight_layout()
-        plt.savefig(f'{func_name}-time.{plot_filetype}')
+
+        if not display:
+            plt.savefig(f'{func_name}-time.{plot_filetype}')
+        else:
+            plt.show()
 
 #     plt.show()

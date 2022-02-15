@@ -5,7 +5,7 @@ from . import agent
 from . import sspspace
 
 from scipy.stats import qmc
-from scipy.optimize import minimize
+from scipy.optimize import minimize, Bounds
 from typing import Callable
 
 class BayesianOptimization:
@@ -45,7 +45,11 @@ class BayesianOptimization:
 #             agt = agent.SSPAgent(init_xs, init_ys,ssp_space) 
             agt = agent.SSPAgent(init_xs, init_ys,length_scale,ssp_space=ssp_space) 
         elif agent_type=='gp':
-            agt = agent.GPAgent(init_xs, init_ys,**kwargs) 
+#             agt = agent.GPAgent(init_xs, init_ys,**kwargs) 
+            agt = agent.GPAgent(init_xs, init_ys) 
+        elif agent_type=='static-gp':
+#             agt = agent.GPAgent(init_xs, init_ys, updating=False, **kwargs) 
+            agt = agent.GPAgent(init_xs, init_ys, updating=False) 
         else:
             raise NotImplementedError()
         return agt, init_xs, init_ys
@@ -71,7 +75,7 @@ class BayesianOptimization:
                                                       )
 
 #         self.lengthscale = agt.ssp_space.length_scale
-        self.lengthscale = agt.get_lengthscale()
+        self.lengthscale = agt.length_scale()
 
         self.times = np.zeros((n_iter,))
         self.xs = []
@@ -102,11 +106,11 @@ class BayesianOptimization:
                
                 x_init = np.random.uniform(low=lbounds, high=ubounds, size=(len(ubounds),))
 
-                if agent_type=='gp':
+                if agent_type=='gp' or agent_type=='static-gp':
                     # Do bounded optimization to ensure x stays in bound
                     soln = minimize(optim_func, x_init,
                                     jac=jac_func, 
-                                    method='L-BFGS-B', 
+                                    method='L-BFGS-B',
                                     bounds=self.bounds)
                     solnx = np.copy(soln.x)
                 else: ## ssp agent
@@ -133,6 +137,7 @@ class BayesianOptimization:
             # Log actions
             self.xs.append(np.copy(x_t))
             self.ys.append(np.copy(y_t))
+            self.agt = agt
 
     def _sample_domain(self, num_points: int=10) -> np.ndarray:
         sampler = qmc.Sobol(d=self.data_dim) 
