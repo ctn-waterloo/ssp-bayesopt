@@ -8,7 +8,34 @@ import warnings
 class SSPSpace:
     def __init__(self, domain_dim: int, ssp_dim: int, axis_matrix=None, phase_matrix=None,
                  domain_bounds=None, length_scale=1):
+        '''
+        Represents a domain using spatial semantic pointers.
 
+        Parameters:
+        -----------
+
+        domain_dim : int 
+            The dimensionality of the domain being represented.
+
+        ssp_dim : int
+            The dimensionality of the spatial semantic pointer vector.
+
+        axis_matrix : np.ndarray
+            A ssp_dim X domain_dim ndarray representing the axis vectors for
+            the domain.
+
+        phase_matrix : np.ndarray
+            A ssp_dim x domain_dim ndarray representing the frequency 
+            components of the SSP representation.
+
+        domain_bounds : np.ndarray
+            A domain_dim X 2 ndarray giving the lower and upper bounds of the 
+            domain, used in decoding from an ssp to the point it represents.
+
+        length_scale : float or np.ndarray
+            Scales values before encoding.
+            
+        '''
         self.domain_dim = domain_dim
         self.ssp_dim = ssp_dim
         self.length_scale = length_scale * np.ones((self.domain_dim,1))
@@ -32,6 +59,9 @@ class SSPSpace:
             self.axis_matrix = np.fft.ifft(np.exp(1.j*phase_matrix), axis=0).real
             
     def update_lengthscale(self, scale):
+        '''
+        Changes the lengthscale being used in the encoding.
+        '''
         if not isinstance(scale, np.ndarray) or scale.size == 1:
             self.length_scale = scale * np.ones((self.domain_dim,))
         else:
@@ -56,6 +86,20 @@ class SSPSpace:
         self.length_scale = retval.x.reshape(-1,1)
     
     def encode(self,x):
+        '''
+        Transforms input data into an SSP representation.
+
+        Parameters:
+        -----------
+        x : np.ndarray
+            A (num_samples, domain_dim) array representing data to be encoded.
+
+        Returns:
+        --------
+        data : np.ndarray
+            A (num_samples, ssp_dim) array of the ssp representation of the data
+            
+        '''
         assert x.ndim == 2, f'Expected 2d data (samples, features), got {x.ndim}d data.'
         assert x.shape[1] == self.phase_matrix.shape[1], (f'Expected data to have '
                                                           f'{self.phase_matrix.shape[1]} '
@@ -72,6 +116,25 @@ class SSPSpace:
         return data.T
     
     def encode_and_deriv(self,x):
+        '''
+        Returns the ssp representation of the data and the derivative of
+        the encoding.
+
+        Parameters:
+        -----------
+        x : np.ndarray
+            A (num_samples, domain_dim) array representing data to be encoded.
+
+        Returns:
+        --------
+        data : np.ndarray
+            A (num_samples, ssp_dim) array of the ssp representation of the 
+            data
+
+        grad : np.ndarray
+            A (num_samples, ssp_dim, domain_dim) array of the ssp representation of the data
+
+        '''
         assert x.ndim == 2, f'Expected 2d data (samples, features), got {x.ndim}d data.'
         assert x.shape[1] == self.phase_matrix.shape[1], (f'Expected data to have ' 
                                                          f'{self.phase_matrix.shape[1]} '
@@ -101,6 +164,31 @@ class SSPSpace:
  
     def decode(self,ssp,method='from-set',sampling_method='grid',
                num_samples =1000, samples=None): # other args for specfic methods
+        '''
+        Transforms ssp representation back into domain representation.
+
+        Parameters:
+        -----------
+        ssp : np.ndarray
+            SSP representation of a data point.
+
+        method : {'from-set', 'direct-optim'}
+            The technique for decoding the ssp.  from-set samples the domain
+            and finds the closest match under the dot product. direct-optim
+            does an initial coarse sampling and then optimizes the decoded
+            value starting from the initial best match in the coarse sampling.
+
+        sampling_method : {'grid'}
+            Evenly distributes samples along the domain axes
+
+        num_samples : int
+            The number of samples along each axis.
+
+        Returns:
+        --------
+        x : np.ndarray
+            The decoded point
+        '''
         if samples is None:
             sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_samples,sampling_method)
         else:
@@ -217,6 +305,9 @@ class SSPSpace:
         return s
             
 class RandomSSPSpace(SSPSpace):
+    '''
+    Creates an SSP space using randomly generated frequency components.
+    '''
     def __init__(self, domain_dim: int, ssp_dim: int,  domain_bounds=None, length_scale=1, rng=np.random.default_rng()):
 #         partial_phases = rng.random.rand(ssp_dim//2,domain_dim)*2*np.pi - np.pi
         partial_phases = rng.random((ssp_dim // 2, domain_dim)) * 2 * np.pi - np.pi
@@ -225,6 +316,10 @@ class RandomSSPSpace(SSPSpace):
                        domain_bounds=domain_bounds,length_scale=length_scale)
         
 class HexagonalSSPSpace(SSPSpace):
+    '''
+    Creates an SSP space using the Hexagonal Tiling developed by NS Dumont 
+    (2020)
+    '''
     def __init__(self,  domain_dim:int,ssp_dim: int=151, n_rotates:int=5, n_scales:int=5, 
                  scale_min=2*np.pi/np.sqrt(6) - 0.5, scale_max=2*np.pi/np.sqrt(6) + 0.5,
                  domain_bounds=None, length_scale=1):
