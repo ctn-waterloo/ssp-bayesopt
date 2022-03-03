@@ -80,8 +80,8 @@ class SamplingTrial(pytry.Trial):
 if __name__=='__main__':
     parser = ArgumentParser()
 
-    parser.add_argument('--func', dest='function_name', type=str, default='branin-hoo')
-    parser.add_argument('--agent', dest='agent_type', type=str, default='gp')
+    parser.add_argument('--func', dest='function_name', type=str, default='himmelblau')
+    parser.add_argument('--agent', dest='agent_type', type=str, default='ssp-rand')
     parser.add_argument('--ssp-dim', dest='ssp_dim', type=str, default=151)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=100)
     parser.add_argument('--num-trials', dest='num_trials', type=int, default=1)

@@ -144,7 +144,7 @@ class SSPSpace:
         ls_mat = np.atleast_2d(np.diag(1 / self.length_scale))
         scaled_x = x @ ls_mat
         data = np.fft.ifft( np.exp( 1.j * self.phase_matrix @ scaled_x.T ), axis=0 ).real
-        ddata = np.fft.ifft( 1.j * (self.phase_matrix @ len_scale_mat) @ np.exp( 1.j * self.phase_matrix @ scaled_x.T ), axis=0 ).real
+        ddata = np.fft.ifft( 1.j * (self.phase_matrix @ ls_mat) @ np.exp( 1.j * self.phase_matrix @ scaled_x.T ), axis=0 ).real
         return data.T, ddata.T
     
     def encode_fourier(self,x):
@@ -303,6 +303,40 @@ class SSPSpace:
         s = np.zeros(self.ssp_dim)
         s[0] = 1
         return s
+    
+    def bind(self,a,b):
+        return np.fft.ifft(np.fft.fft(a) * np.fft.fft(b)).real
+    
+    def invert(self,a):
+        return a[-np.arange(len(a))]
+    
+    def similarity_plot(self,ssp,n_grid=100,plot_type='heatmap',ax=None,**kwargs):
+        import matplotlib.pyplot as plt
+        if ax is None:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+            
+        if self.domain_dim == 1:
+            xs = np.linspace(self.domain_bounds[0,0],self.domain_bounds[0,1], n_grid)
+            sims = ssp @ self.encode(np.atleast_2d(xs).T).T
+            im = ax.plot(xs, sims.reshape(-1) )
+            ax.set_xlim(self.domain_bounds[0,0],self.domain_bounds[0,1])
+        elif self.domain_dim == 2:
+            xs = np.linspace(self.domain_bounds[0,0],self.domain_bounds[0,1], n_grid)
+            ys = np.linspace(self.domain_bounds[1,0],self.domain_bounds[1,1], n_grid)
+            X,Y = np.meshgrid(xs,ys)
+            sims = ssp @ self.encode(np.vstack([X.reshape(-1),Y.reshape(-1)]).T).T 
+            if plot_type=='heatmap':
+                im = ax.pcolormesh(X,Y,sims.reshape(X.shape),**kwargs)
+            elif plot_type=='contour':
+                im = ax.contour(X,Y,sims.reshape(X.shape),**kwargs)
+            elif plot_type=='contourf':
+                im = ax.contourf(X,Y,sims.reshape(X.shape),**kwargs)
+            ax.set_xlim(self.domain_bounds[0,0],self.domain_bounds[0,1])
+            ax.set_ylim(self.domain_bounds[1,0],self.domain_bounds[1,1])
+        else:
+            raise NotImplementedError()
+        return im
             
 class RandomSSPSpace(SSPSpace):
     '''
@@ -310,9 +344,37 @@ class RandomSSPSpace(SSPSpace):
     '''
     def __init__(self, domain_dim: int, ssp_dim: int,  domain_bounds=None, length_scale=1, rng=np.random.default_rng()):
 #         partial_phases = rng.random.rand(ssp_dim//2,domain_dim)*2*np.pi - np.pi
-        partial_phases = rng.random((ssp_dim // 2, domain_dim)) * 2 * np.pi - np.pi
-        axis_matrix = _constructaxisfromphases(partial_phases)
-        super().__init__(domain_dim,ssp_dim,axis_matrix=axis_matrix,
+        
+        
+        #partial_phases = rng.random((ssp_dim // 2, domain_dim)) * 2 * np.pi - np.pi
+        #axis_matrix = _constructaxisfromphases(partial_phases)
+        def make_good_unitary(dim, eps=1e-3, rng=np.random):
+            a = rng.rand((dim - 1) // 2)
+            sign = rng.choice((-1, +1), len(a))
+            phi = sign * np.pi * (eps + a * (1 - 2 * eps))
+            assert np.all(np.abs(phi) >= np.pi * eps)
+            assert np.all(np.abs(phi) <= np.pi * (1 - eps))
+        
+            fv = np.zeros(dim, dtype='complex64')
+            fv[0] = 1
+            fv[1:(dim + 1) // 2] = np.cos(phi) + 1j * np.sin(phi)
+            fv[-1:dim // 2:-1] = np.conj(fv[1:(dim + 1) // 2])
+            if dim % 2 == 0:
+                fv[dim // 2] = 1
+        
+            assert np.allclose(np.abs(fv), 1)
+            v = np.fft.ifft(fv)
+            
+            v = v.real
+            assert np.allclose(np.fft.fft(v), fv)
+            assert np.allclose(np.linalg.norm(v), 1)
+            return v
+
+        axis_matrix = np.zeros((ssp_dim,domain_dim))
+        for i in range(domain_dim):
+            axis_matrix[:,i] = make_good_unitary(ssp_dim)
+
+        super().__init__(domain_dim,axis_matrix.shape[0],axis_matrix=axis_matrix,
                        domain_bounds=domain_bounds,length_scale=length_scale)
         
 class HexagonalSSPSpace(SSPSpace):
@@ -321,9 +383,12 @@ class HexagonalSSPSpace(SSPSpace):
     (2020)
     '''
     def __init__(self,  domain_dim:int,ssp_dim: int=151, n_rotates:int=5, n_scales:int=5, 
-                 scale_min=2*np.pi/np.sqrt(6) - 0.5, scale_max=2*np.pi/np.sqrt(6) + 0.5,
+                 scale_min=0.1, scale_max=3,
                  domain_bounds=None, length_scale=1):
-        #if (n_rotates==5) & (n_scales==5) & (ssp_dim!=151): # user wants to define ssp with total dim, not number of simplex rotates and scales
+        if (n_rotates==5) & (n_scales==5) & (ssp_dim!=151): # user wants to define ssp with total dim, not number of simplex rotates and scales
+            n_rotates = int(np.sqrt((ssp_dim-1)/(2*(domain_dim+1))))
+            n_scales = n_rotates
+            ssp_dim = n_rotates*n_scales*(domain_dim+1)*2 + 1
             
         phases_hex = np.hstack([np.sqrt(1+ 1/domain_dim)*np.identity(domain_dim) - (domain_dim**(-3/2))*(np.sqrt(domain_dim+1) + 1),
                          (domain_dim**(-1/2))*np.ones((domain_dim,1))]).T
@@ -340,7 +405,7 @@ class HexagonalSSPSpace(SSPSpace):
             scales = np.linspace(scale_min,scale_max,n_scales+n_rotates)
             phases_scaled_rotated = np.vstack([phases_hex*i for i in scales])
         elif (domain_dim == 2):
-            angles = np.linspace(0,2*np.pi/3,n_rotates)
+            angles = np.linspace(0,2*np.pi/3,n_rotates,endpoint=False)
             R_mats = np.stack([np.stack([np.cos(angles), -np.sin(angles)],axis=1),
                         np.stack([np.sin(angles), np.cos(angles)], axis=1)], axis=1)
             phases_scaled_rotated = (R_mats @ phases_scaled.T).transpose(0,2,1).reshape(-1,domain_dim)
