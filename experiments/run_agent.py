@@ -40,6 +40,7 @@ class SamplingTrial(pytry.Trial):
         self.param('num initial samples', num_init_samples=10)
         self.param('number of sample points', num_samples=100)
         self.param('ssp dim', ssp_dim=151)
+        self.param('length scale', lenscale=None)
     
     def evaluate(self, p):        
         target, pbounds, budget = functions.factory(p.function_name)
@@ -49,8 +50,12 @@ class SamplingTrial(pytry.Trial):
                                                        verbose=p.verbose)
         
         start = time.thread_time_ns()
-        optimizer.maximize(init_points=p.num_init_samples, n_iter=budget,
-                           agent_type=p.agent_type,ssp_dim=p.ssp_dim,length_scale=3.9)
+        optimizer.maximize(init_points=p.num_init_samples, 
+                           n_iter=budget,
+                           lenscale=p.lenscale,
+                           agent_type=p.agent_type,
+                           ssp_dim=p.ssp_dim,
+                           )
         elapsed_time = time.thread_time_ns() - start
 
         vals = np.zeros((p.num_init_samples + budget,))
@@ -70,6 +75,7 @@ class SamplingTrial(pytry.Trial):
             times = optimizer.times,
             budget=budget,
             vals=vals,
+            len_scale=optimizer.lengthscale,
             mus=None,
             variances=None,
             acquisition=None,
@@ -83,6 +89,7 @@ if __name__=='__main__':
     parser.add_argument('--func', dest='function_name', type=str, default='branin-hoo')
     parser.add_argument('--agent', dest='agent_type', type=str, default='gp')
     parser.add_argument('--ssp-dim', dest='ssp_dim', type=str, default=151)
+    parser.add_argument('--len-scale', dest='lenscale', type=float, default=None)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=100)
     parser.add_argument('--num-trials', dest='num_trials', type=int, default=1)
     parser.add_argument('--data-dir', dest='data_dir', type=str, default='/home/ns2dumon/Documents/ssp-bayesopt/experiments/data/')
@@ -106,6 +113,7 @@ if __name__=='__main__':
                   'data_dir':data_path,
                   'seed':seed, 
                   'verbose':False,
-                  'ssp_dim':args.ssp_dim
+                  'ssp_dim':args.ssp_dim,
+                  'lenscale':args.lenscale
                   }
         r = SamplingTrial().run(**params)

@@ -29,7 +29,7 @@ class BayesianOptimization:
 
     def initialize_agent(self,init_points: int =10, 
                          agent_type='ssp-hex',
-                         length_scale: int = None,
+                         length_scale: float = None,
                          **kwargs):
         init_xs = self._sample_domain(num_points=init_points)
         init_ys = np.array([self.target(np.atleast_2d(x)) for x in init_xs]).reshape((init_points,-1))
@@ -49,7 +49,7 @@ class BayesianOptimization:
             agt = agent.GPAgent(init_xs, init_ys) 
         elif agent_type=='static-gp':
 #             agt = agent.GPAgent(init_xs, init_ys, updating=False, **kwargs) 
-            agt = agent.GPAgent(init_xs, init_ys, updating=False) 
+            agt = agent.GPAgent(init_xs, init_ys, updating=False, kernel='sinc')
         else:
             raise NotImplementedError()
         return agt, init_xs, init_ys
@@ -57,7 +57,7 @@ class BayesianOptimization:
 
     def maximize(self, init_points: int =10, n_iter: int =100,
                  num_restarts: int = 5,
-                 lenscale: int = None,
+                 lenscale: float = None,
                  agent_type='ssp-hex',**kwargs) -> np.ndarray:
         # sample_xs = self._sample_domain(num_points=128 * 128) #self.num_decoding)
         # sample_ssps = self.agt.encode(sample_xs)

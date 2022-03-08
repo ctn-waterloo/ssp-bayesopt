@@ -242,15 +242,15 @@ class SSPAgent(Agent):
         return self.ssp_space.encode(x)
     
     def decode(self,ssp):
-#         return self.ssp_space.decode(ssp, method='direct-optim')
-        return self.ssp_space.decode(ssp,method='direct-optim',samples=self.init_samples)
+#         return self.ssp_space.decode(ssp,method='direct-optim',samples=self.init_samples)
+        return self.ssp_space.decode(ssp,method='from-set',num_samples=300**2)#self.init_samples)
 
     def length_scale(self):
         return self.ssp_space.length_scale
 
 
 class GPAgent(Agent):
-    def __init__(self, init_xs, init_ys, length_scale=None, domain_bounds = None, kernel='matern'):
+    def __init__(self, init_xs, init_ys, length_scale=None, updating=False, domain_bounds = None, kernel='matern'):
         super().__init__()
         # Store observations
         self.xs = init_xs
