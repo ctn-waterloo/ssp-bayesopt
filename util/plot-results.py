@@ -64,10 +64,11 @@ if __name__ == '__main__':
     for func_name in args.folders:
 #         func_name='himmelblau'
 #         gp_data = pd.DataFrame(pytry.read(f'{func_name}/gp-mi'))
+#         gp_data = pd.DataFrame(pytry.read(f'{func_name}/matern.static-gp'))
         gp_data = pd.DataFrame(pytry.read(f'{func_name}/static-gp'))
         gp_regret, gp_avg_regret, gp_time = get_data(gp_data)
 
-        ssp_data = pd.DataFrame(pytry.read(f'{func_name}/ssp-hex'))
+        ssp_data = pd.DataFrame(pytry.read(f'{func_name}/ssp-rand'))
         ssp_regret, ssp_avg_regret, ssp_time = get_data(ssp_data)
 
 #         hex_data = pd.DataFrame(pytry.read(f'{func_name}/hex-mi'))
