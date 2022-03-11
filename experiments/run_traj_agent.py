@@ -18,14 +18,16 @@ import importlib
 importlib.reload(ssp_bayes_opt)
 
 budget=200
-xstar = np.array([[0,0],[0.5,-0.3],[0.6,0.7]])*10
+xstar = np.array([[2.5,-3],[5,2],[8,6]])
+xstarfull = np.vstack([np.zeros(2),xstar])
 traj_len = xstar.shape[0]
 pt_dim = xstar.shape[1]
 data_dim = traj_len*pt_dim
 bounds = 10*np.stack([-np.ones(data_dim), np.ones(data_dim)]).T
 
 def target(x):
-    return np.sum(np.sqrt(np.sum((x.reshape(traj_len,pt_dim) - xstar)**2, axis=1)))
+    x = np.vstack([np.zeros(2),x.reshape(traj_len,pt_dim)])
+    return -np.sum(np.sqrt(np.sum((x - xstarfull)**2, axis=1)))
 
 class SamplingTrial(pytry.Trial):
     def params(self):
@@ -96,3 +98,29 @@ if __name__=='__main__':
                   'ssp_dim':args.ssp_dim
                   }
         r = SamplingTrial().run(**params)
+
+
+
+from matplotlib import pyplot as plt
+from matplotlib.animation import FuncAnimation
+
+fig = plt.figure()
+ax = plt.axes(xlim=(-10, 10), ylim=(-10, 10))
+ax.plot(xstarfull[:,0],xstarfull[:,1],'-g')
+line, = ax.plot([], [], lw=3)
+
+def init():
+    line.set_data([], [])
+    return line,
+def animate(i):
+    best_idx = np.argmax(r['vals'][:i+1])
+    traj = r['sample_locs'][best_idx].reshape(traj_len, pt_dim)
+    traj = np.vstack([np.zeros(2),traj])
+    line.set_data(traj[:,0], traj[:,1])
+    return line,
+
+anim = FuncAnimation(fig, animate, init_func=init,
+                               frames=budget-1, interval=20, blit=True)
+
+anim.save('match_traj.gif', writer='imagemagick')
+
