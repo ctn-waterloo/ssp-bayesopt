@@ -305,7 +305,9 @@ class SSPSpace:
         return s
     
     def bind(self,a,b):
-        return np.fft.ifft(np.fft.fft(a) * np.fft.fft(b)).real
+        a = np.atleast_2d(a)
+        b = np.atleast_2d(b)
+        return np.fft.ifft(np.fft.fft(a, axis=1) * np.fft.fft(b,axis=1), axis=1).real
     
     def invert(self,a):
         return a[-np.arange(len(a))]

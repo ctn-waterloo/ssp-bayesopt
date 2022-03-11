@@ -16,6 +16,7 @@ from . import blr
 import functools
 import warnings
 
+from scipy.stats import qmc
 
 
 def factory(agent_type, init_xs, init_ys, **kwargs):
@@ -233,45 +234,59 @@ class SSPAgent(Agent):
         return self.ssp_space.decode(ssp,method='from-set',samples=self.init_samples)
 
 class SSPTrajectoryAgent(Agent):
-    def __init__(self, x_dim, traj_len, init_trajs, init_ys, ssp_x_space=None, ssp_t_space=None):
+    def __init__(self,  n_init, func, x_dim=1, traj_len=1,
+                 ssp_x_space=None, ssp_t_space=None, ssp_dim=151,domain_bounds=None,length_scale=4):
         super().__init__()
         self.num_restarts = 10
-        (num_pts, data_dim) = init_trajs.shape
-        self.data_dim = data_dim
+        self.data_dim = x_dim*traj_len
         self.x_dim= x_dim
         self.traj_len = traj_len
         self.scaler = PassthroughScaler()
+        if domain_bounds is not None:
+            domain_bounds = np.array([np.min(domain_bounds[:,0])*np.ones(x_dim), 
+                             np.max(domain_bounds[:,1])*np.ones(x_dim)]).T
         if ssp_x_space is None:
-            ssp_x_space = sspspace.HexagonalSSPSpace(x_dim,ssp_dim=151, n_rotates=5, n_scales=5, 
+            ssp_x_space = sspspace.HexagonalSSPSpace(x_dim,ssp_dim=ssp_dim,
                  scale_min=0.1, scale_max=3,
-                 domain_bounds=None, length_scale=5)
+                 domain_bounds=domain_bounds, length_scale=length_scale)
         if ssp_t_space is None:
             ssp_t_space = sspspace.RandomSSPSpace(1,ssp_dim=ssp_x_space.ssp_dim,
-                 domain_bounds=np.array([[0,traj_len]]), length_scale=5)
+                 domain_bounds=np.array([[0,traj_len]]), length_scale=1)
         
         self.ssp_x_space = ssp_x_space
         self.ssp_t_space = ssp_t_space
         
         # Encode timestamps
-        self.timestep_ssps = self.ssp_t_space.encode(np.linspace(0,traj_len,traj_len))
+        self.timestep_ssps = self.ssp_t_space.encode(np.linspace(0,traj_len,traj_len).reshape(-1,1))
         
         # Encode the initial sample points 
+        init_trajs = self.sample_trajectories(n_init)
         init_phis = self.encode(init_trajs)
+        init_ys =  np.array([func(np.atleast_2d(x)) for x in init_trajs]).reshape((n_init,-1))
+        self.init_xs = init_trajs
+        self.init_ys = init_ys
 
-        self.blr = blr.BayesianLinearRegression(self.ssp_space.ssp_dim)
+        self.blr = blr.BayesianLinearRegression(self.ssp_x_space.ssp_dim)
         self.blr.update(init_phis, np.array(init_ys))
 
         # MI params
         self.gamma_t = 0
         self.sqrt_alpha = np.log(2/1e-6)
     
-        self.init_samples = self.ssp_space.get_sample_pts_and_ssps(400,'grid')
+        self.init_samples = self.ssp_x_space.get_sample_pts_and_ssps(10000,'grid')
         
     def eval(self, xs):
         phis = self.encode(xs)
         mu, var = self.blr.predict(phis)
         phi = self.sqrt_alpha * (np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t)) 
         return self.scaler.inverse_transform(mu), var, phi
+
+    def sample_trajectories(self, num_points=10):
+        sampler = qmc.Sobol(d=self.x_dim) 
+        u_sample_points = sampler.random(num_points*self.traj_len)
+        sample_points = qmc.scale(u_sample_points, self.ssp_x_space.domain_bounds[:,0], 
+                                  self.ssp_x_space.domain_bounds[:,1])
+        return sample_points.reshape(num_points, self.traj_len*self.x_dim)
 
     def initial_guess(self):
         '''
@@ -329,18 +344,18 @@ class SSPTrajectoryAgent(Agent):
 
     def encode(self,x):
         x = np.atleast_2d(x)
-        S = np.zeros((self.ssp_x_space.ssp_dim,x.shape[0]))
+        S = np.zeros((x.shape[0], self.ssp_x_space.ssp_dim))
         x = x.reshape(-1,self.traj_len,self.x_dim)
         for j in range(self.traj_len):
             S += self.ssp_x_space.bind(self.timestep_ssps[j,:] , self.ssp_x_space.encode(x[:,j,:]))
-        return S.T
+        return S
     
         
     def decode(self,ssp):
-        decoded_traj = np.zeros((len(self.traj_len),self.x_dim))
+        decoded_traj = np.zeros((self.traj_len,self.x_dim))
         for j in range(self.traj_len):
             query = self.ssp_x_space.bind(self.ssp_t_space.invert(self.timestep_ssps[j,:]) , ssp)
-            decoded_traj[j,:] = self.ssp_x_space.decode(query, method='direct-optim',samples=self.init_samples)
+            decoded_traj[j,:] = self.ssp_x_space.decode(query, method='from-set',samples=self.init_samples)
         return decoded_traj.reshape(-1)
 
 class GPAgent(Agent):

@@ -104,6 +104,10 @@ class BayesianOptimization:
             agt = agent.GPAgent(init_xs, init_ys,**kwargs) 
         elif agent_type=='static-gp':
             agt = agent.GPAgent(init_xs, init_ys, updating=False, **kwargs) 
+        elif agent_type=='ssp-traj':
+            agt = agent.SSPTrajectoryAgent(init_points, self.target, **kwargs) 
+            init_xs = agt.init_xs
+            init_ys = agt.init_ys
         else:
             raise NotImplementedError()
         return agt, init_xs, init_ys
