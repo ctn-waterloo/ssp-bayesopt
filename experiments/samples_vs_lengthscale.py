@@ -52,7 +52,7 @@ alg = 'gp'
 import os.path
 
 for func in funcs:
-    data_dir = os.path.join('/run/media/furlong/Data/ssp-bayesopt/samples-vs-ls/', func, alg)
+    data_dir = os.path.join('/run/media/furlong/Data/ssp-bayesopt/samples-vs-ls/', func, 'sinc-'+alg)
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
     for init_points in init_samples:

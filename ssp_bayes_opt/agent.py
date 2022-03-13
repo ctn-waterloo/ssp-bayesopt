@@ -12,6 +12,7 @@ from sklearn.preprocessing import StandardScaler
 
 from . import sspspace
 from . import blr
+from .kernels import SincKernel
 
 import functools
 import warnings
@@ -27,10 +28,12 @@ def factory(agent_type, init_xs, init_ys, **kwargs):
         ssp_space = sspspace.HexagonalSSPSpace(data_dim, **kwargs)
         agt = SSPAgent(init_xs, init_ys,ssp_space) 
     elif agent_type=='ssp-rand':
-        ssp_space = sspspace.RandomSSPSpace(data_dim, 127, **kwargs)
+        ssp_space = sspspace.RandomSSPSpace(data_dim, **kwargs)
         agt = SSPAgent(init_xs, init_ys,ssp_space) 
-    elif agent_type == 'gp-mi':
+    elif agent_type == 'gp':
         agt = GPAgent(init_xs, init_ys)
+    elif agent_type == 'static-gp':
+        agt = GPAgent(init_xs, init_ys, updating=True, **kwargs)
     else:
         raise RuntimeWarning(f'Undefined agent type {agent_type}')
     return agt
@@ -49,8 +52,8 @@ class Agent:
     def acquisition_func(self):
         pass
 
-    def get_lengthscale(self):
-        pass
+    def length_scale(self):
+        raise NotImplementedError(f'{self.__class__.__name__} does not implement lengthscale.')
 
 
 class PassthroughScaler:
@@ -100,6 +103,8 @@ class SSPAgent(Agent):
         # MI params
         self.gamma_t = 0
         self.sqrt_alpha = np.log(2/1e-6)
+        
+        self.init_samples = self.ssp_space.get_sample_pts_and_ssps(400,'grid')
 
         # Cache for the input xs.
 #         self.phis = None
@@ -125,12 +130,6 @@ class SSPAgent(Agent):
 
                 train_phis = ssp_space.encode(train_x)
                 test_phis = ssp_space.encode(test_x)
-
-
-#                 W = np.linalg.pinv(train_phis) @ train_y
-#                 mu = np.dot(test_phis, W)
-#                 diff = test_y.flatten() - mu.flatten()
-#                 errors.append(np.mean(np.power(diff, 2)))
 
                 b = blr.BayesianLinearRegression(ssp_space.ssp_dim)
                 b.update(train_phis, train_y)
@@ -243,30 +242,50 @@ class SSPAgent(Agent):
         return self.ssp_space.encode(x)
     
     def decode(self,ssp):
-        return self.ssp_space.decode(ssp, method='direct-optim')
+#         return self.ssp_space.decode(ssp,method='direct-optim',samples=self.init_samples)
+        return self.ssp_space.decode(ssp,method='from-set',num_samples=300**2)#self.init_samples)
+
+    def length_scale(self):
+        return self.ssp_space.length_scale
+
 
 class GPAgent(Agent):
-    def __init__(self, init_xs, init_ys, length_scale=None, domain_bounds = None):
+    def __init__(self, init_xs, init_ys, length_scale=None, updating=False, domain_bounds = None, kernel='matern'):
         super().__init__()
         # Store observations
         self.xs = init_xs
         self.ys = init_ys
         # create the gp
-        ## TODO instantiate scikitlearn regressor.
-        self.gp = GaussianProcessRegressor(
-                kernel=Matern(nu=2.5),
-                alpha=1e-6,
-                normalize_y=True,
-                n_restarts_optimizer=5,
-                random_state=None,
-                )
 
-        # fit to the initial values
+        ## Create the GP to use during optimization.
+        if updating:
+            kern = Matern(nu=2.5) if kernel=='matern' else SincKernel()
+        else:
+            ## fit to the initial values
+            fit_gp = GaussianProcessRegressor(
+                        kernel=Matern(nu=2.5) if kernel == 'matern' else SincKernel(),
+                        alpha=1e-6,
+                        normalize_y=True,
+                        n_restarts_optimizer=5,
+                        random_state=None,
+                    )
+            fit_gp.fit(self.xs, self.ys)
+            kern = Matern(nu=2.5,
+                          length_scale=np.exp(fit_gp.kernel_.theta),
+                          length_scale_bounds='fixed')
+        ### end if
+        self.gp = GaussianProcessRegressor(
+                    kernel=kern,
+                    alpha=1e-6,
+                    normalize_y=True,
+                    n_restarts_optimizer=5,
+                    random_state=None,
+                )
         self.gp.fit(self.xs, self.ys)
+
         self.gamma_t = 0
         self.sqrt_alpha = np.log(2/1e-6)
-
-        self._params = self.gp.get_params()
+    ### end __init__
 
     def eval(self, xs):
         mu, std = self.gp.predict(xs, return_std=True)
@@ -280,9 +299,8 @@ class GPAgent(Agent):
         self.gamma_t = self.gamma_t + sigma_t
     
         self.gp.fit(self.xs, self.ys)
+    ### end update
         
-        # Reset the parameters after an update.
-        self.gp.set_params(**(self._params))
 
     def get_lengthscale(self):
 #         params = self.gp.get_params()
@@ -303,3 +321,6 @@ class GPAgent(Agent):
                 return -(mu + phi).flatten()
 
         return min_func, None
+
+    def length_scale(self):
+        return self.gp.kernel_.length_scale
