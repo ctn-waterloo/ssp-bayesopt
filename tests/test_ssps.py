@@ -5,14 +5,14 @@ import pytest
 
 from ssp_bayes_opt import sspspace
 
-def make_hex_space(domain_dim=2, bounds = 15*np.array([[-1,1],[-1,1]])):
+def make_hex_space(domain_dim=2, bounds = 15*np.array([[-1,1],[-1,1]]), ls=1):
     ssp_space = sspspace.HexagonalSSPSpace(
                     domain_dim,
                     ssp_dim=151, 
                     scale_min=2*np.pi/np.sqrt(6) - 0.5, 
                     scale_max=2*np.pi/np.sqrt(6) + 0.5, 
                     domain_bounds=bounds, 
-                    length_scale=1)
+                    length_scale=ls)
     return ssp_space
     
 def test_constructor():
@@ -32,7 +32,7 @@ def test_from_set_decode():
     ssp_space = make_hex_space()
     S0 = ssp_space.encode(test_x)
     assert S0.shape == (1, ssp_space.ssp_dim)
-    recov_x = ssp_space.decode(S0, method='from-set')
+    recov_x = ssp_space.decode(S0, method='from-set', num_samples=10000)
     assert np.all(np.isclose(test_x, recov_x, atol=1e-1))
 
 def test_direct_optim_decode():
@@ -58,6 +58,22 @@ def test_grad_descent_decode():
     S0 = ssp_space.encode(test_x)
     assert S0.shape == (1, ssp_space.ssp_dim)
     recov_x = ssp_space.decode(S0, method='grad_descent')
+    assert np.all(np.isclose(test_x, recov_x))
+
+def test_small_lenscale_decode():
+    test_x = np.atleast_2d(np.array([1.3,-3.4]))
+    ssp_space = make_hex_space(ls=0.5)
+    S0 = ssp_space.encode(test_x)
+    assert S0.shape == (1, ssp_space.ssp_dim)
+    recov_x = ssp_space.decode(S0, method='direct-optim', num_samples=4000)
+    assert np.all(np.isclose(test_x, recov_x))
+
+def test_large_lenscale_decode():
+    test_x = np.atleast_2d(np.array([1.3,-3.4]))
+    ssp_space = make_hex_space(ls=2)
+    S0 = ssp_space.encode(test_x)
+    assert S0.shape == (1, ssp_space.ssp_dim)
+    recov_x = ssp_space.decode(S0, method='direct-optim', num_samples=200)
     assert np.all(np.isclose(test_x, recov_x))
 
 
