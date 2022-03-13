@@ -8,7 +8,34 @@ import warnings
 class SSPSpace:
     def __init__(self, domain_dim: int, ssp_dim: int, axis_matrix=None, phase_matrix=None,
                  domain_bounds=None, length_scale=1):
+        '''
+        Represents a domain using spatial semantic pointers.
 
+        Parameters:
+        -----------
+
+        domain_dim : int 
+            The dimensionality of the domain being represented.
+
+        ssp_dim : int
+            The dimensionality of the spatial semantic pointer vector.
+
+        axis_matrix : np.ndarray
+            A ssp_dim X domain_dim ndarray representing the axis vectors for
+            the domain.
+
+        phase_matrix : np.ndarray
+            A ssp_dim x domain_dim ndarray representing the frequency 
+            components of the SSP representation.
+
+        domain_bounds : np.ndarray
+            A domain_dim X 2 ndarray giving the lower and upper bounds of the 
+            domain, used in decoding from an ssp to the point it represents.
+
+        length_scale : float or np.ndarray
+            Scales values before encoding.
+            
+        '''
         self.domain_dim = domain_dim
         self.ssp_dim = ssp_dim
         self.length_scale = length_scale * np.ones((self.domain_dim,1))
@@ -32,6 +59,9 @@ class SSPSpace:
             self.axis_matrix = np.fft.ifft(np.exp(1.j*phase_matrix), axis=0).real
             
     def update_lengthscale(self, scale):
+        '''
+        Changes the lengthscale being used in the encoding.
+        '''
         if not isinstance(scale, np.ndarray) or scale.size == 1:
             self.length_scale = scale * np.ones((self.domain_dim,))
         else:
@@ -56,6 +86,20 @@ class SSPSpace:
         self.length_scale = retval.x.reshape(-1,1)
     
     def encode(self,x):
+        '''
+        Transforms input data into an SSP representation.
+
+        Parameters:
+        -----------
+        x : np.ndarray
+            A (num_samples, domain_dim) array representing data to be encoded.
+
+        Returns:
+        --------
+        data : np.ndarray
+            A (num_samples, ssp_dim) array of the ssp representation of the data
+            
+        '''
         assert x.ndim == 2, f'Expected 2d data (samples, features), got {x.ndim}d data.'
         assert x.shape[1] == self.phase_matrix.shape[1], (f'Expected data to have '
                                                           f'{self.phase_matrix.shape[1]} '
@@ -72,6 +116,25 @@ class SSPSpace:
         return data.T
     
     def encode_and_deriv(self,x):
+        '''
+        Returns the ssp representation of the data and the derivative of
+        the encoding.
+
+        Parameters:
+        -----------
+        x : np.ndarray
+            A (num_samples, domain_dim) array representing data to be encoded.
+
+        Returns:
+        --------
+        data : np.ndarray
+            A (num_samples, ssp_dim) array of the ssp representation of the 
+            data
+
+        grad : np.ndarray
+            A (num_samples, ssp_dim, domain_dim) array of the ssp representation of the data
+
+        '''
         assert x.ndim == 2, f'Expected 2d data (samples, features), got {x.ndim}d data.'
         assert x.shape[1] == self.phase_matrix.shape[1], (f'Expected data to have ' 
                                                          f'{self.phase_matrix.shape[1]} '
@@ -81,7 +144,7 @@ class SSPSpace:
         ls_mat = np.atleast_2d(np.diag(1 / self.length_scale))
         scaled_x = x @ ls_mat
         data = np.fft.ifft( np.exp( 1.j * self.phase_matrix @ scaled_x.T ), axis=0 ).real
-        ddata = np.fft.ifft( 1.j * (self.phase_matrix @ len_scale_mat) @ np.exp( 1.j * self.phase_matrix @ scaled_x.T ), axis=0 ).real
+        ddata = np.fft.ifft( 1.j * (self.phase_matrix @ ls_mat) @ np.exp( 1.j * self.phase_matrix @ scaled_x.T ), axis=0 ).real
         return data.T, ddata.T
     
     def encode_fourier(self,x):
@@ -101,6 +164,31 @@ class SSPSpace:
  
     def decode(self,ssp,method='from-set',sampling_method='grid',
                num_samples =1000, samples=None): # other args for specfic methods
+        '''
+        Transforms ssp representation back into domain representation.
+
+        Parameters:
+        -----------
+        ssp : np.ndarray
+            SSP representation of a data point.
+
+        method : {'from-set', 'direct-optim'}
+            The technique for decoding the ssp.  from-set samples the domain
+            and finds the closest match under the dot product. direct-optim
+            does an initial coarse sampling and then optimizes the decoded
+            value starting from the initial best match in the coarse sampling.
+
+        sampling_method : {'grid'}
+            Evenly distributes samples along the domain axes
+
+        num_samples : int
+            The number of samples along each axis.
+
+        Returns:
+        --------
+        x : np.ndarray
+            The decoded point
+        '''
         if samples is None:
             sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_samples,sampling_method)
         else:
@@ -215,20 +303,94 @@ class SSPSpace:
         s = np.zeros(self.ssp_dim)
         s[0] = 1
         return s
+    
+    def bind(self,a,b):
+        a = np.atleast_2d(a)
+        b = np.atleast_2d(b)
+        return np.fft.ifft(np.fft.fft(a, axis=1) * np.fft.fft(b,axis=1), axis=1).real
+    
+    def invert(self,a):
+        return a[-np.arange(len(a))]
+    
+    def similarity_plot(self,ssp,n_grid=100,plot_type='heatmap',ax=None,**kwargs):
+        import matplotlib.pyplot as plt
+        if ax is None:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+            
+        if self.domain_dim == 1:
+            xs = np.linspace(self.domain_bounds[0,0],self.domain_bounds[0,1], n_grid)
+            sims = ssp @ self.encode(np.atleast_2d(xs).T).T
+            im = ax.plot(xs, sims.reshape(-1) )
+            ax.set_xlim(self.domain_bounds[0,0],self.domain_bounds[0,1])
+        elif self.domain_dim == 2:
+            xs = np.linspace(self.domain_bounds[0,0],self.domain_bounds[0,1], n_grid)
+            ys = np.linspace(self.domain_bounds[1,0],self.domain_bounds[1,1], n_grid)
+            X,Y = np.meshgrid(xs,ys)
+            sims = ssp @ self.encode(np.vstack([X.reshape(-1),Y.reshape(-1)]).T).T 
+            if plot_type=='heatmap':
+                im = ax.pcolormesh(X,Y,sims.reshape(X.shape),**kwargs)
+            elif plot_type=='contour':
+                im = ax.contour(X,Y,sims.reshape(X.shape),**kwargs)
+            elif plot_type=='contourf':
+                im = ax.contourf(X,Y,sims.reshape(X.shape),**kwargs)
+            ax.set_xlim(self.domain_bounds[0,0],self.domain_bounds[0,1])
+            ax.set_ylim(self.domain_bounds[1,0],self.domain_bounds[1,1])
+        else:
+            raise NotImplementedError()
+        return im
             
 class RandomSSPSpace(SSPSpace):
+    '''
+    Creates an SSP space using randomly generated frequency components.
+    '''
     def __init__(self, domain_dim: int, ssp_dim: int,  domain_bounds=None, length_scale=1, rng=np.random.default_rng()):
 #         partial_phases = rng.random.rand(ssp_dim//2,domain_dim)*2*np.pi - np.pi
-        partial_phases = rng.random((ssp_dim // 2, domain_dim)) * 2 * np.pi - np.pi
-        axis_matrix = _constructaxisfromphases(partial_phases)
-        super().__init__(domain_dim,ssp_dim,axis_matrix=axis_matrix,
+        
+        
+        #partial_phases = rng.random((ssp_dim // 2, domain_dim)) * 2 * np.pi - np.pi
+        #axis_matrix = _constructaxisfromphases(partial_phases)
+        def make_good_unitary(dim, eps=1e-3, rng=np.random):
+            a = rng.rand((dim - 1) // 2)
+            sign = rng.choice((-1, +1), len(a))
+            phi = sign * np.pi * (eps + a * (1 - 2 * eps))
+            assert np.all(np.abs(phi) >= np.pi * eps)
+            assert np.all(np.abs(phi) <= np.pi * (1 - eps))
+        
+            fv = np.zeros(dim, dtype='complex64')
+            fv[0] = 1
+            fv[1:(dim + 1) // 2] = np.cos(phi) + 1j * np.sin(phi)
+            fv[-1:dim // 2:-1] = np.conj(fv[1:(dim + 1) // 2])
+            if dim % 2 == 0:
+                fv[dim // 2] = 1
+        
+            assert np.allclose(np.abs(fv), 1)
+            v = np.fft.ifft(fv)
+            
+            v = v.real
+            assert np.allclose(np.fft.fft(v), fv)
+            assert np.allclose(np.linalg.norm(v), 1)
+            return v
+
+        axis_matrix = np.zeros((ssp_dim,domain_dim))
+        for i in range(domain_dim):
+            axis_matrix[:,i] = make_good_unitary(ssp_dim)
+
+        super().__init__(domain_dim,axis_matrix.shape[0],axis_matrix=axis_matrix,
                        domain_bounds=domain_bounds,length_scale=length_scale)
         
 class HexagonalSSPSpace(SSPSpace):
+    '''
+    Creates an SSP space using the Hexagonal Tiling developed by NS Dumont 
+    (2020)
+    '''
     def __init__(self,  domain_dim:int,ssp_dim: int=151, n_rotates:int=5, n_scales:int=5, 
-                 scale_min=2*np.pi/np.sqrt(6) - 0.5, scale_max=2*np.pi/np.sqrt(6) + 0.5,
+                 scale_min=0.1, scale_max=3,
                  domain_bounds=None, length_scale=1):
-        #if (n_rotates==5) & (n_scales==5) & (ssp_dim!=151): # user wants to define ssp with total dim, not number of simplex rotates and scales
+        if (n_rotates==5) & (n_scales==5) & (ssp_dim!=151): # user wants to define ssp with total dim, not number of simplex rotates and scales
+            n_rotates = int(np.sqrt((ssp_dim-1)/(2*(domain_dim+1))))
+            n_scales = n_rotates
+            ssp_dim = n_rotates*n_scales*(domain_dim+1)*2 + 1
             
         phases_hex = np.hstack([np.sqrt(1+ 1/domain_dim)*np.identity(domain_dim) - (domain_dim**(-3/2))*(np.sqrt(domain_dim+1) + 1),
                          (domain_dim**(-1/2))*np.ones((domain_dim,1))]).T
@@ -245,7 +407,7 @@ class HexagonalSSPSpace(SSPSpace):
             scales = np.linspace(scale_min,scale_max,n_scales+n_rotates)
             phases_scaled_rotated = np.vstack([phases_hex*i for i in scales])
         elif (domain_dim == 2):
-            angles = np.linspace(0,2*np.pi/3,n_rotates)
+            angles = np.linspace(0,2*np.pi/3,n_rotates,endpoint=False)
             R_mats = np.stack([np.stack([np.cos(angles), -np.sin(angles)],axis=1),
                         np.stack([np.sin(angles), np.cos(angles)], axis=1)], axis=1)
             phases_scaled_rotated = (R_mats @ phases_scaled.T).transpose(0,2,1).reshape(-1,domain_dim)
