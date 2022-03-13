@@ -49,6 +49,18 @@ class Agent:
         pass
 
     def acquisition_func(self):
+        '''
+        Returns:
+        --------
+        
+            objective_func : Callable
+                Returns the acquisition function that is being optimized
+                by the bayesian optimization.
+
+            jacobian_func : Callable | None
+                Returns the gradient of the acquisition function, or None
+                if we are too lazy to implementing/think it won't help.
+        '''
         pass
 
 
@@ -159,6 +171,13 @@ class SSPAgent(Agent):
                         sigma=self.blr.S,
                         gamma=self.gamma_t,
                         beta_inv=1/self.blr.beta):
+            '''
+            old code:
+            beta_inv=self.blr.beta):
+            val = ptr.T @ m
+            mi = np.sqrt(gamma + beta_inv + ptr.T @ sigma @ ptr)
+            return  -(val + mi + np.sqrt(gamma))
+            '''
             val = phi.T @ m
             mi = np.sqrt(gamma + beta_inv + phi.T @ sigma @ phi) - np.sqrt(gamma)
             return -(val + mi).flatten()
@@ -167,7 +186,7 @@ class SSPAgent(Agent):
         def gradient(phi, m=self.blr.m,
                       sigma=self.blr.S,
                       gamma=self.gamma_t,
-                      beta_inv=1/self.blr.beta):
+                      beta_inv=1/self.blr.beta): # same thing with beta_inv as above
             sqr = (phi.T @ sigma @ phi) 
             scale = np.sqrt(sqr + gamma + beta_inv)
             retval = -(m.flatten() + sigma @ phi / scale)
@@ -230,6 +249,59 @@ class SSPAgent(Agent):
     
     def decode(self,ssp):
         return self.ssp_space.decode(ssp,method='direct-optim',samples=self.init_samples)
+
+class UCBSSPAgent(SSPAgent):
+    def __init__(self, init_xs, init_ys, ssp_space=None):
+        super.__init__(init_xs, init_ys, ssp_space=ssp_space)
+
+    def initial_guess(self):
+        '''
+        The initial guess for optimizing the acquisition function.
+        '''
+        # Return an initial guess from either the distribution or
+        # From the approximate solution of dot(m,x) + x^T Sigma x
+#         return -self.blr.S_inv @ self.blr.m
+        return self.blr.sample()
+
+    def eval(self, xs):
+        phis = self.encode(xs)
+        mu, var = self.blr.predict(phis)
+        phi = self.sqrt_alpha * np.sqrt(var) 
+        return self.scaler.inverse_transform(mu), var, phi
+
+    def acquisition_func(self):
+        '''
+        Returns:
+        --------
+        
+            objective_func : Callable
+                Returns the acquisition function that is being optimized
+                by the bayesian optimization.
+
+            jacobian_func : Callable | None
+                Returns the gradient of the acquisition function, or None
+                if we are too lazy to implementing/think it won't help.
+        '''
+        # TODO: Currently returning (objective_func, None) to be fixed when 
+        # I finish the derivation
+
+        def min_func(phi, m=self.blr.m,
+                        sigma=self.blr.S,
+                        gamma=self.gamma_t,
+                        beta_inv=1/self.blr.beta):
+            val = phi.T @ m
+            std = np.sqrt(beta_inv + phi.T @ sigma @ phi)
+            return -(val + std).flatten()
+
+
+        def gradient(phi, m=self.blr.m,
+                      sigma=self.blr.S,
+                      gamma=self.gamma_t,
+                      beta_inv=1/self.blr.beta):
+            sqr = (phi.T @ sigma @ phi) 
+            scale = np.sqrt(sqr + beta_inv)
+            retval = -(m.flatten() + sigma @ phi / scale)
+            return retval
 
 class GPAgent(Agent):
     def __init__(self, init_xs, init_ys, updating=True):
