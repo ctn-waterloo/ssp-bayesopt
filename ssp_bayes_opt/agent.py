@@ -83,11 +83,12 @@ class SSPAgent(Agent):
         
         self.ssp_space = ssp_space
         # Optimize the length scales
-        self.ssp_space.update_lengthscale(self._optimize_lengthscale(init_xs, init_ys))
+        #self.ssp_space.update_lengthscale(self._optimize_lengthscale(init_xs, init_ys))
+        self.ssp_space.update_lengthscale(4)
         print('Selected Lengthscale: ', self.ssp_space.length_scale)
 
         # Encode the initial sample points 
-        init_phis = self.ssp_space.encode(init_xs)
+        init_phis = self.encode(init_xs)
 
         self.blr = blr.BayesianLinearRegression(self.ssp_space.ssp_dim)
 
@@ -97,7 +98,7 @@ class SSPAgent(Agent):
         self.gamma_t = 0
         self.sqrt_alpha = np.log(2/1e-6)
         
-        self.init_samples = self.ssp_space.get_sample_pts_and_ssps(400,'grid')
+        self.init_samples = self.ssp_space.get_sample_pts_and_ssps(300**data_dim,'grid')
 
         # Cache for the input xs.
 #         self.phis = None
@@ -233,7 +234,119 @@ class SSPAgent(Agent):
     
     def decode(self,ssp):
 #         return self.ssp_space.decode(ssp, method='direct-optim')
-        return self.ssp_space.decode(ssp,method='direct-optim',samples=self.init_samples)
+#         return self.ssp_space.decode(ssp,method='direct-optim',samples=self.init_samples)
+        return self.ssp_space.decode(ssp,method='from-set',samples=self.init_samples)
+
+class SSPTrajectoryAgent(Agent):
+    def __init__(self, x_dim, traj_len, init_trajs, init_ys, ssp_x_space=None, ssp_t_space=None):
+        super().__init__()
+        self.num_restarts = 10
+        (num_pts, data_dim) = init_trajs.shape
+        self.data_dim = data_dim
+        self.x_dim= x_dim
+        self.traj_len = traj_len
+        self.scaler = PassthroughScaler()
+        if ssp_x_space is None:
+            ssp_x_space = sspspace.HexagonalSSPSpace(x_dim,ssp_dim=151, n_rotates=5, n_scales=5, 
+                 scale_min=0.1, scale_max=3,
+                 domain_bounds=None, length_scale=5)
+        if ssp_t_space is None:
+            ssp_t_space = sspspace.RandomSSPSpace(1,ssp_dim=ssp_x_space.ssp_dim,
+                 domain_bounds=np.array([[0,traj_len]]), length_scale=5)
+        
+        self.ssp_x_space = ssp_x_space
+        self.ssp_t_space = ssp_t_space
+        
+        # Encode timestamps
+        self.timestep_ssps = self.ssp_t_space.encode(np.linspace(0,traj_len,traj_len))
+        
+        # Encode the initial sample points 
+        init_phis = self.encode(init_trajs)
+
+        self.blr = blr.BayesianLinearRegression(self.ssp_space.ssp_dim)
+        self.blr.update(init_phis, np.array(init_ys))
+
+        # MI params
+        self.gamma_t = 0
+        self.sqrt_alpha = np.log(2/1e-6)
+    
+        self.init_samples = self.ssp_space.get_sample_pts_and_ssps(400,'grid')
+        
+    def eval(self, xs):
+        phis = self.encode(xs)
+        mu, var = self.blr.predict(phis)
+        phi = self.sqrt_alpha * (np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t)) 
+        return self.scaler.inverse_transform(mu), var, phi
+
+    def initial_guess(self):
+        '''
+        The initial guess for optimizing the acquisition function.
+        '''
+        # Return an initial guess from either the distribution or
+        # From the approximate solution of dot(m,x) + x^T Sigma x
+        return self.blr.sample()
+
+    def acquisition_func(self):
+        '''
+        return objective_func, jacobian_func
+        '''
+        # TODO: Currently returning (objective_func, None) to be fixed when 
+        # I finish the derivation
+
+        def min_func(phi, m=self.blr.m,
+                        sigma=self.blr.S,
+                        gamma=self.gamma_t,
+                        beta_inv=1/self.blr.beta):
+            val = phi.T @ m
+            mi = np.sqrt(gamma + beta_inv + phi.T @ sigma @ phi) - np.sqrt(gamma)
+            return -(val + mi).flatten()
+
+
+        def gradient(phi, m=self.blr.m,
+                      sigma=self.blr.S,
+                      gamma=self.gamma_t,
+                      beta_inv=1/self.blr.beta):
+            sqr = (phi.T @ sigma @ phi) 
+            scale = np.sqrt(sqr + gamma + beta_inv)
+            retval = -(m.flatten() + sigma @ phi / scale)
+            return retval
+
+        return min_func, gradient
+    
+    def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float):
+        '''
+        Updates the state of the Bayesian Linear Regression.
+        '''
+    
+        x_val = x_t
+        y_val = y_t
+        if len(x_t.shape) < 2:
+            x_val = x_t.reshape(1, x_t.shape[0])
+            y_val = y_t.reshape(1, y_t.shape[0])
+        y_val = self.scaler.transform(y_val)
+    
+        # Update BLR
+        phi = np.atleast_2d(self.encode(x_val).squeeze())
+        self.blr.update(phi, y_val)
+        
+        # Update gamma
+        self.gamma_t = self.gamma_t + sigma_t
+
+    def encode(self,x):
+        x = np.atleast_2d(x)
+        S = np.zeros((self.ssp_x_space.ssp_dim,x.shape[0]))
+        x = x.reshape(-1,self.traj_len,self.x_dim)
+        for j in range(self.traj_len):
+            S += self.ssp_x_space.bind(self.timestep_ssps[j,:] , self.ssp_x_space.encode(x[:,j,:]))
+        return S.T
+    
+        
+    def decode(self,ssp):
+        decoded_traj = np.zeros((len(self.traj_len),self.x_dim))
+        for j in range(self.traj_len):
+            query = self.ssp_x_space.bind(self.ssp_t_space.invert(self.timestep_ssps[j,:]) , ssp)
+            decoded_traj[j,:] = self.ssp_x_space.decode(query, method='direct-optim',samples=self.init_samples)
+        return decoded_traj.reshape(-1)
 
     def length_scale(self):
         return self.ssp_space.length_scale

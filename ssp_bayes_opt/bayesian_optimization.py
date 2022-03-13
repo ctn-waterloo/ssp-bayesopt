@@ -11,6 +11,32 @@ from typing import Callable
 class BayesianOptimization:
     def __init__(self, f: Callable[...,float] =None, bounds: np.ndarray=None, 
                  random_state: int =None, verbose: bool=False):
+        '''
+        Initializes the Bayesian Optimization object 
+
+        Parameters:
+        -----------
+
+        f : Callable 
+            The target function that is being optimized. Assumed to be a 
+            of the form np.ndarray -> float 
+
+        bounds : np.ndarray 
+            A n X 2 numpy array. n is the dimensionality to the input of the 
+            target function.
+
+        random_state : int 
+            A seed for the random number generator.
+
+        verbose : bool 
+            Controls whether or not diagnostic information is printed.
+
+        Returns:
+        --------
+
+            None
+        '''
+
         assert not f is None, 'Must specify a callable target function'
         assert not bounds is None, 'Must dictionary of input bounds'
         assert bounds.shape[1] == 2, 'Must specify bounds of form [lower, upper] for each data dimension'
@@ -28,6 +54,42 @@ class BayesianOptimization:
         self.ys = None
 
     def initialize_agent(self,init_points: int =10,agent_type='ssp-hex',**kwargs):
+        '''
+        Creates the optimization agent from an initial sampling of the target
+        function.
+
+        Parameters:
+        -----------
+        
+        init_points : int 
+            The number of points sampled from the domain of the target 
+            function for initial hyper parameter tuning.
+
+        agent_type : str 
+            One of (ssp-hex|ssp-rand|static-gp|gp).  'gp' re-optimizes the 
+            lengthscale parameters after every new observation, the other 
+            algorithms do not.  All agents use the Mutual Information 
+            acquisition function of Contal et al. (2014).
+
+        bounds : np.ndarray, optional 
+            The bounds of the function domain, used with the ssp-* algorithms 
+            when decoding sample points.
+
+        Returns:
+        --------
+
+        agt : Agent 
+            The agent used in optimizing the target function.
+
+        init_xs : np.ndarray
+            The sample points from the domain of the target function used to
+            optimize the agent's hyper parameters
+
+        init_ys : np.ndarray
+            The values of the target function at init_xs
+            
+        '''
+
         init_xs = self._sample_domain(num_points=init_points)
         init_ys = np.array([self.target(np.atleast_2d(x)) for x in init_xs]).reshape((init_points,-1))
 
@@ -50,7 +112,36 @@ class BayesianOptimization:
 
 
     def maximize(self, init_points: int =10, n_iter: int =100,num_restarts: int = 5,
-                 agent_type='ssp-hex',**kwargs) -> np.ndarray:
+                 agent_type='ssp-hex',**kwargs):
+
+        '''
+        Maximizes the target function.
+
+        Parameters:
+        -----------
+
+        init_points : int
+            The number of sample points used to initalize agent hyperparameters
+
+        n_iter : int
+            The total sampling budget for the optimization.
+
+        num_restarts : int
+            The number of restarts used when optimizing sample point selection.
+
+        agent_type : str
+            One of (ssp-hex|ssp-rand|static-gp|gp).  'gp' re-optimizes the 
+            lengthscale parameters after every new observation, the other 
+            algorithms do not.  All agents use the Mutual Information 
+            acquisition function of Contal et al. (2014).
+
+        Returns:
+        --------
+
+        None - Optimization results stored in property res
+            
+        '''
+
         # sample_xs = self._sample_domain(num_points=128 * 128) #self.num_decoding)
         # sample_ssps = self.agt.encode(sample_xs)
         # assert sample_ssps.shape[0] == sample_xs.shape[0]
@@ -138,9 +229,15 @@ class BayesianOptimization:
 
     @property 
     def res(self):
+        '''
+        The results of the optimization process
+        '''
         return [{'target':t, 'params':p} for t,p in zip(self.ys, self.xs)]
 
     @property
     def max(self):
+        '''
+        The maximum identified by the optimization process
+        '''
         max_idx = np.argmax(self.ys)
         return {'target':self.ys[max_idx], 'params':self.xs[max_idx]}
