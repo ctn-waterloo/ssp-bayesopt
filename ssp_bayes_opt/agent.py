@@ -173,13 +173,6 @@ class SSPAgent(Agent):
                         sigma=self.blr.S,
                         gamma=self.gamma_t,
                         beta_inv=1/self.blr.beta):
-            '''
-            old code:
-            beta_inv=self.blr.beta):
-            val = ptr.T @ m
-            mi = np.sqrt(gamma + beta_inv + ptr.T @ sigma @ ptr)
-            return  -(val + mi + np.sqrt(gamma))
-            '''
             val = phi.T @ m
             mi = np.sqrt(gamma + beta_inv + phi.T @ sigma @ phi) - np.sqrt(gamma)
             return -(val + mi).flatten()
