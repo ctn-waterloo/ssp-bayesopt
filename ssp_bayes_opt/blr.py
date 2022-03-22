@@ -20,9 +20,12 @@ class BayesianLinearRegression:
         '''
         assert phis.shape[1] == self.input_dim, f'Expected input shape ({ts.shape[0]}, {self.input_dim}), got {phis.shape}'
         assert len(ts.shape) > 1 and ts.shape[1] == self.output_dim, f'Expected output shape ({phis.shape[0]}, 1), got {ts.shape}'
+#         assert np.isfinite(phis).all(), 'Received a non-finite value'
 
         if self.beta is None:
-            self.beta = 1. / np.var(ts)
+            assert len(ts) > 1, f'Expected more than one initial example, got {len(ts)}.'
+            var_ts = np.var(ts)
+            self.beta = 1. / var_ts
         S_inv = self.S_inv + self.beta * np.dot(phis.T, phis)
         
         S = np.copy(self.S)
