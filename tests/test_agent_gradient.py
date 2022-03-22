@@ -55,9 +55,15 @@ init_ys = func(init_xs).reshape((-1,1))
 
 
 import matplotlib.pyplot as plt
+
+import warnings
+warnings.warn('This test script is depricated.  It relies on producing an acquisiton function that takes unencoded domain points as input.', 
+              DeprecationWarning,
+              stacklevel=2)
+exit()
 if True:
 
-    agt = agent.factory('ssp-mi', init_xs[:,:], np.atleast_2d(init_ys[:,0]).T)
+    agt = agent.factory('ssp-rand', init_xs[:,:], np.atleast_2d(init_ys[:,0]).T)
 
 
     from scipy.optimize import minimize, Bounds

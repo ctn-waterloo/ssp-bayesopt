@@ -27,7 +27,7 @@ def factory(agent_type, init_xs, init_ys, **kwargs):
         ssp_space = sspspace.HexagonalSSPSpace(data_dim, **kwargs)
         agt = SSPAgent(init_xs, init_ys,ssp_space) 
     elif agent_type=='ssp-rand':
-        ssp_space = sspspace.RandomSSPSpace(data_dim, **kwargs)
+        ssp_space = sspspace.RandomSSPSpace(data_dim, 151, **kwargs)
         agt = SSPAgent(init_xs, init_ys,ssp_space) 
     elif agent_type == 'gp':
         agt = GPAgent(init_xs, init_ys)
@@ -88,18 +88,14 @@ class SSPAgent(Agent):
         init_phis = self.encode(init_xs)
 
         self.blr = blr.BayesianLinearRegression(self.ssp_space.ssp_dim)
-
-        self.blr.update(init_phis, np.array(init_ys))
+#         self.blr.update(init_phis, np.array(init_ys))
+        self.blr.fit(init_phis, np.array(init_ys))
 
         # MI params
         self.gamma_t = 0
         self.sqrt_alpha = np.log(2/1e-6)
         
         self.init_samples = self.ssp_space.get_sample_pts_and_ssps(300**data_dim,'grid')
-
-        # Cache for the input xs.
-#         self.phis = None
-
     ### end __init__
 
     def _optimize_lengthscale(self, init_xs, init_ys):
@@ -259,7 +255,8 @@ class SSPTrajectoryAgent(Agent):
         init_phis = self.encode(init_trajs)
 
         self.blr = blr.BayesianLinearRegression(self.ssp_space.ssp_dim)
-        self.blr.update(init_phis, np.array(init_ys))
+#         self.blr.update(init_phis, np.array(init_ys))
+        self.blr.fit(init_phis, np.array(init_ys))
 
         # MI params
         self.gamma_t = 0

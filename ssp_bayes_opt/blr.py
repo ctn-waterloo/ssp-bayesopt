@@ -14,15 +14,51 @@ class BayesianLinearRegression:
         self.rank_one_updates = True
     ### end __init__
 
+    def fit(self, phis:np.ndarray, ts:np.ndarray):
+        '''
+        Initial fit of parameters. Must provide more than one data point. 
+        Fit must be called before update().
+        Calling fit multiple times will overwrite any hyperparameters specified
+        in this function
+
+        Parameters
+        ----------
+        phis : np.ndarray
+            A (num_examples, data_dim) numpy array of input data.
+
+        ts : np.ndarray
+            A (num_examples, output_dim) of predictions to regress against.
+            num_examples must be > 1.
+        '''
+        assert phis.shape[1] == self.input_dim, f'Expected input shape ({ts.shape[0]}, {self.input_dim}), got {phis.shape}'
+        assert len(ts.shape) > 1 and ts.shape[1] == self.output_dim, f'Expected output shape ({phis.shape[0]}, 1), got {ts.shape}'
+        assert ts.shape[0] > 1, f'Expected multiple training data points, got {ts.shape[0]}'
+
+        self.beta = 1. / np.var(ts)
+        S_inv = self.S_inv + self.beta * np.dot(phis.T, phis)
+        S = np.linalg.pinv(S_inv)
+
+        x = self.beta * np.dot(phis.T, ts)
+        assert x.shape == (self.input_dim, 1), f'Mean update should be shape {self.input_dim, 1} was {x.shape}'
+        
+        self.m = S @ (self.S_inv @ self.m + x)
+        self.S_inv = S_inv
+        self.S = S
+
+        assert self.m.shape[0] == self.input_dim and self.m.shape[1] == 1
+
+
     def update(self, phis:np.ndarray, ts:np.ndarray):
         '''
-        Compute one-step update of bayesian linear regression
+        Compute one-step update of bayesian linear regression.
+        Must be called after the fit() function has been called.
+
+        TODO: update beta parameter online.
         '''
         assert phis.shape[1] == self.input_dim, f'Expected input shape ({ts.shape[0]}, {self.input_dim}), got {phis.shape}'
         assert len(ts.shape) > 1 and ts.shape[1] == self.output_dim, f'Expected output shape ({phis.shape[0]}, 1), got {ts.shape}'
 
-        if self.beta is None:
-            self.beta = 1. / np.var(ts)
+        assert self.beta is not None, 'Error: Must call fit before update'
         S_inv = self.S_inv + self.beta * np.dot(phis.T, phis)
         
         S = np.copy(self.S)
