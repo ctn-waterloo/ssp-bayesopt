@@ -19,7 +19,8 @@ class BayesianOptimization:
 
         f : Callable 
             The target function that is being optimized. Assumed to be a 
-            of the form np.ndarray -> float 
+            of the form np.ndarray, str -> float. The second, string 
+            argument will give status of the optimization.
 
         bounds : np.ndarray 
             A n X 2 numpy array. n is the dimensionality to the input of the 
@@ -206,9 +207,11 @@ class BayesianOptimization:
             self.times[t] = time.thread_time_ns() - start
             ## END timing section
 
+            optimization_status = f'{t}'
+
             best_val_idx = np.argmax(vals)
             x_t = np.atleast_2d(solns[best_val_idx].flatten())
-            y_t = np.atleast_2d(self.target(x_t))
+            y_t = np.atleast_2d(self.target(x_t, optimization_status))
             
             mu_t, var_t, phi_t = agt.eval(x_t)
 
