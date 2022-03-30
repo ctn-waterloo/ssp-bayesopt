@@ -1,10 +1,10 @@
 import numpy as np
 import time
 
-from . import agent
+from . import agents
 from . import sspspace
 
-from scipy.stats import qmc
+# from scipy.stats import qmc
 from scipy.optimize import minimize, Bounds
 from typing import Callable
 
@@ -90,32 +90,48 @@ class BayesianOptimization:
             The values of the target function at init_xs
             
         '''
+    
+        if 'traj' in agent_type:
+            domain = agents.domains.TrajectoryDomain(kwargs['traj_len'], 
+                                                     kwargs['x_dim'],
+                                                     self.bounds)
+        else:
+            domain = agents.domains.BoundedDomain(self.bounds)
 
-        init_xs = self._sample_domain(num_points=init_points)
+        init_xs = domain.sample(init_points)
+        print(init_xs.shape)
         init_ys = np.array([self.target(np.atleast_2d(x)) for x in init_xs]).reshape((init_points,-1))
+
+#         init_xs = self._sample_domain(num_points=init_points)
+#         init_ys = np.array([self.target(np.atleast_2d(x)) for x in init_xs]).reshape((init_points,-1))
+
+#         init_trajs = self.sample_trajectories(n_init)
+#         init_ys =  np.array([func(np.atleast_2d(x)) for x in init_trajs]).reshape((n_init,-1))
+
 
         # Initialize the agent
         if agent_type=='ssp-hex':
             ssp_space = sspspace.HexagonalSSPSpace(self.data_dim, **kwargs)
-            agt = agent.SSPAgent(init_xs, init_ys,ssp_space) 
+            agt = agents.SSPAgent(init_xs, init_ys,ssp_space) 
         elif agent_type=='ssp-rand':
             ssp_space = sspspace.RandomSSPSpace(self.data_dim, **kwargs)
-            agt = agent.SSPAgent(init_xs, init_ys,ssp_space) 
+            agt = agents.SSPAgent(init_xs, init_ys,ssp_space) 
         elif agent_type=='gp':
-            agt = agent.GPAgent(init_xs, init_ys,**kwargs) 
+            agt = agents.GPAgent(init_xs, init_ys,**kwargs) 
         elif agent_type=='static-gp':
-            agt = agent.GPAgent(init_xs, init_ys, updating=False, **kwargs) 
+            agt = agents.GPAgent(init_xs, init_ys, updating=False, **kwargs) 
         elif agent_type=='ssp-traj':
-            agt = agent.SSPTrajectoryAgent(init_points, self.target, **kwargs) 
+            agt = agents.SSPTrajectoryAgent(init_xs, init_ys, **kwargs) 
             init_xs = agt.init_xs
             init_ys = agt.init_ys
         else:
-            raise NotImplementedError()
+            raise NotImplementedError(f'{agent_type} agent not implemented')
         return agt, init_xs, init_ys
 
 
-    def maximize(self, init_points: int =10, n_iter: int =100,num_restarts: int = 5,
-                 agent_type='ssp-hex',**kwargs):
+    def maximize(self, init_points: int =10, n_iter: int =100,
+                 num_restarts: int = 5, agent_type='ssp-hex',
+                 **kwargs):
 
         '''
         Maximizes the target function.
