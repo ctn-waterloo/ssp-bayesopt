@@ -25,7 +25,7 @@ pt_dim = xstar.shape[1]
 data_dim = traj_len*pt_dim
 bounds = 10*np.stack([-np.ones(data_dim), np.ones(data_dim)]).T
 
-def target(x):
+def target(x, info=None):
     x = np.vstack([np.zeros(2),x.reshape(traj_len,pt_dim)])
     return -np.sum(np.sqrt(np.sum((x - xstarfull)**2, axis=1)))
 
