@@ -96,8 +96,7 @@ class SSPTrajectoryAgent(Agent):
         phi = self.encode(x)
         # TODO: modify to running average of ssps.  
         # Could exceed the scale of the mean values 
-        # if not careful.  Alternative approach: 
-        # badness is -1 * self.blr.eval(phi)
+        # if not careful. 
         self.constraint_ssp += badness * phi
 
     def acquisition_func(self):
