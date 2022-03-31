@@ -13,7 +13,7 @@ from .agent import Agent
 class SSPTrajectoryAgent(Agent):
     def __init__(self, init_xs, init_ys, x_dim=1, traj_len=1,
                  ssp_x_space=None, ssp_t_space=None, ssp_dim=151,
-                 domain_bounds=None,length_scale=4):
+                 domain_bounds=None, length_scale=4, gamma_c=1.0):
         super().__init__()
         self.num_restarts = 10
         self.data_dim = x_dim*traj_len
@@ -48,6 +48,7 @@ class SSPTrajectoryAgent(Agent):
 
         # MI params
         self.gamma_t = 0
+        self.gamma_c = gamma_c
         self.sqrt_alpha = np.log(2/1e-6)
     
         self.init_samples = self.ssp_x_space.get_sample_pts_and_ssps(10000,'grid')
@@ -117,7 +118,7 @@ class SSPTrajectoryAgent(Agent):
         self.blr.update(phi, y_val)
         
         # Update gamma
-        self.gamma_t = self.gamma_t + sigma_t
+        self.gamma_t = self.gamma_t + self.gamma_c*sigma_t
 
     def encode(self,x):
         x = np.atleast_2d(x)
