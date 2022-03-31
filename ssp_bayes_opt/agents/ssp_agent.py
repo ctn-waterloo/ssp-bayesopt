@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, PassthroughScaler
 from sklearn.model_selection import KFold
 import warnings
 
