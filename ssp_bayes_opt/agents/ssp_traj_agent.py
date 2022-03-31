@@ -46,6 +46,8 @@ class SSPTrajectoryAgent(Agent):
         self.blr = blr.BayesianLinearRegression(self.ssp_x_space.ssp_dim)
         self.blr.update(init_phis, np.array(init_ys))
 
+        self.contraint_ssp = np.zeros_like(self.blr.m)
+
         # MI params
         self.gamma_t = 0
         self.sqrt_alpha = np.log(2/1e-6)
@@ -73,6 +75,31 @@ class SSPTrajectoryAgent(Agent):
         # From the approximate solution of dot(m,x) + x^T Sigma x
         return self.blr.sample()
 
+
+    def untrusted(self, x, badness=-1):
+        '''
+        Updates the domain constraints for the optimization.
+        TODO: modify to permit multiple updates at once
+
+        Parameters
+        ----------
+        x : np.ndarray
+            points to be excluded from the optimization.
+            For now assuming one data point per call of untrusted
+
+
+        badness : float
+            The scale to be applied to the x points.  For now
+            assuming that one scalar value is applied per point in
+            x
+        '''
+        phi = self.encode(x)
+        # TODO: modify to running average of ssps.  
+        # Could exceed the scale of the mean values 
+        # if not careful.  Alternative approach: 
+        # badness is -1 * self.blr.eval(phi)
+        self.constraint_ssp += badness * phi
+
     def acquisition_func(self):
         '''
         return objective_func, jacobian_func
@@ -80,7 +107,7 @@ class SSPTrajectoryAgent(Agent):
         # TODO: Currently returning (objective_func, None) to be fixed when 
         # I finish the derivation
 
-        def min_func(phi, m=self.blr.m,
+        def min_func(phi, m=self.blr.m + self.constraint_ssp,
                         sigma=self.blr.S,
                         gamma=self.gamma_t,
                         beta_inv=1/self.blr.beta):
@@ -89,7 +116,7 @@ class SSPTrajectoryAgent(Agent):
             return -(val + mi).flatten()
 
 
-        def gradient(phi, m=self.blr.m,
+        def gradient(phi, m=self.blr.m + self.constraint_ssp,
                       sigma=self.blr.S,
                       gamma=self.gamma_t,
                       beta_inv=1/self.blr.beta):
