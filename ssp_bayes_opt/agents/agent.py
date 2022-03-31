@@ -44,6 +44,9 @@ class Agent:
     def update(self, x_t, y_t, sigma_t):
         pass
 
+    def untrusted(self, x, badness=None):
+        pass
+
     def acquisition_func(self):
         pass
 
