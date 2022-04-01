@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
-from sklearn.preprocessing import StandardScaler, PassthroughScaler
 from sklearn.model_selection import KFold
 import warnings
 
@@ -19,9 +18,6 @@ class SSPAgent(Agent):
         self.num_restarts = 10
         (num_pts, data_dim) = init_xs.shape
         self.data_dim = data_dim
-
-#         self.scaler = StandardScaler()
-        self.scaler = PassthroughScaler()
 
         if ssp_space is None:
             ssp_space = sspspace.HexagonalSSPSpace(data_dim,ssp_dim=151, n_rotates=5, n_scales=5, 
@@ -54,9 +50,8 @@ class SSPAgent(Agent):
 
     def _optimize_lengthscale(self, init_xs, init_ys):
         ls_0 = np.array([[8.]]) 
-        self.scaler.fit(init_ys)
 
-        def min_func(length_scale, xs=init_xs, ys=self.scaler.transform(init_ys),
+        def min_func(length_scale, xs=init_xs, ys=init_ys,
                         ssp_space=self.ssp_space):
             errors = []
             kfold = KFold(n_splits=min(xs.shape[0], 50))
@@ -89,7 +84,7 @@ class SSPAgent(Agent):
         phis = self.encode(xs)
         mu, var = self.blr.predict(phis)
         phi = self.sqrt_alpha * (np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t)) 
-        return self.scaler.inverse_transform(mu), var, phi
+        return mu, var, phi
 
     def initial_guess(self):
         '''
@@ -167,7 +162,6 @@ class SSPAgent(Agent):
             x_val = x_t.reshape(1, x_t.shape[0])
             y_val = y_t.reshape(1, y_t.shape[0])
         ### end if
-        y_val = self.scaler.transform(y_val)
     
         # Update BLR
         phi = np.atleast_2d(self.encode(x_val).squeeze())
