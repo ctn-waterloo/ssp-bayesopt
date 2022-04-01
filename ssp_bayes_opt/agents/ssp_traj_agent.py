@@ -46,7 +46,7 @@ class SSPTrajectoryAgent(Agent):
         self.blr = blr.BayesianLinearRegression(self.ssp_x_space.ssp_dim)
         self.blr.update(init_phis, np.array(init_ys))
 
-        self.contraint_ssp = np.zeros_like(self.blr.m)
+        self.constraint_ssp = np.zeros_like(self.blr.m)
 
         # MI params
         self.gamma_t = 0
