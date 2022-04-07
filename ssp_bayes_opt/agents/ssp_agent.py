@@ -23,12 +23,12 @@ class SSPAgent(Agent):
             ssp_space = sspspace.HexagonalSSPSpace(data_dim,ssp_dim=151, n_rotates=5, n_scales=5, 
                  scale_min=2*np.pi/np.sqrt(6) - 0.5, scale_max=2*np.pi/np.sqrt(6) + 0.5,
                  domain_bounds=None, length_scale=5)
+            # Optimize the length scales
+            ssp_space.update_lengthscale(self._optimize_lengthscale(init_xs, init_ys))
+            print('Selected Lengthscale: ', ssp_space.length_scale)
         
         self.ssp_space = ssp_space
-        # Optimize the length scales
-        #self.ssp_space.update_lengthscale(self._optimize_lengthscale(init_xs, init_ys))
-        self.ssp_space.update_lengthscale(4)
-        print('Selected Lengthscale: ', self.ssp_space.length_scale)
+        
 
         # Encode the initial sample points 
         init_phis = self.encode(init_xs)

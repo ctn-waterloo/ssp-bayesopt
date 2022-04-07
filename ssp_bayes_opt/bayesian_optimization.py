@@ -49,7 +49,10 @@ class BayesianOptimization:
         if not random_state is None:
             np.random.seed(random_state)
 
-        self.target = f
+        if f.__code__.co_argcount == 1:
+            self.target = lambda x, info=None: f(x)
+        else:
+            self.target = f
         self.bounds = bounds
         self.log_and_plot_f = log_and_plot_f
 
@@ -100,14 +103,15 @@ class BayesianOptimization:
             domain = agents.domains.TrajectoryDomain(kwargs['traj_len'], 
                                                      kwargs['x_dim'],
                                                      self.bounds)
+            
         else:
             domain = agents.domains.BoundedDomain(self.bounds)
-
+            
+        
         init_xs = domain.sample(init_points)
         init_ys = np.array(
-            [self.target(np.atleast_2d(x), str(itr))
-             for itr, x in enumerate(init_xs)]).reshape((init_points,-1))
-
+                [self.target(np.atleast_2d(x), str(itr))
+                 for itr, x in enumerate(init_xs)]).reshape((init_points,-1))
 #         init_xs = self._sample_domain(num_points=init_points)
 #         init_ys = np.array([self.target(np.atleast_2d(x)) for x in init_xs]).reshape((init_points,-1))
 
@@ -122,6 +126,9 @@ class BayesianOptimization:
         elif agent_type=='ssp-rand':
             ssp_space = sspspace.RandomSSPSpace(self.data_dim, **kwargs)
             agt = agents.SSPAgent(init_xs, init_ys,ssp_space) 
+        elif agent_type=='ssp-custom':
+            assert 'ssp_space' in kwargs
+            agt = agents.SSPAgent(init_xs, init_ys,kwargs.get('ssp_space') )
         elif agent_type=='gp':
             agt = agents.GPAgent(init_xs, init_ys,**kwargs) 
         elif agent_type=='static-gp':
