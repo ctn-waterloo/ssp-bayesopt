@@ -9,7 +9,8 @@ from scipy.optimize import minimize, Bounds
 from typing import Callable
 
 class BayesianOptimization:
-    def __init__(self, f: Callable[...,float] =None, bounds: np.ndarray=None, 
+    def __init__(self, f: Callable[...,float] =None, bounds: np.ndarray=None,
+                 log_and_plot_f: Callable[...,float] =None,
                  random_state: int =None, verbose: bool=False):
         '''
         Initializes the Bayesian Optimization object 
@@ -29,6 +30,9 @@ class BayesianOptimization:
         random_state : int 
             A seed for the random number generator.
 
+        log_and_plot_f : Callable
+            A function for logging and plotting.
+
         verbose : bool 
             Controls whether or not diagnostic information is printed.
 
@@ -45,8 +49,12 @@ class BayesianOptimization:
         if not random_state is None:
             np.random.seed(random_state)
 
-        self.target = f
+        if f.__code__.co_argcount == 1:
+            self.target = lambda x, info=None: f(x)
+        else:
+            self.target = f
         self.bounds = bounds
+        self.log_and_plot_f = log_and_plot_f
 
         self.data_dim = self.bounds.shape[0]
         self.num_decoding = 10000
@@ -95,13 +103,15 @@ class BayesianOptimization:
             domain = agents.domains.TrajectoryDomain(kwargs['traj_len'], 
                                                      kwargs['x_dim'],
                                                      self.bounds)
+            
         else:
             domain = agents.domains.BoundedDomain(self.bounds)
-
+            
+        
         init_xs = domain.sample(init_points)
-        print(init_xs.shape)
-        init_ys = np.array([self.target(np.atleast_2d(x)) for x in init_xs]).reshape((init_points,-1))
-
+        init_ys = np.array(
+                [self.target(np.atleast_2d(x), str(itr))
+                 for itr, x in enumerate(init_xs)]).reshape((init_points,-1))
 #         init_xs = self._sample_domain(num_points=init_points)
 #         init_ys = np.array([self.target(np.atleast_2d(x)) for x in init_xs]).reshape((init_points,-1))
 
@@ -116,6 +126,9 @@ class BayesianOptimization:
         elif agent_type=='ssp-rand':
             ssp_space = sspspace.RandomSSPSpace(self.data_dim, **kwargs)
             agt = agents.SSPAgent(init_xs, init_ys,ssp_space) 
+        elif agent_type=='ssp-custom':
+            assert 'ssp_space' in kwargs
+            agt = agents.SSPAgent(init_xs, init_ys,kwargs.get('ssp_space') )
         elif agent_type=='gp':
             agt = agents.GPAgent(init_xs, init_ys,**kwargs) 
         elif agent_type=='static-gp':
@@ -192,7 +205,8 @@ class BayesianOptimization:
         print('-------------------------------')
         for t in range(n_iter):
             ## Begin timing section
-            start = time.thread_time_ns()
+            if hasattr(time, 'thread_time_ns'):
+                start = time.thread_time_ns()
             # get the functions to optimize
             ### TODO fix jacobian so it returns dx in x space
             optim_func, jac_func = agt.acquisition_func()
@@ -220,7 +234,8 @@ class BayesianOptimization:
                     solnx = agt.decode(np.copy(np.atleast_2d(soln.x)))
                 vals.append(-soln.fun)
                 solns.append(solnx)
-            self.times[t] = time.thread_time_ns() - start
+            if hasattr(time, 'thread_time_ns'):
+                self.times[t] = time.thread_time_ns() - start
             ## END timing section
 
             optimization_status = f'{t}'
@@ -237,6 +252,8 @@ class BayesianOptimization:
             # Log actions
             self.xs.append(np.copy(x_t))
             self.ys.append(np.copy(y_t))
+            if self.log_and_plot_f is not None:
+                self.log_and_plot_f(np.vstack(self.xs), np.vstack(self.ys), t)
             self.agt = agt
 
     def _sample_domain(self, num_points: int=10) -> np.ndarray:

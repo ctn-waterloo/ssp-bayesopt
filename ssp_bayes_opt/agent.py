@@ -263,9 +263,12 @@ class SSPTrajectoryAgent(Agent):
         init_trajs = self.sample_trajectories(n_init)
         init_phis = self.encode(init_trajs)
         init_ys =  np.array([func(np.atleast_2d(x)) for x in init_trajs]).reshape((n_init,-1))
+        
         self.init_xs = init_trajs
         self.init_ys = init_ys
-
+        optres = self._optimize_lengthscale(init_trajs, init_ys)
+        self.ssp_x_space.update_lengthscale(optres[0])
+        self.ssp_t_space.update_lengthscale(optres[1])
         self.blr = blr.BayesianLinearRegression(self.ssp_x_space.ssp_dim)
         self.blr.update(init_phis, np.array(init_ys))
 
@@ -280,7 +283,38 @@ class SSPTrajectoryAgent(Agent):
         mu, var = self.blr.predict(phis)
         phi = self.sqrt_alpha * (np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t)) 
         return self.scaler.inverse_transform(mu), var, phi
+    
+    def _optimize_lengthscale(self, init_trajs, init_ys):
+        ls_0 = np.array([[4.],[10]]) 
 
+        def min_func(length_scale, xs=init_trajs, ys=init_ys,
+                        ssp_x_space=self.ssp_x_space,ssp_t_space=self.ssp_t_space):
+            errors = []
+            kfold = KFold(n_splits=min(xs.shape[0], 50))
+            ssp_x_space.update_lengthscale(length_scale[0])
+            ssp_t_space.update_lengthscale(length_scale[1])
+            for train_idx, test_idx in kfold.split(xs):
+                train_x, test_x = xs[train_idx], xs[test_idx]
+                train_y, test_y = ys[train_idx], ys[test_idx]
+
+                train_phis = self.encode(train_x)
+                test_phis = self.encode(test_x)
+
+                b = blr.BayesianLinearRegression(ssp_x_space.ssp_dim)
+                b.update(train_phis, train_y)
+                mu, var = b.predict(test_phis)
+                diff = test_y.flatten() - mu.flatten()
+                loss = -0.5*np.log(var) - np.divide(np.power(diff,2),var)
+                errors.append(np.sum(-loss))
+            ### end for
+            return np.sum(errors)
+        ### end min_func
+
+        retval = minimize(min_func, x0=ls_0, method='L-BFGS-B',
+                          bounds=[(1/np.sqrt(init_trajs.shape[0]),None),(1/np.sqrt(init_trajs.shape[0]),None)],
+                          )
+        return np.abs(retval.x) 
+    
     def sample_trajectories(self, num_points=10):
         sampler = qmc.Sobol(d=self.x_dim) 
         u_sample_points = sampler.random(num_points*self.traj_len)

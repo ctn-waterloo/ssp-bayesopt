@@ -1,5 +1,5 @@
 import os
-from setuptools import setup
+from setuptools import setup, find_packages
 
 
 # Helper function to load up readme as long description.
@@ -15,7 +15,7 @@ setup(
         license = 'TBD',
         keywords = '',
         url='http://github.com/ctn-waterloo/ssp-bayesopt',
-        packages=['ssp_bayes_opt','tests'],
+        packages=find_packages(),
         long_description=read('README.md'),
         classifiers=[
             'Development Status :: 2 - Pre-Alpha',

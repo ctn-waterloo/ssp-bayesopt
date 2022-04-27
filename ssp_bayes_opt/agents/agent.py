@@ -49,14 +49,3 @@ class Agent:
 
     def acquisition_func(self):
         pass
-
-
-class PassthroughScaler:
-    def __init__(self):
-        pass
-    def fit(self, x):
-        pass
-    def transform(self, x):
-        return x
-    def inverse_transform(self, x):
-        return x

@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
-from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import KFold
 import warnings
 
@@ -20,19 +19,16 @@ class SSPAgent(Agent):
         (num_pts, data_dim) = init_xs.shape
         self.data_dim = data_dim
 
-#         self.scaler = StandardScaler()
-#         self.scaler = PassthroughScaler()
-
         if ssp_space is None:
             ssp_space = sspspace.HexagonalSSPSpace(data_dim,ssp_dim=151, n_rotates=5, n_scales=5, 
                  scale_min=2*np.pi/np.sqrt(6) - 0.5, scale_max=2*np.pi/np.sqrt(6) + 0.5,
                  domain_bounds=None, length_scale=5)
+            # Optimize the length scales
+            ssp_space.update_lengthscale(self._optimize_lengthscale(init_xs, init_ys))
+            print('Selected Lengthscale: ', ssp_space.length_scale)
         
         self.ssp_space = ssp_space
-        # Optimize the length scales
-        #self.ssp_space.update_lengthscale(self._optimize_lengthscale(init_xs, init_ys))
-        self.ssp_space.update_lengthscale(4)
-        print('Selected Lengthscale: ', self.ssp_space.length_scale)
+        
 
         # Encode the initial sample points 
         init_phis = self.encode(init_xs)
@@ -54,13 +50,9 @@ class SSPAgent(Agent):
 
     def _optimize_lengthscale(self, init_xs, init_ys):
         ls_0 = np.array([[8.]]) 
-#         self.scaler.fit(init_ys)
 
-        def min_func(length_scale,
-                     xs=init_xs, 
-#                      ys=self.scaler.transform(init_ys),
-                     ys=init_ys,
-                     ssp_space=self.ssp_space):
+        def min_func(length_scale, xs=init_xs, ys=init_ys,
+                        ssp_space=self.ssp_space):
             errors = []
             kfold = KFold(n_splits=min(xs.shape[0], 50))
             ssp_space.update_lengthscale(length_scale)
@@ -92,7 +84,6 @@ class SSPAgent(Agent):
         phis = self.encode(xs)
         mu, var = self.blr.predict(phis)
         phi = self.sqrt_alpha * (np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t)) 
-#         return self.scaler.inverse_transform(mu), var, phi
         return mu, var, phi
 
     def initial_guess(self):
@@ -171,7 +162,6 @@ class SSPAgent(Agent):
             x_val = x_t.reshape(1, x_t.shape[0])
             y_val = y_t.reshape(1, y_t.shape[0])
         ### end if
-#         y_val = self.scaler.transform(y_val) 
 
         # Update BLR
         phi = np.atleast_2d(self.encode(x_val).squeeze())
