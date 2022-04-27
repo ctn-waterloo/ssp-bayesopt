@@ -80,8 +80,8 @@ class SSPAgent(Agent):
         
         self.ssp_space = ssp_space
         # Optimize the length scales
-        #self.ssp_space.update_lengthscale(self._optimize_lengthscale(init_xs, init_ys))
-        self.ssp_space.update_lengthscale(4)
+        self.ssp_space.update_lengthscale(self._optimize_lengthscale(init_xs, init_ys))
+#         self.ssp_space.update_lengthscale(4)
         print('Selected Lengthscale: ', self.ssp_space.length_scale)
 
         # Encode the initial sample points 
