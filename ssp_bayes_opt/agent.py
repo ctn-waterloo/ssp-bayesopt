@@ -177,34 +177,6 @@ class SSPAgent(Agent):
 
         return min_func, gradient
     
-    def acquisition_func_v2(self):
-        '''
-        return objective_func, jacobian_func
-        '''
-
-        def optim_func(x, m=self.blr.m,
-                       sigma=self.blr.S,
-                       gamma=self.gamma_t,
-                       beta_inv=1/self.blr.beta
-                       ):
-            ptr = self.encode(x)
-            val = ptr @ m
-            mi = np.sqrt(gamma + beta_inv + ptr @ sigma @ ptr.T) - np.sqrt(gamma)
-            return -(val + mi).flatten()
-        ### end optim_func
-
-        def jac_func(x, m=self.blr.m,
-                     sigma=self.blr.S,
-                     gamma=self.gamma_t,
-                     beta_inv=1/self.blr.beta
-                     ):
-            ptr, grad_ptr = self.ssp_space.encode_and_deriv(x)
-            sqr = (ptr @ sigma @ ptr.T) 
-            scale = np.sqrt(sqr + gamma + beta_inv)
-            retval = grad_ptr.squeeze().T @ -(m + sigma @ ptr.T / scale) 
-            return retval
-        ### end gradient
-        return optim_func, jac_func 
 
     def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float):
         '''
