@@ -169,9 +169,10 @@ class SSPAgent(Agent):
                       sigma=self.blr.S,
                       gamma=self.gamma_t,
                       beta_inv=1/self.blr.beta):
-            sqr = (phi.T @ sigma @ phi) 
+            sig_phi = sigma @ phi
+            sqr = (phi.T @ sig_phi ) 
             scale = np.sqrt(sqr + gamma + beta_inv)
-            retval = -(m.flatten() + sigma @ phi / scale)
+            retval = -(m.flatten() + sig_phi / scale)
             return retval
 
         return min_func, gradient
