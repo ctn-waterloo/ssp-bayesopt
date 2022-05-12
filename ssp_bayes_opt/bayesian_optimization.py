@@ -96,10 +96,10 @@ class BayesianOptimization:
         # Initialize the agent
         if agent_type=='ssp-hex':
             ssp_space = sspspace.HexagonalSSPSpace(self.data_dim, **kwargs)
-            agt = agent.SSPAgent(init_xs, init_ys,ssp_space) 
+            agt = agent.SSPAgent(init_xs, init_ys,ssp_space, **kwargs) 
         elif agent_type=='ssp-rand':
             ssp_space = sspspace.RandomSSPSpace(self.data_dim, **kwargs)
-            agt = agent.SSPAgent(init_xs, init_ys,ssp_space) 
+            agt = agent.SSPAgent(init_xs, init_ys,ssp_space, **kwargs) 
         elif agent_type=='gp':
             agt = agent.GPAgent(init_xs, init_ys,**kwargs) 
         elif agent_type=='static-gp':

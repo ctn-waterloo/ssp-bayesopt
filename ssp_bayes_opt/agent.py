@@ -24,10 +24,10 @@ def factory(agent_type, init_xs, init_ys, **kwargs):
     # Initialize the agent
     agt = None
     if agent_type=='ssp-hex':
-        ssp_space = sspspace.HexagonalSSPSpace(data_dim, **kwargs)
+        ssp_space = sspspace.HexagonalSSPSpace(**kwargs)
         agt = SSPAgent(init_xs, init_ys,ssp_space) 
     elif agent_type=='ssp-rand':
-        ssp_space = sspspace.RandomSSPSpace(data_dim, **kwargs)
+        ssp_space = sspspace.RandomSSPSpace(**kwargs)
         agt = SSPAgent(init_xs, init_ys,ssp_space) 
     elif agent_type == 'gp':
         agt = GPAgent(init_xs, init_ys)
@@ -63,7 +63,7 @@ class PassthroughScaler:
         return x
 
 class SSPAgent(Agent):
-    def __init__(self, init_xs, init_ys, ssp_space=None):
+    def __init__(self, init_xs, init_ys, ssp_space=None, **kwargs):
         super().__init__()
   
         self.num_restarts = 10
@@ -80,8 +80,11 @@ class SSPAgent(Agent):
         
         self.ssp_space = ssp_space
         # Optimize the length scales
-        self.ssp_space.update_lengthscale(self._optimize_lengthscale(init_xs, init_ys))
-#         self.ssp_space.update_lengthscale(4)
+        if not 'length_scale' in kwargs:
+            self.ssp_space.update_lengthscale(self._optimize_lengthscale(init_xs, init_ys))
+        else:
+            self.ssp_space.update_lengthscale(kwargs.get('length_scale', 4))
+        ### end if
         print('Selected Lengthscale: ', self.ssp_space.length_scale)
 
         # Encode the initial sample points 
@@ -103,7 +106,7 @@ class SSPAgent(Agent):
     ### end __init__
 
     def _optimize_lengthscale(self, init_xs, init_ys):
-        ls_0 = np.array([[8.]]) 
+        ls_0 = np.array([[7]]) 
         self.scaler.fit(init_ys)
 
         def min_func(length_scale, xs=init_xs, ys=self.scaler.transform(init_ys),
@@ -111,6 +114,15 @@ class SSPAgent(Agent):
             errors = []
             kfold = KFold(n_splits=min(xs.shape[0], 50))
             ssp_space.update_lengthscale(length_scale)
+
+#             phis = ssp_space.encode(xs)
+#             b = blr.BayesianLinearRegression(ssp_space.ssp_dim)
+#             b.update(phis, ys)
+#             mu, var = b.predict(phis)
+#             diff = ys.flatten() - mu.flatten()
+#             loss = -0.5*np.log(var) - 0.5*np.divide(np.power(diff,2),var)
+#             err_val = np.sum(loss) - xs.shape[0] * np.log(2*np.pi) / 2
+#             return err_val
 
             for train_idx, test_idx in kfold.split(xs):
                 train_x, test_x = xs[train_idx], xs[test_idx]
@@ -123,10 +135,11 @@ class SSPAgent(Agent):
                 b.update(train_phis, train_y)
                 mu, var = b.predict(test_phis)
                 diff = test_y.flatten() - mu.flatten()
-                loss = -0.5*np.log(var) - np.divide(np.power(diff,2),var)
-                errors.append(np.sum(-loss))
+                loss = -0.5*np.log(var) - 0.5*np.divide(np.power(diff,2),var)
+                errors.append(np.sum(loss))
             ### end for
-            return np.sum(errors)
+            err_val = np.sum(errors) - xs.shape[0] / (2*np.log(2*np.pi))
+            return err_val
         ### end min_func
 
         retval = minimize(min_func, x0=ls_0, method='L-BFGS-B',
