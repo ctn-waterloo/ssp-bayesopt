@@ -261,7 +261,7 @@ class SSPSpace:
         if method == 'grid':
             num_pts_per_dim = [samples_per_dim for _ in range(bounds.shape[0])]
         elif method == 'length-scale':
-            num_pts_per_dim = [int(np.ceil((b[1]-b[0])/self.length_scale[b_idx])) for b_idx, b in enumerate(bounds)]
+            num_pts_per_dim = [2*int(np.ceil((b[1]-b[0])/self.length_scale[b_idx])) for b_idx, b in enumerate(bounds)]
 
 
         if method=='grid' or method=='length-scale':
