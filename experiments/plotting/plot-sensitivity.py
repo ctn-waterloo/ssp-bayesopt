@@ -1,0 +1,145 @@
+import numpy as np
+import pytry
+import glob
+import os.path
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+
+from argparse import ArgumentParser
+
+display = True
+if not display:
+    mpl.use('pgf')
+    mpl.rcParams.update({
+        'pgf.texsystem': 'pdflatex',
+        'text.usetex': True,
+        'pgf.rcfonts': False,
+        'pdf.fonttype': 42,
+        'ps.fonttype': 42,
+        })
+### end if
+mpl.rcParams.update({
+    'font.family': 'serif',
+    'figure.autolayout': True
+    })
+
+
+def get_data(data_frame):
+    ssp_dim = data_frame['ssp_dim']
+    try:
+        regret = data_frame['regret']
+        avg_regret = np.sum(regret) / data_frame['budget']
+#         avg_regret = np.divide(np.cumsum(regret, axis=1), np.cumsum(np.arange(1,regret.shape[1]+1)))
+        return ssp_dim, avg_regret
+    except:
+        print(data_frame.keys())
+        exit()
+    ### end try
+### end get_data
+
+from scipy import stats
+from sklearn import preprocessing
+from sklearn.model_selection import RepeatedKFold
+from sklearn.linear_model import LinearRegression
+
+def preprocess_data(indep, dep):
+    indeps = np.array(indep).reshape((-1,1))
+
+    deps = np.array(dep).reshape(indeps.shape[0],1)
+
+    return indeps, deps
+
+def compute_stats(xs, ys):
+    x_vals = np.unique(xs)
+    mus = np.array([np.mean(ys[xs==x]) for x in x_vals])
+    sems = np.array([stats.sem(ys[xs==x]) for x in x_vals])
+
+    return x_vals, mus, sems
+
+
+if __name__=='__main__':
+
+    parser = ArgumentParser(description='Plot sensitivity to SSP dimension')
+    parser.add_argument('folder', type=str)
+
+    args = parser.parse_args()
+
+    files = pytry.read(os.path.abspath(args.folder))
+
+    ssp_dim, terminal_avg_regret = zip(*[get_data(f) for f in files])
+
+    X, Y = preprocess_data(ssp_dim, terminal_avg_regret)
+
+    model = LinearRegression(fit_intercept=True)
+    num_repeats = 10000
+    num_splits = 2
+
+    num_features = X.shape[1]
+    kfold = RepeatedKFold(n_splits=num_splits, n_repeats=num_repeats)
+    
+    scores = np.zeros((num_splits * num_repeats,))
+    coeffs = np.zeros((num_splits * num_repeats, num_features+1))
+    for i, (train, test) in enumerate(kfold.split(X, Y)):
+        model.fit(X[train,:], Y[train])
+        coeffs[i,:num_features] = model.coef_
+        coeffs[i,-1] = model.intercept_
+
+        scores[i] = model.score(X[test,:], Y[test])
+
+
+#     plt.figure()
+#     stes = 1.96 * np.std(coeffs, axis=0) / np.sqrt(num_splits * num_repeats)
+#     plt.bar([0, 1], np.mean(coeffs, axis=0), 0.5, yerr=stes)
+   
+    plt.figure()
+    x_unique, mu, sem = compute_stats(X,Y)
+
+    plt.fill_between(x_unique, mu-sem, mu+sem, alpha=0.5)
+    if 'hex' in args.folder:
+        alg_type = 'Hex'
+    if 'rand' in args.folder:
+        alg_type = 'Rand'
+    plt.plot(x_unique, mu, label=f'{alg_type} SSP, '+ r'$\beta = '+f'{np.mean(coeffs[:,0]):.3f}'+'$')
+    
+    matern_mu = 5.15
+    matern_ste = 3.38 / np.sqrt(30)
+
+    sinc_mu = 8.14 
+    sinc_ste = 4.41 / np.sqrt(30)
+
+    plt.fill_between(x_unique,
+            (sinc_mu - sinc_ste) * np.ones(x_unique.shape),
+            (sinc_mu + sinc_ste) * np.ones(x_unique.shape),
+            alpha=0.3, color='tab:green')
+    plt.plot(x_unique, sinc_mu * np.ones(x_unique.shape), 
+            label='GP-Sinc terminal regret', ls='dotted', color='tab:green')
+
+    plt.fill_between(x_unique,
+            (matern_mu - matern_ste) * np.ones(x_unique.shape),
+            (matern_mu + matern_ste) * np.ones(x_unique.shape),
+            alpha=0.3, color='tab:red')
+    plt.plot(x_unique, matern_mu * np.ones(x_unique.shape), 
+            label='GP-Matern terminal regret', ls='dashdot', color='tab:red')
+
+
+    plt.gca().spines['left'].set_position(('outward', 10))
+    plt.gca().spines['bottom'].set_position(('outward', 10))
+
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False) 
+
+    plt.legend()
+    plt.ylabel('Terminal Average Regret (a.u.)')#, fontsize=24)
+    plt.xlabel('SSP Dimension')#, fontsize=24)
+    plt.title(f'Terminal Average Regret vs SSP Dimension (Branin-Hoo)')
+    plt.tight_layout()
+
+#     plt.figure()
+#     plt.hist(X, bins=20)
+# 
+    plt.show()
+
+
+
+#     plt.scatter(ssp_dim, terminal_avg_regret)
+#     plt.show()
