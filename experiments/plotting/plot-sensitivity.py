@@ -61,6 +61,7 @@ if __name__=='__main__':
 
     parser = ArgumentParser(description='Plot sensitivity to SSP dimension')
     parser.add_argument('folder', type=str)
+    parser.add_argument('--save', action='store_true')
 
     args = parser.parse_args()
 
@@ -94,12 +95,20 @@ if __name__=='__main__':
     plt.figure()
     x_unique, mu, sem = compute_stats(X,Y)
 
-    plt.fill_between(x_unique, mu-sem, mu+sem, alpha=0.5)
+    color =''
+    line_style = ''
     if 'hex' in args.folder:
         alg_type = 'Hex'
+        color = 'tab:orange'
+        line_style = 'dashed'
     if 'rand' in args.folder:
         alg_type = 'Rand'
-    plt.plot(x_unique, mu, label=f'{alg_type} SSP, '+ r'$\beta = '+f'{np.mean(coeffs[:,0]):.3f}'+'$')
+        color = 'tab:blue'
+        line_style = 'dashed'
+
+    plt.fill_between(x_unique, mu-sem, mu+sem, alpha=0.3, color=color)
+    plt.plot(x_unique, mu, label=f'{alg_type} SSP', c=color, ls=line_style)
+    plt.scatter([151], mu[-2], color='tab:blue', zorder=10)
     
     matern_mu = 5.15
     matern_ste = 3.38 / np.sqrt(30)
@@ -112,14 +121,14 @@ if __name__=='__main__':
             (sinc_mu + sinc_ste) * np.ones(x_unique.shape),
             alpha=0.3, color='tab:green')
     plt.plot(x_unique, sinc_mu * np.ones(x_unique.shape), 
-            label='GP-Sinc terminal regret', ls='dotted', color='tab:green')
+            label='GP-Sinc', ls='dotted', color='tab:green')
 
     plt.fill_between(x_unique,
             (matern_mu - matern_ste) * np.ones(x_unique.shape),
             (matern_mu + matern_ste) * np.ones(x_unique.shape),
             alpha=0.3, color='tab:red')
     plt.plot(x_unique, matern_mu * np.ones(x_unique.shape), 
-            label='GP-Matern terminal regret', ls='dashdot', color='tab:red')
+            label='GP-Matern', ls='dashdot', color='tab:red')
 
 
     plt.gca().spines['left'].set_position(('outward', 10))
@@ -128,18 +137,13 @@ if __name__=='__main__':
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False) 
 
-    plt.legend()
-    plt.ylabel('Terminal Average Regret (a.u.)')#, fontsize=24)
-    plt.xlabel('SSP Dimension')#, fontsize=24)
-    plt.title(f'Terminal Average Regret vs SSP Dimension (Branin-Hoo)')
+    plt.legend(fontsize=18)
+    plt.ylabel('Terminal Average Regret (a.u.)', fontsize=18)
+    plt.xlabel('SSP Dimension', fontsize=18)
+    plt.title(f'Terminal Average Regret vs SSP Dimension\n(Branin-Hoo, N=30, ' + r'$\beta = ' + f'{np.mean(coeffs[:,0]):.3f}'+'$)', fontsize=18)
     plt.tight_layout()
 
-#     plt.figure()
-#     plt.hist(X, bins=20)
-# 
-    plt.show()
-
-
-
-#     plt.scatter(ssp_dim, terminal_avg_regret)
-#     plt.show()
+    if args.save:
+        plt.savefig(f'{alg_type}-regret-vs-ssp_dim.pgf')
+    else:
+        plt.show()
