@@ -13,11 +13,13 @@ from .agent import Agent
 class SSPTrajectoryAgent(Agent):
     def __init__(self, init_xs, init_ys, x_dim=1, traj_len=1,
                  ssp_x_space=None, ssp_t_space=None, ssp_dim=151,
-                 domain_bounds=None, length_scale=4, gamma_c=1.0):
+                 domain_bounds=None, length_scale=4, gamma_c=1.0,
+                 init_pos=None):
         super().__init__()
         self.num_restarts = 10
         self.data_dim = x_dim*traj_len
         self.x_dim= x_dim
+        self.init_pos = None if init_pos is None else np.atleast_2d(init_pos)
         self.traj_len = traj_len
         if domain_bounds is not None:
             domain_bounds = np.array([np.min(domain_bounds[:,0])*np.ones(x_dim), 
@@ -28,13 +30,19 @@ class SSPTrajectoryAgent(Agent):
                  domain_bounds=domain_bounds, length_scale=length_scale)
         if ssp_t_space is None:
             ssp_t_space = sspspace.RandomSSPSpace(1,ssp_dim=ssp_x_space.ssp_dim,
-                 domain_bounds=np.array([[0,traj_len]]), length_scale=1)
+                 domain_bounds=np.array([[0,self.traj_len]]), length_scale=1)
         
         self.ssp_x_space = ssp_x_space
         self.ssp_t_space = ssp_t_space
         
         # Encode timestamps
-        self.timestep_ssps = self.ssp_t_space.encode(np.linspace(0,traj_len,traj_len).reshape(-1,1))
+        self.timestep_ssps = self.ssp_t_space.encode(
+                                                    np.linspace(0,
+                                                                self.traj_len,
+                                                                self.traj_len
+                                                                ).reshape(-1,1)
+                                                    )
+        ###
         
         # Encode the initial sample points 
         init_phis = self.encode(init_xs)
@@ -50,7 +58,19 @@ class SSPTrajectoryAgent(Agent):
         self.blr = blr.BayesianLinearRegression(self.ssp_x_space.ssp_dim)
         self.blr.update(init_phis, np.array(init_ys))
 
+
         self.constraint_ssp = np.zeros_like(self.blr.m)
+
+        if not self.init_pos is None:
+            constraint_val = self.ssp_x_space.bind(
+                                        self.timestep_ssps[0,:],
+                                        self.ssp_x_space.encode(self.init_pos)
+                                    )
+            # Transpose on constraint_val because the ssp_space expects
+            # data to be organized with samples in rows 
+            # but BLR expects samples in columns.
+            self.constraint_ssp += constraint_val.T
+        ### end if
 
         # MI params
         self.gamma_t = 0
@@ -142,7 +162,7 @@ class SSPTrajectoryAgent(Agent):
         # TODO: Currently returning (objective_func, None) to be fixed when 
         # I finish the derivation
 
-        def min_func(phi, m=self.blr.m + self.constraint_ssp,
+        def min_func(phi, m=self.blr.m,# + self.constraint_ssp,
                         sigma=self.blr.S,
                         gamma=self.gamma_t,
                         beta_inv=1/self.blr.beta):
@@ -151,7 +171,7 @@ class SSPTrajectoryAgent(Agent):
             return -(val + mi).flatten()
 
 
-        def gradient(phi, m=self.blr.m + self.constraint_ssp,
+        def gradient(phi, m=self.blr.m,# + self.constraint_ssp,
                       sigma=self.blr.S,
                       gamma=self.gamma_t,
                       beta_inv=1/self.blr.beta):
@@ -182,11 +202,25 @@ class SSPTrajectoryAgent(Agent):
         self.gamma_t = self.gamma_t + self.gamma_c*sigma_t
 
     def encode(self,x):
-        x = np.atleast_2d(x)
+        '''
+        Translates a trajectory x into an SSP representation.
+        HACK: This code depends on whether or not the init_pos
+        has been specified in the constructor.  If it is, then
+        x needs to be a trajectory of length l-1
+
+        Parameters:
+        -----------
+        x : np.ndarray
+            A (s, l, d) numpy array specifying s trajectories
+            of length l.
+        '''
+        enc_x = np.atleast_2d(x)
         S = np.zeros((x.shape[0], self.ssp_x_space.ssp_dim))
-        x = x.reshape(-1,self.traj_len,self.x_dim)
+        
+        enc_x = enc_x.reshape(-1,self.traj_len,self.x_dim)
         for j in range(self.traj_len):
-            S += self.ssp_x_space.bind(self.timestep_ssps[j,:] , self.ssp_x_space.encode(x[:,j,:]))
+            S += self.ssp_x_space.bind(self.timestep_ssps[j,:], 
+                                       self.ssp_x_space.encode(enc_x[:,j,:]))
         return S
     
         
