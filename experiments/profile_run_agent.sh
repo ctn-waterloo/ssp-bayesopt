@@ -1,6 +1,6 @@
 #!/bin/bash
 
-dest_dir="tmp-data/profiling"
+dest_dir="$HOME/Public/data/ssp-bayesopt/profiling"
 echo $dest_dir
 
 for agt in "ssp-rand" "ssp-hex"
