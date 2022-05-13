@@ -1,6 +1,16 @@
 import numpy as np
 import time
 
+import logging 
+import sys
+
+logger = logging.getLogger()
+# logger.setLevel(logging.DEBUG)
+# 
+# handler = logging.StreamHandler(sys.stdout)
+# handler.setLevel(logging.DEBUG)
+# logger.addHandler(handler)
+
 from . import agents
 from . import sspspace
 
@@ -49,7 +59,7 @@ class BayesianOptimization:
         if not random_state is None:
             np.random.seed(random_state)
 
-        if f.__code__.co_argcount == 1:
+        if hasattr(f, '__code__') and f.__code__.co_argcount == 1:
             self.target = lambda x, info=None: f(x)
         else:
             self.target = f
@@ -98,17 +108,23 @@ class BayesianOptimization:
             The values of the target function at init_xs
             
         '''
-    
+
+        assert init_points > 1, f'Need to sample more than one point when initializing agents, got {init_points}'
+   
         if 'traj' in agent_type:
+            logger.info('Creating Trajectory Domain')
             domain = agents.domains.TrajectoryDomain(kwargs['traj_len'], 
                                                      kwargs['x_dim'],
                                                      self.bounds)
             
         else:
+            logger.info('Creating Rectangular Domain')
             domain = agents.domains.BoundedDomain(self.bounds)
             
-        
+       
+        logger.info('Sampling from domain')
         init_xs = domain.sample(init_points)
+        logger.info('Evaluating Domain Samples')
         init_ys = np.array(
                 [self.target(np.atleast_2d(x), str(itr))
                  for itr, x in enumerate(init_xs)]).reshape((init_points,-1))
@@ -120,6 +136,7 @@ class BayesianOptimization:
 
 
         # Initialize the agent
+        logger.info(f'Creating {agent_type} agent')
         if agent_type=='ssp-hex':
             ssp_space = sspspace.HexagonalSSPSpace(self.data_dim, **kwargs)
             agt = agents.SSPAgent(init_xs, init_ys,ssp_space) 
@@ -139,6 +156,7 @@ class BayesianOptimization:
             init_ys = agt.init_ys
         else:
             raise NotImplementedError(f'{agent_type} agent not implemented')
+        logger.info(f'{type(agt).__name__} Agent created')
         return agt, init_xs, init_ys
 
 
@@ -182,11 +200,14 @@ class BayesianOptimization:
 
         # print(np.mean(np.linalg.norm(sample_xs - (sample_ssps @ self.ssp_to_domain_mat),axis=1)))
 
+        logger.info('Maximizing')
+        
         agt, init_xs, init_ys = self.initialize_agent(init_points,
                                                       agent_type,
                                                       domain_bounds=self.bounds,
                                                       **kwargs
                                                       )
+        logging.info('Agent initialized')
 
         self.times = np.zeros((n_iter,))
         self.xs = []
