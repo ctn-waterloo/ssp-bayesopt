@@ -42,7 +42,8 @@ class BoundedDomain(Domain):
 ### end class ###
 
 class TrajectoryDomain(Domain):
-    def __init__(self, trajectory_length:int, spatial_dim:int, bounds:np.ndarray):
+    def __init__(self, trajectory_length:int, spatial_dim:int, 
+                 bounds:np.ndarray):
         self.traj_len = trajectory_length
 #         self.domain_bounds = bounds
         self.domain_bounds = np.array([bounds[:,0].min() * np.ones(spatial_dim), 
@@ -65,5 +66,8 @@ class TrajectoryDomain(Domain):
         sample_points = qmc.scale(u_sample_points,
                                   self.domain_bounds[:,0], 
                                   self.domain_bounds[:,1])
+
         return sample_points.reshape(num_points,
                                      self.traj_len * self.spatial_dim)
+    ### end sample 
+
