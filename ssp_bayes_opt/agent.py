@@ -98,7 +98,8 @@ class SSPAgent(Agent):
         self.gamma_t = 0
         self.sqrt_alpha = np.log(2/1e-6)
         
-        self.init_samples = self.ssp_space.get_sample_pts_and_ssps(300**data_dim,'grid')
+#         self.init_samples = self.ssp_space.get_sample_pts_and_ssps(300**data_dim,'grid')
+        self.init_samples = self.ssp_space.get_sample_pts_and_ssps(300**data_dim,'length-scale')
 
         # Cache for the input xs.
 #         self.phis = None
@@ -216,7 +217,8 @@ class SSPAgent(Agent):
         return self.ssp_space.encode(x)
     
     def decode(self,ssp):
-        return self.ssp_space.decode(ssp,method='from-set',samples=self.init_samples)
+#         return self.ssp_space.decode(ssp,method='from-set',samples=self.init_samples)
+        return self.ssp_space.decode(ssp,method='direct-optim',samples=self.init_samples)
 
 class SSPTrajectoryAgent(Agent):
     def __init__(self, x_dim, traj_len, init_trajs, init_ys, ssp_x_space=None, ssp_t_space=None):
