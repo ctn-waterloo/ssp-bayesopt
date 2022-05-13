@@ -50,8 +50,12 @@ class SamplingTrial(pytry.Trial):
                                                        verbose=p.verbose)
         
         start = time.thread_time_ns()
-        optimizer.maximize(init_points=p.num_init_samples, n_iter=budget,
-                           agent_type=p.agent_type,ssp_dim=p.ssp_dim,length_scale=p.len_scale)
+        optimizer.maximize(init_points=p.num_init_samples, 
+                           n_iter=budget,
+                           num_restarts=1,
+                           agent_type=p.agent_type,
+                           ssp_dim=p.ssp_dim,
+                           length_scale=p.len_scale)
         elapsed_time = time.thread_time_ns() - start
 
         vals = np.zeros((p.num_init_samples + budget,))
