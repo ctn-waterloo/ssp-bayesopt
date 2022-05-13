@@ -376,8 +376,73 @@ class RandomSSPSpace(SSPSpace):
         for i in range(domain_dim):
             axis_matrix[:,i] = make_good_unitary(ssp_dim)
 
-        super().__init__(domain_dim,axis_matrix.shape[0],axis_matrix=axis_matrix,
-                       domain_bounds=domain_bounds,length_scale=length_scale)
+        super().__init__(domain_dim, 
+                         axis_matrix.shape[0],
+                         axis_matrix=axis_matrix,
+                         domain_bounds=domain_bounds,
+                         length_scale=length_scale,
+                         )
+### end class RandomSSPSpace ###
+
+class GaussianSSPSpace(SSPSpace):
+    '''
+    Creates an SSP space using randomly generated frequency components.
+    '''
+    def __init__(self, 
+                 domain_dim: int,
+                 ssp_dim: int,
+                 domain_bounds=None,
+                 length_scale=1,
+                 rng=np.random.default_rng()):
+
+        partial_phases = rng.normal(loc=0,
+                                    scale=1,
+                                    size=(ssp_dim//2, domain_dim)
+                                    )#*2*np.pi - np.pi
+        #partial_phases = rng.random((ssp_dim // 2, domain_dim)) * 2 * np.pi - np.pi
+        axis_matrix = _constructaxisfromphases(partial_phases)
+#         ### TODO: should the rng default argument for make_good_unitary be the 
+#         # rng passed in through the default __init__ argument?
+#         def make_good_unitary(dim, eps=1e-3, rng=np.random):
+#             a = rng.normal(loc=0, scale=np.pi, size=dim)#size=(dim - 1) // 2)
+#             phi = a
+# #             phi = (eps + a * (1 - 2 * eps))
+# #             sign = rng.choice((-1, +1), len(a))
+# #             phi = sign * (eps + a * (1 - 2 * eps))
+# #             assert np.all(np.abs(phi) >= eps)
+# #             assert np.all(np.abs(phi) <= (1 - eps))
+#         
+#             fv = np.zeros(dim, dtype='complex64')
+#             fv = np.cos(phi) + 1j * np.sin(phi)
+# #             fv[0] = 1
+# #             fv[1:(dim + 1) // 2] = np.cos(phi) + 1j * np.sin(phi)
+# #             fv[-1:dim // 2:-1] = np.conj(fv[1:(dim + 1) // 2])
+#             if dim % 2 == 0:
+#                 fv[dim // 2] = 1
+#             else:
+#                 fv[0] = 1
+#         
+# #             assert np.allclose(np.abs(fv), 1)
+#             v = np.fft.ifft(fv)
+#             
+#             v = v.real
+# #             assert np.allclose(np.fft.fft(v), fv)
+# #             assert np.allclose(np.linalg.norm(v), 1)
+#             return v
+# 
+#         axis_matrix = np.zeros((ssp_dim,domain_dim))
+#         for i in range(domain_dim):
+#             axis_matrix[:,i] = make_good_unitary(ssp_dim)
+# 
+        super().__init__(domain_dim,
+                         axis_matrix.shape[0],
+                         axis_matrix=axis_matrix,
+                         domain_bounds=domain_bounds,
+                         length_scale=length_scale,
+                         )
+### end class GaussianSSPSpace ###
+
+
         
 class HexagonalSSPSpace(SSPSpace):
     '''
