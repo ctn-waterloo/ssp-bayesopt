@@ -66,7 +66,6 @@ class SSPAgent(Agent):
     def __init__(self, init_xs, init_ys, ssp_space=None, **kwargs):
         super().__init__()
   
-        self.num_restarts = 10
         (num_pts, data_dim) = init_xs.shape
         self.data_dim = data_dim
 
@@ -74,13 +73,19 @@ class SSPAgent(Agent):
         self.scaler = PassthroughScaler()
 
         if ssp_space is None:
-            ssp_space = sspspace.HexagonalSSPSpace(data_dim,ssp_dim=151, n_rotates=5, n_scales=5, 
-                 scale_min=2*np.pi/np.sqrt(6) - 0.5, scale_max=2*np.pi/np.sqrt(6) + 0.5,
-                 domain_bounds=None, length_scale=5)
+            ssp_space = sspspace.HexagonalSSPSpace(data_dim,
+                                    ssp_dim=151, 
+                                    n_rotates=5, 
+                                    n_scales=5, 
+                                    scale_min=2*np.pi/np.sqrt(6) - 0.5,
+                                    scale_max=2*np.pi/np.sqrt(6) + 0.5,
+                                    domain_bounds=None, 
+                                    length_scale=5,
+            )
         
         self.ssp_space = ssp_space
         # Optimize the length scales
-        if not 'length_scale' in kwargs:
+        if not 'length_scale' in kwargs or kwargs.get('length_scale') < 0:
             self.ssp_space.update_lengthscale(self._optimize_lengthscale(init_xs, init_ys))
         else:
             self.ssp_space.update_lengthscale(kwargs.get('length_scale', 4))
@@ -107,6 +112,22 @@ class SSPAgent(Agent):
     ### end __init__
 
     def _optimize_lengthscale(self, init_xs, init_ys):
+        from .kernels import SincKernel
+
+        ## fit to the initial values
+        fit_gp = GaussianProcessRegressor(
+                    kernel=SincKernel(),
+                    alpha=1e-6,
+                    normalize_y=True,
+                    n_restarts_optimizer=5,
+                    random_state=None,
+                )
+        fit_gp.fit(init_xs, init_ys)
+        lenscale = np.exp(fit_gp.kernel_.theta)
+        return lenscale
+
+
+    def _optimize_lengthscale_v1(self, init_xs, init_ys):
         ls_0 = np.array([[7]]) 
         self.scaler.fit(init_ys)
 
