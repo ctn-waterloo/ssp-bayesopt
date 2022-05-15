@@ -9,6 +9,6 @@ for dim in 40 151 200
 do
 	for agt in "ssp-rand" "ssp-hex"
 	do
-		python run_agent.py --agent $agt --num-trials 30 --func $func_name --data-dir $dest_dir --len-scale 4 --ssp-dim $dim
+		python run_agent.py --agent $agt --num-trials 30 --func $func_name --data-dir $dest_dir --len-scale -1 --ssp-dim $dim
 	done
 done
