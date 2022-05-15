@@ -113,8 +113,8 @@ if __name__=='__main__':
     matern_mu = 5.15
     matern_ste = 3.38 / np.sqrt(30)
 
-    sinc_mu = 8.14 
-    sinc_ste = 4.41 / np.sqrt(30)
+    sinc_mu = 14.12
+    sinc_ste = 13.40 / np.sqrt(30)
 
     plt.fill_between(x_unique,
             (sinc_mu - sinc_ste) * np.ones(x_unique.shape),
