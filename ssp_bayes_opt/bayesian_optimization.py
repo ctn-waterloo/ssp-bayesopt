@@ -171,7 +171,6 @@ class BayesianOptimization:
         print('-------------------------------')
         for t in range(n_iter):
             ## Begin timing section
-            start = time.thread_time_ns()
             # get the functions to optimize
             ### TODO fix jacobian so it returns dx in x space
             optim_func, jac_func = agt.acquisition_func()
@@ -185,21 +184,24 @@ class BayesianOptimization:
 
                 if agent_type=='gp':
                     # Do bounded optimization to ensure x stays in bound
+                    start = time.thread_time_ns()
                     soln = minimize(optim_func, x_init,
                                     jac=jac_func, 
                                     method='L-BFGS-B',
                                     bounds=self.bounds)
+                    self.times[t] = time.thread_time_ns() - start
                     solnx = np.copy(soln.x)
                 else: ## ssp agent
 #                     phi_init = agt.encode(x_init)
                     phi_init = agt.initial_guess()
+                    start = time.thread_time_ns()
                     soln = minimize(optim_func, phi_init,
                                     jac=jac_func, 
                                     method='L-BFGS-B')
+                    self.times[t] = time.thread_time_ns() - start
                     solnx = agt.decode(np.copy(np.atleast_2d(soln.x)))
                 vals.append(-soln.fun)
                 solns.append(solnx)
-            self.times[t] = time.thread_time_ns() - start
             ## END timing section
 
             best_val_idx = np.argmax(vals)
