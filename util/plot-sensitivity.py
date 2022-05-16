@@ -110,11 +110,11 @@ if __name__=='__main__':
     plt.plot(x_unique, mu, label=f'{alg_type} SSP', c=color, ls=line_style)
     plt.scatter([151], mu[-2], color='tab:blue', zorder=10)
     
-    matern_mu = 5.15
-    matern_ste = 3.38 / np.sqrt(30)
+    matern_mu = 8.22
+    matern_ste = 0.61 
 
     sinc_mu = 14.12
-    sinc_ste = 13.40 / np.sqrt(30)
+    sinc_ste = 3.32
 
     plt.fill_between(x_unique,
             (sinc_mu - sinc_ste) * np.ones(x_unique.shape),
