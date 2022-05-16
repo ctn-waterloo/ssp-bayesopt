@@ -153,6 +153,7 @@ class BayesianOptimization:
                                                       domain_bounds=self.bounds,
                                                       **kwargs
                                                       )
+        self.length_scale = agt.length_scale()
 
         self.times = np.zeros((n_iter,))
         self.xs = []
