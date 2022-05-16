@@ -119,7 +119,11 @@ class SSPAgent(Agent):
 
         ## fit to the initial values
         fit_gp = GaussianProcessRegressor(
-                    kernel=SincKernel(),
+                    kernel=SincKernel(
+                        length_scale_bounds=(
+                            1/np.sqrt(init_xs.shape[0]+1), 
+                            1e5)
+                        ),
                     alpha=1e-6,
                     normalize_y=True,
                     n_restarts_optimizer=5,
@@ -194,10 +198,18 @@ class SSPAgent(Agent):
         # TODO: Currently returning (objective_func, None) to be fixed when 
         # I finish the derivation
 
+        optim_norm_margin = 4
+
         def min_func(phi, m=self.blr.m,
                         sigma=self.blr.S,
                         gamma=self.gamma_t,
-                        beta_inv=1/self.blr.beta):
+                        beta_inv=1/self.blr.beta,
+                        norm_margin=optim_norm_margin):
+
+            phi_norm = np.linalg.norm(phi)
+            if phi_norm > norm_margin:
+                phi = norm_margin * phi / phi_norm
+            ### end if
             val = phi.T @ m
             mi = np.sqrt(gamma + beta_inv + phi.T @ sigma @ phi) - np.sqrt(gamma)
             return -(val + mi).flatten()
@@ -206,7 +218,13 @@ class SSPAgent(Agent):
         def gradient(phi, m=self.blr.m,
                       sigma=self.blr.S,
                       gamma=self.gamma_t,
-                      beta_inv=1/self.blr.beta):
+                      beta_inv=1/self.blr.beta,
+                      norm_margin=optim_norm_margin):
+
+            phi_norm = np.linalg.norm(phi)
+            if phi_norm > norm_margin:
+                phi = norm_margin * phi / phi_norm
+            ### end if
             sig_phi = sigma @ phi
             sqr = (phi.T @ sig_phi ) 
             scale = np.sqrt(sqr + gamma + beta_inv)
