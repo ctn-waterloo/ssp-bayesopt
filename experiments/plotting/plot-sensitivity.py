@@ -28,9 +28,9 @@ def get_data(data_frame):
     ssp_dim = data_frame['ssp_dim']
     try:
         regret = data_frame['regret']
-        avg_regret = np.sum(regret) / data_frame['budget']
-#         avg_regret = np.divide(np.cumsum(regret, axis=1), np.cumsum(np.arange(1,regret.shape[1]+1)))
-        return ssp_dim, avg_regret
+        cum_regret = np.cumsum(regret)
+        avg_regret = np.divide(cum_regret, np.arange(1, regret.shape[0] + 1))
+        return ssp_dim, avg_regret[-1]
     except:
         print(data_frame.keys())
         exit()

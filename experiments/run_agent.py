@@ -41,13 +41,16 @@ class SamplingTrial(pytry.Trial):
         self.param('number of sample points', num_samples=100)
         self.param('ssp length scale', len_scale=4)
         self.param('ssp dim', ssp_dim=151)
+        self.param('trial number', trial_num=None)
     
     def evaluate(self, p):        
         target, pbounds, budget = functions.factory(p.function_name)
         #target, pbounds = functions.rescale(target,pbounds)
         
-        optimizer = ssp_bayes_opt.BayesianOptimization(f=target, bounds=pbounds, 
-                                                       verbose=p.verbose)
+        optimizer = ssp_bayes_opt.BayesianOptimization(f=target,
+                                                       bounds=pbounds, 
+                                                       verbose=p.verbose,
+                                                       sampling_seed=p.seed)
         
         start = time.thread_time_ns()
         optimizer.maximize(init_points=p.num_init_samples, 
