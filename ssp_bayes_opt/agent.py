@@ -393,7 +393,7 @@ class GPAgent(Agent):
                         kernel=Matern(nu=2.5),
                         alpha=1e-6,
                         normalize_y=True,
-                        n_restarts_optimizer=5,
+                        n_restarts_optimizer=20,
                         random_state=0,
                     )
             fit_gp.fit(self.xs, self.ys)
@@ -405,7 +405,7 @@ class GPAgent(Agent):
                     kernel=kern,
                     alpha=1e-6,
                     normalize_y=True,
-                    n_restarts_optimizer=5,
+                    n_restarts_optimizer=20,
                     random_state=0,
                 )
         self.gp.fit(self.xs, self.ys)
