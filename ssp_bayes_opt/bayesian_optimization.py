@@ -10,7 +10,7 @@ from typing import Callable
 
 class BayesianOptimization:
     def __init__(self, f: Callable[...,float] =None, bounds: np.ndarray=None, 
-                 random_state: int =None, verbose: bool=False):
+            random_state: int =None, verbose: bool=False, sampling_seed:int=None):
         '''
         Initializes the Bayesian Optimization object 
 
@@ -44,6 +44,7 @@ class BayesianOptimization:
         if not random_state is None:
             np.random.seed(random_state)
 
+        self.sampling_seed = sampling_seed 
         self.target = f
         self.bounds = bounds
 
@@ -220,9 +221,11 @@ class BayesianOptimization:
             self.agt = agt
 
     def _sample_domain(self, num_points: int=10) -> np.ndarray:
-        sampler = qmc.Sobol(d=self.data_dim) 
+        sampler = qmc.Sobol(d=self.data_dim, seed=self.sampling_seed) 
         u_sample_points = sampler.random(num_points)
-        sample_points = qmc.scale(u_sample_points, self.bounds[:,0], self.bounds[:,1])
+        sample_points = qmc.scale(u_sample_points, 
+                                  self.bounds[:,0],
+                                  self.bounds[:,1])
         return sample_points
 
     @property 
