@@ -127,7 +127,7 @@ class SSPAgent(Agent):
                     alpha=1e-6,
                     normalize_y=True,
                     n_restarts_optimizer=5,
-                    random_state=None,
+                    random_state=0,
                 )
         fit_gp.fit(init_xs, init_ys)
         lenscale = np.exp(fit_gp.kernel_.theta)
@@ -394,7 +394,7 @@ class GPAgent(Agent):
                         alpha=1e-6,
                         normalize_y=True,
                         n_restarts_optimizer=5,
-                        random_state=None,
+                        random_state=0,
                     )
             fit_gp.fit(self.xs, self.ys)
             kern = Matern(nu=2.5,
@@ -406,7 +406,7 @@ class GPAgent(Agent):
                     alpha=1e-6,
                     normalize_y=True,
                     n_restarts_optimizer=5,
-                    random_state=None,
+                    random_state=0,
                 )
         self.gp.fit(self.xs, self.ys)
 
