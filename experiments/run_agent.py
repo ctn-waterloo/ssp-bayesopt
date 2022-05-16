@@ -73,6 +73,7 @@ class SamplingTrial(pytry.Trial):
             sample_locs=sample_locs,
             elapsed_time=elapsed_time,
             times = optimizer.times,
+            selected_len_scale = optimizer.length_scale,
             budget=budget,
             vals=vals,
             mus=None,

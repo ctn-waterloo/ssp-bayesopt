@@ -51,6 +51,9 @@ class Agent:
     def acquisition_func(self):
         pass
 
+    def length_scale(self):
+        pass
+
 
 class PassthroughScaler:
     def __init__(self):
@@ -241,6 +244,9 @@ class SSPAgent(Agent):
 #         return self.ssp_space.decode(ssp,method='from-set',samples=self.init_samples)
         return self.ssp_space.decode(ssp,method='direct-optim',samples=self.init_samples)
 
+    def length_scale(self):
+        return self.ssp_space.length_scale
+
 class SSPTrajectoryAgent(Agent):
     def __init__(self, x_dim, traj_len, init_trajs, init_ys, ssp_x_space=None, ssp_t_space=None):
         super().__init__()
@@ -418,3 +424,6 @@ class GPAgent(Agent):
                 return -(mu + phi).flatten()
 
         return min_func, None
+
+    def length_scale(self):
+        return np.exp(self.gp.kernel_.theta)
