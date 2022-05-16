@@ -126,7 +126,7 @@ class SSPAgent(Agent):
                         ),
                     alpha=1e-6,
                     normalize_y=True,
-                    n_restarts_optimizer=5,
+                    n_restarts_optimizer=20,
                     random_state=0,
                 )
         fit_gp.fit(init_xs, init_ys)
