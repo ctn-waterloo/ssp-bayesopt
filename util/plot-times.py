@@ -71,12 +71,7 @@ if __name__ == '__main__':
 
         (alg_num_trials, budget) = alg_time.shape
 
-        offset = 0 
-        if 'SSP' in alg_name:
-            offset = 0.002
-            avg_alg_time_mu, avg_alg_time_ste = get_stats((alg_time/5) - offset)
-        else:
-            avg_alg_time_mu, avg_alg_time_ste = get_stats(alg_time - offset)
+        avg_alg_time_mu, avg_alg_time_ste = get_stats(alg_time)
         alg_stats[(func,alg_name)] = (alg_time, 
                             avg_alg_time_mu,
                             avg_alg_time_ste,
