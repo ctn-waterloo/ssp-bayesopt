@@ -1,11 +1,10 @@
 #!/bin/bash
 
-dest_dir="tmp-data/dim-sensitivity"
+dest_dir="/run/media/furlong/Data/ssp-bayesopt/dim-sensitivity"
 func_name="branin-hoo"
 echo $dest_dir
 
-# for dim in 10 25 50 75 100
-for dim in 40 151 200
+for dim in 10 25 40 50 75 100 151 200
 do
 	for agt in "ssp-rand" "ssp-hex"
 	do
