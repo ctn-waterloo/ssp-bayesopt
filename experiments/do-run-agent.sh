@@ -1,6 +1,6 @@
 #!/bin/bash
 
-dest_dir="/run/media/furlong/Data/ssp-bayesopt/timing"
+# dest_dir="/run/media/furlong/Data/ssp-bayesopt/test-funcs
 echo $dest_dir
 
 for func in "branin-hoo" "himmelblau" "goldstein-price"
