@@ -10,7 +10,7 @@ from typing import Callable
 
 class BayesianOptimization:
     def __init__(self, f: Callable[...,float] =None, bounds: np.ndarray=None, 
-                 random_state: int =None, verbose: bool=False):
+            random_state: int =None, verbose: bool=False, sampling_seed:int=None):
         '''
         Initializes the Bayesian Optimization object 
 
@@ -44,6 +44,7 @@ class BayesianOptimization:
         if not random_state is None:
             np.random.seed(random_state)
 
+        self.sampling_seed = sampling_seed 
         self.target = f
         self.bounds = bounds
 
@@ -96,16 +97,19 @@ class BayesianOptimization:
         # Initialize the agent
         if agent_type=='ssp-hex':
             ssp_space = sspspace.HexagonalSSPSpace(self.data_dim, **kwargs)
-            agt = agent.SSPAgent(init_xs, init_ys,ssp_space) 
+            agt = agent.SSPAgent(init_xs, init_ys,ssp_space, **kwargs) 
         elif agent_type=='ssp-rand':
             ssp_space = sspspace.RandomSSPSpace(self.data_dim, **kwargs)
-            agt = agent.SSPAgent(init_xs, init_ys,ssp_space) 
+            agt = agent.SSPAgent(init_xs, init_ys,ssp_space, **kwargs) 
         elif agent_type=='gp':
 #             agt = agent.GPAgent(init_xs, init_ys,**kwargs) 
             agt = agent.GPAgent(init_xs, init_ys) 
         elif agent_type=='static-gp':
-#             agt = agent.GPAgent(init_xs, init_ys, updating=False, **kwargs) 
-            agt = agent.GPAgent(init_xs, init_ys, updating=False) 
+            agt = agent.GPAgent(init_xs, init_ys, updating=False, **kwargs) 
+        elif agent_type=='gp-matern':
+            agt = agent.GPAgent(init_xs, init_ys, kernel_type='matern', updating=False, **kwargs) 
+        elif agent_type=='gp-sinc':
+            agt = agent.GPAgent(init_xs, init_ys, kernel_type='sinc', updating=False, **kwargs) 
         else:
             raise NotImplementedError()
         return agt, init_xs, init_ys
@@ -155,6 +159,7 @@ class BayesianOptimization:
                                                       domain_bounds=self.bounds,
                                                       **kwargs
                                                       )
+        self.length_scale = agt.length_scale()
 
 #         self.lengthscale = agt.ssp_space.length_scale
         self.lengthscale = agt.length_scale()
@@ -176,7 +181,6 @@ class BayesianOptimization:
         print('-------------------------------')
         for t in range(n_iter):
             ## Begin timing section
-            start = time.thread_time_ns()
             # get the functions to optimize
             ### TODO fix jacobian so it returns dx in x space
             optim_func, jac_func = agt.acquisition_func()
@@ -188,23 +192,26 @@ class BayesianOptimization:
                
                 x_init = np.random.uniform(low=lbounds, high=ubounds, size=(len(ubounds),))
 
-                if agent_type=='gp' or agent_type=='static-gp':
+                if agent_type=='gp-matern' or agent_type=='gp-sinc':
                     # Do bounded optimization to ensure x stays in bound
+                    start = time.thread_time_ns()
                     soln = minimize(optim_func, x_init,
                                     jac=jac_func, 
                                     method='L-BFGS-B',
                                     bounds=self.bounds)
+                    self.times[t] = time.thread_time_ns() - start
                     solnx = np.copy(soln.x)
                 else: ## ssp agent
 #                     phi_init = agt.encode(x_init)
                     phi_init = agt.initial_guess()
+                    start = time.thread_time_ns()
                     soln = minimize(optim_func, phi_init,
                                     jac=jac_func, 
                                     method='L-BFGS-B')
+                    self.times[t] = time.thread_time_ns() - start
                     solnx = agt.decode(np.copy(np.atleast_2d(soln.x)))
                 vals.append(-soln.fun)
                 solns.append(solnx)
-            self.times[t] = time.thread_time_ns() - start
             ## END timing section
 
             best_val_idx = np.argmax(vals)
@@ -222,9 +229,11 @@ class BayesianOptimization:
             self.agt = agt
 
     def _sample_domain(self, num_points: int=10) -> np.ndarray:
-        sampler = qmc.Sobol(d=self.data_dim) 
+        sampler = qmc.Sobol(d=self.data_dim, seed=self.sampling_seed) 
         u_sample_points = sampler.random(num_points)
-        sample_points = qmc.scale(u_sample_points, self.bounds[:,0], self.bounds[:,1])
+        sample_points = qmc.scale(u_sample_points, 
+                                  self.bounds[:,0],
+                                  self.bounds[:,1])
         return sample_points
 
     @property 

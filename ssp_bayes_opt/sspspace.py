@@ -163,7 +163,7 @@ class SSPSpace:
     
  
     def decode(self,ssp,method='from-set',sampling_method='grid',
-               num_samples =1000, samples=None): # other args for specfic methods
+               num_samples =300, samples=None): # other args for specfic methods
         '''
         Transforms ssp representation back into domain representation.
 
@@ -178,7 +178,7 @@ class SSPSpace:
             does an initial coarse sampling and then optimizes the decoded
             value starting from the initial best match in the coarse sampling.
 
-        sampling_method : {'grid'}
+        sampling_method : {'grid'|'length-scale'|'sobol'}
             Evenly distributes samples along the domain axes
 
         num_samples : int
@@ -190,50 +190,34 @@ class SSPSpace:
             The decoded point
         '''
         if samples is None:
-            sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_samples,sampling_method)
+            sample_ssps, sample_points = self.get_sample_pts_and_ssps(method=sampling_method, 
+                    num_points_per_dim=num_samples)
         else:
             sample_ssps, sample_points = samples
             
         assert sample_ssps.shape[1] == ssp.shape[1]
+
+        unit_ssp = ssp / np.linalg.norm(ssp)
         
-        if method=='least-squares':
-            x = np.linalg.lstsq(self.phase_matrix, (1.j*np.log(np.fft.fft(ssp,axis=1))).real.T)[0]
-            return x
-        elif method=='from-set': ## ONLY ONE THAT WORKS WELL
-            sims = sample_ssps @ ssp.T
+        if method=='from-set': 
+            sims = sample_ssps @ unit_ssp.T
             return sample_points[np.argmax(sims),:]
         elif method=='direct-optim':
-            x0 = self.decode(ssp, method='from-set',sampling_method=sampling_method, num_samples=num_samples, samples=samples)
+            x0 = self.decode(unit_ssp, 
+                             method='from-set',
+                             sampling_method='length-scale', 
+                             num_samples=num_samples, samples=samples)
+
             def min_func(x,target=ssp):
                 x_ssp = self.encode(np.atleast_2d(x))
                 return -np.inner(x_ssp, target).flatten()
-            soln = minimize(min_func, x0, method='L-BFGS-B',bounds=self.domain_bounds)
-            return soln.x
-        elif method=='grad_descent':
-            x = self.decode(ssp, method='from-set',sampling_method=sampling_method, num_samples=num_samples, samples=samples)
-            fssp = np.fft.fft(ssp,axis=1)
-            ls_mat = np.diag(1/self.length_scale.flatten())
-            for j in range(10):
-                scaled_x = x @ ls_mat
-                x_enc = np.exp(1.j * self.phase_matrix @ scaled_x)
-                grad_mat = (1.j * (self.phase_matrix @ ls_mat).T * x_enc)
-                grad =  (grad_mat @ fssp.T).flatten()
-                x = x - 0.1*grad.real
-            return x
-        elif method=='nonlin-reg':
-            x = self.decode(ssp, method='from-set',sampling_method=sampling_method, num_samples=num_samples, samples=samples)
-            fssp = np.fft.fft(ssp,axis=1)
-            dy = np.hstack([fssp.real, fssp.imag])
 
-            ls_mat = np.diag(1/self.length_scale.flatten())
-            for j in range(10):
-                J = np.vstack([self.phase_matrix * np.sin(self.phase_matrix @ x @ ls_mat).reshape(1,-1),
-                               -self.phase_matrix * np.cos(self.phase_matrix @ x @ ls_mat).reshape(1,-1)])
-                soln = np.linalg.pinv(J.T @ J) @ J.T @ dy
-                x = x + soln
-            return x
+            soln = minimize(min_func, x0, 
+                            method='L-BFGS-B',
+                            bounds=self.domain_bounds)
+            return soln.x
         else:
-            raise NotImplementedError()
+            raise NotImplementedError(f'Unrecognized decoding method: {method}')
         
     def clean_up(self,ssp,method='from-set'):
         if method=='least-squares':
@@ -246,33 +230,59 @@ class SSPSpace:
         else:
             raise NotImplementedError()
         
-    def get_sample_points(self,num_points,method='grid'):
+    def get_sample_points(self, samples_per_dim=100, method='length-scale'):
+        '''
+        Identifies points in the domain of the SSP encoding that 
+        will be used to determine optimal decoding.
+
+        Parameters
+        ----------
+
+        method: {'grid'|'length-scale'|'sobol'}
+            The way to select samples from the domain. 
+            'grid' uniformly spaces samples_per_dim points on the domain
+            'sobol' decodes using samples_per_dim**data_dim points generated 
+                using a sobol sampling
+            'length-scale' uses the selected lengthscale to determine the number
+                of sample points generated per dimension.
+
+        Returns
+        -------
+
+        sample_pts : np.ndarray 
+            A (num_samples, domain_dim) array of candiate decoding points.
+        '''
+
         if self.domain_bounds is None:
             bounds = np.vstack([-10*np.ones(self.domain_dim), 10*np.ones(self.domain_dim)]).T
         else:
             bounds = self.domain_bounds
-        if method=='grid':
-            n_per_dim = int(num_points**(1/self.domain_dim))
-            if n_per_dim**self.domain_dim != num_points:
-                warnings.warn((f'Evenly distributing points over a '
-                               f'{self.domain_dim} grid requires numbers '
-                               f'of samples to be powers of {self.domain_dim}.'
-                               f'Requested {num_points} samples, returning '
-                               f'{n_per_dim**self.domain_dim}'), RuntimeWarning)
-            ### end if
-            xs = np.linspace(bounds[:,0],bounds[:,1],n_per_dim)
-            xxs = np.meshgrid(*[xs[:,i] for i in range(self.domain_dim)])
+
+        if method == 'grid':
+            num_pts_per_dim = [samples_per_dim for _ in range(bounds.shape[0])]
+        elif method == 'length-scale':
+            num_pts_per_dim = [2*int(np.ceil((b[1]-b[0])/self.length_scale[b_idx])) for b_idx, b in enumerate(bounds)]
+
+
+        if method=='grid' or method=='length-scale':
+            xxs = np.meshgrid(*[np.linspace(bounds[i,0], 
+                                            bounds[i,1],
+                                            num_pts_per_dim[i]
+                                        ) for i in range(self.domain_dim)])
             retval = np.array([x.reshape(-1) for x in xxs]).T
             assert retval.shape[1] == self.domain_dim, f'Expected {self.domain_dim}d data, got {retval.shape[1]}d data'
             return retval
+
         elif method=='sobol':
+            num_points = np.prod(num_pts_per_dim)
+
             sampler = qmc.Sobol(d=self.domain_dim) 
             lbounds = bounds[:,0]
             ubounds = bounds[:,1]
             u_sample_points = sampler.random(num_points)
             sample_points = qmc.scale(u_sample_points, lbounds, ubounds)
         else:
-            raise NotImplementedError()
+            raise NotImplementedError(f'Sampling method {method} is not implemented')
         return sample_points.T 
         
     
@@ -281,13 +291,19 @@ class SSPSpace:
         sample_ssps = self.encode(sample_points)
         return sample_ssps
     
-    def get_sample_pts_and_ssps(self,num_points,method='grid'): 
-        sample_points = self.get_sample_points(num_points,method)
-        expected_points = (int(num_points**(1/self.domain_dim))**self.domain_dim)
-        assert sample_points.shape[0] == expected_points, f'Expected {expected_points} samples, got {sample_points.shape[0]}.'
+    def get_sample_pts_and_ssps(self,num_points_per_dim=100, method='grid'): 
+        sample_points = self.get_sample_points(
+                                        method=method, 
+                                        samples_per_dim=num_points_per_dim
+                                    )
+        if method == 'grid':
+            expected_points = int(num_points_per_dim**(self.domain_dim))
+            assert sample_points.shape[0] == expected_points, f'Expected {expected_points} samples, got {sample_points.shape[0]}.'
 
         sample_ssps = self.encode(sample_points)
-        assert sample_ssps.shape[0] == expected_points
+
+        if method == 'grid':
+            assert sample_ssps.shape[0] == expected_points
 
         return sample_ssps, sample_points
     
