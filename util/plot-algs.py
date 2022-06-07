@@ -100,6 +100,7 @@ if __name__ == '__main__':
                             avg_alg_regret_mu,
                             avg_alg_regret_ste,
                             budget)
+        print(alg_name, 'terminal regret: ', avg_alg_regret_mu[-1], avg_alg_regret_ste[-1])
     ### end for
 
 

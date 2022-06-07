@@ -28,9 +28,9 @@ def get_data(data_frame):
     ssp_dim = data_frame['ssp_dim']
     try:
         regret = data_frame['regret']
-        avg_regret = np.sum(regret) / data_frame['budget']
-#         avg_regret = np.divide(np.cumsum(regret, axis=1), np.cumsum(np.arange(1,regret.shape[1]+1)))
-        return ssp_dim, avg_regret
+        cum_regret = np.cumsum(regret)
+        avg_regret = np.divide(cum_regret, np.arange(1, regret.shape[0] + 1))
+        return ssp_dim, avg_regret[-1]
     except:
         print(data_frame.keys())
         exit()
@@ -110,11 +110,11 @@ if __name__=='__main__':
     plt.plot(x_unique, mu, label=f'{alg_type} SSP', c=color, ls=line_style)
     plt.scatter([151], mu[-2], color='tab:blue', zorder=10)
     
-    matern_mu = 5.15
-    matern_ste = 3.38 / np.sqrt(30)
+    matern_mu = 8.22
+    matern_ste = 0.61 
 
     sinc_mu = 14.12
-    sinc_ste = 13.40 / np.sqrt(30)
+    sinc_ste = 3.32
 
     plt.fill_between(x_unique,
             (sinc_mu - sinc_ste) * np.ones(x_unique.shape),

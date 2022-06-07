@@ -1,12 +1,17 @@
 # Project specific
 
 tests/data/
+util/plots/
+*.npy
+*.swp
+
 
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
 
 # C extensions
 *.so

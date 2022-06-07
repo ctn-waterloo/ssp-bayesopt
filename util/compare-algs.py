@@ -28,12 +28,21 @@ def get_data(data_frame):
         time = data_frame['times'] * 1e-9
     else:
         time = data_frame['elapsed_time'] * 1e-9
-    return regret, avg_regret, time
+    return regret, avg_regret, time, data_frame['seed']
 
 
 def get_stats(data):
     (num_trials, _) = data.shape
     return np.mean(data, axis=0), np.std(data, axis=0) * 1.96 / np.sqrt(num_trials)
+
+def pair_data(alg_regrets, alg_seeds, baseline_regrets, baseline_seeds):
+    paired_alg = np.zeros((len(alg_seeds),))
+    paired_baseline = np.zeros((len(alg_seeds),))
+    for seed_idx, alg_seed in enumerate(alg_seeds):
+        baseline_idx = baseline_seeds.index(alg_seed)
+        paired_alg[seed_idx] = alg_regrets[seed_idx]
+        paired_baseline[seed_idx] = baseline_regrets[baseline_idx]
+    return paired_alg, paired_baseline
 
 if __name__ == '__main__':
 
@@ -50,28 +59,63 @@ if __name__ == '__main__':
         head, func = os.path.split(head)
 
         alg_data = (pytry.read(func_dir))
-        alg_regret, avg_alg_regret, alg_time = zip(*[get_data(f) for f in alg_data])
+        alg_regret, avg_alg_regret, alg_time, alg_seeds = zip(*[get_data(f) for f in alg_data])
         alg_regret = np.array(alg_regret).squeeze()
         avg_alg_regret = np.array(avg_alg_regret).squeeze()
 
         (alg_num_trials, budget) = alg_regret.shape
 
         print(avg_alg_regret.shape)
-        return avg_alg_regret, func
+        return avg_alg_regret, func, alg_seeds
 
     alg_name, alg_dir = args.alg
     baseline_name, baseline_dir = args.baseline
 
-    alg_regret, func_name = parse(alg_dir)
-    baseline_regret, baseline_func_name = parse(baseline_dir)
+    alg_regret, func_name, alg_seeds = parse(alg_dir)
+    baseline_regret, baseline_func_name, baseline_seeds = parse(baseline_dir)
 
     alg_terminal_regret = alg_regret[:,-1]
     baseline_terminal_regret = baseline_regret[:,-1]
 
+    paired_alg_term_regret, paired_baseline_term_regret = pair_data(
+                alg_terminal_regret, 
+                alg_seeds, 
+                baseline_terminal_regret, 
+                baseline_seeds
+    )
+
     assert func_name == baseline_func_name
 
-    print(f'{alg_name} terminal regret: {np.mean(alg_terminal_regret)} +- {np.std(alg_terminal_regret)}')
-    print(f'{baseline_name} terminal regret: {np.mean(baseline_terminal_regret)} +- {np.std(baseline_terminal_regret)}')
+    def cohens_d(xs, ys):
+        mu_x = np.mean(xs)
+        mu_y = np.mean(ys)
+        n_x = xs.shape[0]
+        n_y = ys.shape[0]
+        s_x = np.std(xs)
+        s_y = np.std(ys)
+
+        pooled_std = np.sqrt(((n_x-1)*s_x**2 + (n_y-1)*s_y**2)/(n_x+n_y-2))
+
+        return (mu_x - mu_y) / pooled_std
+
+    from scipy.stats import sem, wilcoxon
+#     print(f'{alg_name} terminal regret: {np.mean(alg_terminal_regret)} +- {np.std(alg_terminal_regret)/np.sqrt(30)}')
+    print(f'{alg_name} terminal regret: {np.mean(alg_terminal_regret)} +- {sem(alg_terminal_regret)}')
+#     print(f'{baseline_name} terminal regret: {np.mean(baseline_terminal_regret)} +- {np.std(baseline_terminal_regret)/np.sqrt(30)}')
+    print(f'{baseline_name} terminal regret: {np.mean(baseline_terminal_regret)} +- {sem(baseline_terminal_regret)}')
+
+    regret_diff = paired_baseline_term_regret - paired_alg_term_regret
+    print('mean:', np.mean(regret_diff), sem(regret_diff))
+    print(wilcoxon(paired_alg_term_regret,paired_baseline_term_regret))
+    print('effect: ', cohens_d(paired_baseline_term_regret, paired_alg_term_regret))
+
+    np.save(f'{func_name}_{alg_name}_term-regret.npz',paired_alg_term_regret)
+    np.save(f'{func_name}_{baseline_name}_term-regret.npz',paired_baseline_term_regret)
+
+    exit()
+
+
+
 
 
     end_results = best.unpaired(baseline_terminal_regret, alg_terminal_regret)

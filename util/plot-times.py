@@ -103,10 +103,10 @@ if __name__ == '__main__':
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False) 
 
-    plt.legend()
-    plt.ylabel('Query Time (sec)')#, fontsize=24)
-    plt.xlabel('Sample Number')#, fontsize=24)
-    plt.title(f'Query Time: {func_name.title()}')
+    plt.legend(fontsize=24)
+    plt.ylabel('Query Time (sec)', fontsize=24)
+    plt.xlabel('Sample Number', fontsize=24)
+    plt.title(f'Query Time: {func_name.title()}', fontsize=24)
     plt.tight_layout()
 
     if args.save:

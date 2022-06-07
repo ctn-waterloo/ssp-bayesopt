@@ -105,6 +105,10 @@ class BayesianOptimization:
             agt = agent.GPAgent(init_xs, init_ys,**kwargs) 
         elif agent_type=='static-gp':
             agt = agent.GPAgent(init_xs, init_ys, updating=False, **kwargs) 
+        elif agent_type=='gp-matern':
+            agt = agent.GPAgent(init_xs, init_ys, kernel_type='matern', updating=False, **kwargs) 
+        elif agent_type=='gp-sinc':
+            agt = agent.GPAgent(init_xs, init_ys, kernel_type='sinc', updating=False, **kwargs) 
         else:
             raise NotImplementedError()
         return agt, init_xs, init_ys
@@ -184,7 +188,7 @@ class BayesianOptimization:
                
                 x_init = np.random.uniform(low=lbounds, high=ubounds, size=(len(ubounds),))
 
-                if agent_type=='gp':
+                if agent_type=='gp-matern' or agent_type=='gp-sinc':
                     # Do bounded optimization to ensure x stays in bound
                     start = time.thread_time_ns()
                     soln = minimize(optim_func, x_init,

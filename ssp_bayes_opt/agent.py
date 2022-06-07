@@ -12,6 +12,7 @@ from sklearn.preprocessing import StandardScaler
 
 from . import sspspace
 from . import blr
+from .kernels import SincKernel
 
 import functools
 import warnings
@@ -115,7 +116,6 @@ class SSPAgent(Agent):
     ### end __init__
 
     def _optimize_lengthscale(self, init_xs, init_ys):
-        from .kernels import SincKernel
 
         ## fit to the initial values
         fit_gp = GaussianProcessRegressor(
@@ -377,7 +377,7 @@ class SSPTrajectoryAgent(Agent):
         return decoded_traj.reshape(-1)
 
 class GPAgent(Agent):
-    def __init__(self, init_xs, init_ys, updating=True):
+    def __init__(self, init_xs, init_ys, kernel_type='sinc', updating=False, **kwargs):
         super().__init__()
         # Store observations
         self.xs = init_xs
@@ -386,27 +386,42 @@ class GPAgent(Agent):
 
         ## Create the GP to use during optimization.
         if updating:
-            kern = Matern(nu=2.5)
+            if kernel_type == 'matern':
+                kern = Matern(nu=2.5) 
+            elif kernel_type == 'sinc':
+                kern = SincKernel()
         else:
             ## fit to the initial values
+            if kernel_type == 'matern':
+                fit_kern = Matern(nu=2.5) 
+            elif kernel_type == 'sinc': 
+                fit_kern = SincKernel(length_scale_bounds=(
+                                        1/np.sqrt(init_xs.shape[0]+1),
+                                        1e5)
+                                 )
             fit_gp = GaussianProcessRegressor(
-                        kernel=Matern(nu=2.5),
+                        kernel=fit_kern,
                         alpha=1e-6,
                         normalize_y=True,
-                        n_restarts_optimizer=5,
-                        random_state=None,
+                        n_restarts_optimizer=20,
+                        random_state=0,
                     )
             fit_gp.fit(self.xs, self.ys)
-            kern = Matern(nu=2.5,
-                          length_scale=np.exp(fit_gp.kernel_.theta),
-                          length_scale_bounds='fixed')
-        ### end if
+            if kernel_type == 'matern':
+                kern = Matern(nu=2.5,
+                              length_scale=np.exp(fit_gp.kernel_.theta),
+                              length_scale_bounds='fixed')
+            elif kernel_type == 'sinc':
+                kern = SincKernel(length_scale=np.exp(fit_gp.kernel_.theta),
+                                  length_scale_bounds='fixed')
+            ### end if kernel_type
+        ### end if updating
         self.gp = GaussianProcessRegressor(
                     kernel=kern,
                     alpha=1e-6,
                     normalize_y=True,
-                    n_restarts_optimizer=5,
-                    random_state=None,
+                    n_restarts_optimizer=20,
+                    random_state=0,
                 )
         self.gp.fit(self.xs, self.ys)
 
