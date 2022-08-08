@@ -111,12 +111,18 @@ class BayesianOptimization:
 
         assert init_points > 1, f'Need to sample more than one point when initializing agents, got {init_points}'
    
+
         if 'traj' in agent_type:
             logger.info('Creating Trajectory Domain')
             domain = agents.domains.TrajectoryDomain(kwargs['traj_len'], 
                                                      kwargs['x_dim'],
                                                      self.bounds)
             
+        elif 'multi' in agent_type:
+            logger.info('Creating Multi-Agent Trajectory Domain')
+            domain = agents.domains.MultiTrajectoryDomain(kwargs['n_agents'], kwargs['traj_len'], 
+                                                     kwargs['x_dim'],
+                                                     self.bounds)
         else:
             logger.info('Creating Rectangular Domain')
             domain = agents.domains.BoundedDomain(self.bounds)
@@ -152,6 +158,10 @@ class BayesianOptimization:
             agt = agents.GPAgent(init_xs, init_ys, updating=False, **kwargs) 
         elif agent_type=='ssp-traj':
             agt = agents.SSPTrajectoryAgent(init_xs, init_ys, **kwargs) 
+            init_xs = agt.init_xs
+            init_ys = agt.init_ys
+        elif agent_type=='ssp-multi':
+            agt = agents.SSPMultiAgent(init_xs, init_ys, **kwargs) 
             init_xs = agt.init_xs
             init_ys = agt.init_ys
         else:
