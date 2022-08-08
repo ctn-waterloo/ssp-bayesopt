@@ -14,7 +14,7 @@ class SSPMultiAgent(Agent):
     def __init__(self, init_xs, init_ys, n_agents, x_dim=1, traj_len=1,
                  ssp_x_spaces=None, ssp_t_space=None,
                  ssp_dim=151,
-                 domain_bounds=None, length_scales=4, 
+                 domain_bounds=None, length_scales=None, length_scale=4,
                  gamma_c=1.0,
                  init_pos=None):
         super().__init__()
@@ -27,8 +27,8 @@ class SSPMultiAgent(Agent):
         if domain_bounds is not None:
             domain_bounds = np.array([np.min(domain_bounds[:,0])*np.ones(x_dim*n_agents), 
                              np.max(domain_bounds[:,1])*np.ones(x_dim*n_agents)]).T
-        if not isinstance(length_scales, (list, tuple, np.ndarray)):
-            length_scales = [length_scales]*n_agents
+        if length_scales is None:
+            length_scales = [length_scale]*n_agents
        
         if ssp_x_spaces is None:
             ssp_x_spaces=[]
@@ -38,7 +38,7 @@ class SSPMultiAgent(Agent):
                                                                 domain_bounds=domain_bounds[i*x_dim:(i+1)*x_dim,:], 
                                                                 length_scale=length_scales[i]) )
         if ssp_t_space is None:
-            ssp_t_space =  sspspace.RandomSSPSpace(1,ssp_dim=ssp_dim,
+            ssp_t_space =  sspspace.RandomSSPSpace(1,ssp_dim=ssp_x_spaces[0].ssp_dim,
                                 domain_bounds=np.array([[0,self.traj_len]]), length_scale=1) 
         agent_sps = sspspace.RandomSSPSpace(n_agents, ssp_dim=ssp_x_spaces[0].ssp_dim, length_scale=1).axis_matrix.T
         self.ssp_x_spaces = ssp_x_spaces
@@ -218,9 +218,7 @@ class SSPMultiAgent(Agent):
     def encode(self,x):
         '''
         Translates a trajectory x into an SSP representation.
-        HACK: This code depends on whether or not the init_pos
-        has been specified in the constructor.  If it is, then
-        x needs to be a trajectory of length l-1
+        
 
         Parameters:
         -----------
@@ -235,6 +233,9 @@ class SSPMultiAgent(Agent):
         for i in range(self.n_agents):
             Si = np.zeros((x.shape[0], self.ssp_dim))
             for j in range(self.traj_len):
+                #print(enc_x.shape)
+                #print(enc_x[:,i,j,:].shape)
+                #print(self.ssp_x_spaces[i].encode(enc_x[:,i,j,:]).shape)
                 Si += self.ssp_x_spaces[i].bind(self.timestep_ssps[j,:], 
                                        self.ssp_x_spaces[i].encode(enc_x[:,i,j,:]))
             S += self.ssp_x_spaces[i].bind(self.agent_sps[i,:], Si)
