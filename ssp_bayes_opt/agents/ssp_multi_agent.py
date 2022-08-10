@@ -30,6 +30,7 @@ class SSPMultiAgent(Agent):
         if not isinstance(length_scale, (list, tuple, np.ndarray)):
             length_scale = [length_scale]*n_agents
        
+       
         if ssp_x_spaces is None:
             ssp_x_spaces=[]
             for i in range(n_agents):
@@ -65,6 +66,7 @@ class SSPMultiAgent(Agent):
         # for i in range(n_agents):
         #     self.ssp_x_spaces[i].update_lengthscale(optres[0])
         #self.ssp_t_space.update_lengthscale(optres[1])
+        self.length_scales = length_scale
 
         self.blr = blr.BayesianLinearRegression(self.ssp_dim)
         self.blr.update(init_phis, np.array(init_ys))
@@ -87,7 +89,14 @@ class SSPMultiAgent(Agent):
         self.gamma_t = 0
         self.gamma_c = gamma_c
         self.sqrt_alpha = np.log(2/1e-6)
+        
+        init_samples = []
+        for i in range(n_agents):
+            init_samples.append( self.ssp_x_spaces[i].get_sample_pts_and_ssps() )
+        self.init_samples = init_samples
     
+    def length_scale(self):
+        return self.length_scales
 
     def eval(self, xs):
         phis = self.encode(xs)
