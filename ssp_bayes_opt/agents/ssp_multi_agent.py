@@ -88,11 +88,7 @@ class SSPMultiAgent(Agent):
         self.gamma_c = gamma_c
         self.sqrt_alpha = np.log(2/1e-6)
     
-        init_samples = []
-        for i in range(n_agents):
-            init_samples.append( self.ssp_x_spaces[i].get_sample_pts_and_ssps(10000,'grid') )
-        self.init_samples = init_samples
-        
+
     def eval(self, xs):
         phis = self.encode(xs)
         mu, var = self.blr.predict(phis)
@@ -107,7 +103,7 @@ class SSPMultiAgent(Agent):
 #         return sample_points.reshape(num_points, self.traj_len*self.x_dim)
 
     def _optimize_lengthscale(self, init_trajs, init_ys):
-        ls_0 = np.array([[4.],[10]]) 
+        ls_0 = np.array([[4.],[4.]]) 
 
         def min_func(length_scale, xs=init_trajs, ys=init_ys,
                         ssp_x_space=self.ssp_x_space,ssp_t_space=self.ssp_t_space):
