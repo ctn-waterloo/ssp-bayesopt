@@ -14,7 +14,7 @@ class SSPMultiAgent(Agent):
     def __init__(self, init_xs, init_ys, n_agents, x_dim=1, traj_len=1,
                  ssp_x_spaces=None, ssp_t_space=None,
                  ssp_dim=151,
-                 domain_bounds=None, length_scales=None, length_scale=4,
+                 domain_bounds=None, length_scale=4,
                  gamma_c=1.0,
                  init_pos=None):
         super().__init__()
@@ -27,8 +27,8 @@ class SSPMultiAgent(Agent):
         if domain_bounds is not None:
             domain_bounds = np.array([np.min(domain_bounds[:,0])*np.ones(x_dim*n_agents), 
                              np.max(domain_bounds[:,1])*np.ones(x_dim*n_agents)]).T
-        if length_scales is None:
-            length_scales = [length_scale]*n_agents
+        if not isinstance(length_scale, (list, tuple, np.ndarray)):
+            length_scale = [length_scale]*n_agents
        
         if ssp_x_spaces is None:
             ssp_x_spaces=[]
@@ -36,7 +36,7 @@ class SSPMultiAgent(Agent):
                 ssp_x_spaces.append( sspspace.HexagonalSSPSpace(x_dim,ssp_dim=ssp_dim,
                                                                 scale_min=0.1, scale_max=3,
                                                                 domain_bounds=domain_bounds[i*x_dim:(i+1)*x_dim,:], 
-                                                                length_scale=length_scales[i]) )
+                                                                length_scale=length_scale[i]) )
         if ssp_t_space is None:
             ssp_t_space =  sspspace.RandomSSPSpace(1,ssp_dim=ssp_x_spaces[0].ssp_dim,
                                 domain_bounds=np.array([[0,self.traj_len]]), length_scale=1) 
