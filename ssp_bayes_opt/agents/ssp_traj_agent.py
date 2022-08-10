@@ -77,7 +77,10 @@ class SSPTrajectoryAgent(Agent):
         self.gamma_c = gamma_c
         self.sqrt_alpha = np.log(2/1e-6)
     
-        self.init_samples = self.ssp_x_space.get_sample_pts_and_ssps(10000,'grid')
+        self.init_samples = self.ssp_x_space.get_sample_pts_and_ssps(
+                                        10000,
+                                        'length-scale',
+        )
         
     def eval(self, xs):
         phis = self.encode(xs)
@@ -228,5 +231,6 @@ class SSPTrajectoryAgent(Agent):
         decoded_traj = np.zeros((self.traj_len,self.x_dim))
         for j in range(self.traj_len):
             query = self.ssp_x_space.bind(self.ssp_t_space.invert(self.timestep_ssps[j,:]) , ssp)
-            decoded_traj[j,:] = self.ssp_x_space.decode(query, method='from-set',samples=self.init_samples)
+#             decoded_traj[j,:] = self.ssp_x_space.decode(query, method='from-set',samples=self.init_samples)
+            decoded_traj[j,:] = self.ssp_x_space.decode(query, method='direct-optim',samples=self.init_samples)
         return decoded_traj.reshape(-1)
