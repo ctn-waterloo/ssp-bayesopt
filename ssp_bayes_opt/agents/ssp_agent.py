@@ -57,7 +57,7 @@ class SSPAgent(Agent):
         self.sqrt_alpha = np.log(2/1e-6)
         
         self.init_samples = self.ssp_space.get_sample_pts_and_ssps(
-                                        300**data_dim,
+                                        2**17,
                                         'length-scale'
         )
     ### end __init__

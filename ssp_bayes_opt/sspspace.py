@@ -280,7 +280,7 @@ class SSPSpace:
             lbounds = bounds[:,0]
             ubounds = bounds[:,1]
             u_sample_points = sampler.random(num_points)
-            sample_points = qmc.scale(u_sample_points, lbounds, ubounds)
+            sample_points = qmc.scale(u_sample_points, lbounds, ubounds).T
         else:
             raise NotImplementedError(f'Sampling method {method} is not implemented')
         return sample_points.T 
