@@ -41,7 +41,7 @@ class SSPAgent(Agent):
         self.gamma_t = 0
         self.sqrt_alpha = np.log(2/1e-6)
         
-        self.init_samples = self.ssp_space.get_sample_pts_and_ssps(300**data_dim,'grid')
+        self.init_samples = self.ssp_space.get_sample_pts_and_ssps(2**17,'sobol')
 
         # Cache for the input xs.
 #         self.phis = None

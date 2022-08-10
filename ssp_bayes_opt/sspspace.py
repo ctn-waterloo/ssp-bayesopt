@@ -270,7 +270,7 @@ class SSPSpace:
             lbounds = bounds[:,0]
             ubounds = bounds[:,1]
             u_sample_points = sampler.random(num_points)
-            sample_points = qmc.scale(u_sample_points, lbounds, ubounds)
+            sample_points = qmc.scale(u_sample_points, lbounds, ubounds).T
         else:
             raise NotImplementedError()
         return sample_points.T 
@@ -283,8 +283,8 @@ class SSPSpace:
     
     def get_sample_pts_and_ssps(self,num_points,method='grid'): 
         sample_points = self.get_sample_points(num_points,method)
-        expected_points = (int(num_points**(1/self.domain_dim))**self.domain_dim)
-        assert sample_points.shape[0] == expected_points, f'Expected {expected_points} samples, got {sample_points.shape[0]}.'
+        expected_points = sample_points.shape[0]  # (int(num_points**(1/self.domain_dim))**self.domain_dim)
+        #assert sample_points.shape[0] == expected_points, f'Expected {expected_points} samples, got {sample_points.shape[0]}.'
 
         sample_ssps = self.encode(sample_points)
         assert sample_ssps.shape[0] == expected_points
