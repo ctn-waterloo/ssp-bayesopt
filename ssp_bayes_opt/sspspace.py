@@ -5,6 +5,8 @@ from scipy.optimize import minimize
 
 import warnings
 
+from itertools import product
+
 class SSPSpace:
     def __init__(self, domain_dim: int, ssp_dim: int, axis_matrix=None, phase_matrix=None,
                  domain_bounds=None, length_scale=1):
@@ -189,13 +191,13 @@ class SSPSpace:
         x : np.ndarray
             The decoded point
         '''
-        if samples is None:
-            sample_ssps, sample_points = self.get_sample_pts_and_ssps(method=sampling_method, 
-                    num_points_per_dim=num_samples)
-        else:
+#         if samples is None:
+#             sample_ssps, sample_points = self.get_sample_pts_and_ssps(method=sampling_method, 
+#                     num_points_per_dim=num_samples)
+#         else:
+        if samples is not None:
             sample_ssps, sample_points = samples
-            
-        assert sample_ssps.shape[1] == ssp.shape[1]
+            assert sample_ssps.shape[1] == ssp.shape[1]
 
         unit_ssp = ssp / np.linalg.norm(ssp)
         
@@ -216,8 +218,61 @@ class SSPSpace:
                             method='L-BFGS-B',
                             bounds=self.domain_bounds)
             return soln.x
+        elif method=='temporal-optim':
+            x0 = self.get_best_sample_point(unit_ssp, method='length-scale')
+
+            def min_func(x,target=ssp):
+                x_ssp = self.encode(np.atleast_2d(x))
+                return -np.inner(x_ssp, target).flatten()
+
+            soln = minimize(min_func, x0, 
+                            method='L-BFGS-B',
+                            bounds=self.domain_bounds)
+            return soln.x
         else:
             raise NotImplementedError(f'Unrecognized decoding method: {method}')
+
+
+    def get_best_sample_point(self, query_ssp, method='length-scale'):
+        '''
+        Identifies points in the domain of the SSP encoding that 
+        will be used to determine optimal decoding.
+
+        Parameters
+        ----------
+
+        method: {'length-scale'}
+            The way to select samples from the domain. 
+            'length-scale' uses the selected lengthscale to determine the number
+                of sample points generated per dimension.
+
+        Returns
+        -------
+
+        sample_pts : np.ndarray 
+            A (num_samples, domain_dim) array of candiate decoding points.
+        '''
+
+        bounds = self.domain_bounds
+
+        if method == 'length-scale':
+            num_pts_per_dim = [2*int(np.ceil((b[1]-b[0])/self.length_scale[b_idx])) for b_idx, b in enumerate(bounds)]
+
+            sample_points = [np.linspace(bounds[i,0], 
+                                         bounds[i,1],
+                                         num_pts_per_dim[i]
+                                        ) for i in range(self.domain_dim)]
+            max_val = -np.inf
+            best_loc = None
+            for x in product(*sample_points):
+                s = self.encode(np.atleast_2d(x))
+                cur_val = np.dot(s,query_ssp.T)
+
+                if cur_val > max_val:
+                    best_loc = np.atleast_2d(x)
+                    max_val = cur_val 
+            return best_loc
+
         
     def clean_up(self,ssp,method='from-set'):
         if method=='least-squares':
@@ -290,7 +345,7 @@ class SSPSpace:
         sample_points = self.get_sample_points(num_points)
         sample_ssps = self.encode(sample_points)
         return sample_ssps
-    
+  
     def get_sample_pts_and_ssps(self,num_points_per_dim=100, method='grid'): 
         sample_points = self.get_sample_points(
                                         method=method, 
