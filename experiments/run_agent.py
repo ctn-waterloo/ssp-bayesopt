@@ -41,6 +41,8 @@ class SamplingTrial(pytry.Trial):
         self.param('number of sample points', num_samples=100)
         self.param('ssp length scale', len_scale=4)
         self.param('ssp dim', ssp_dim=151)
+        self.param('hex ssp rotations', n_rotates=5)
+        self.param('hex ssp scales', n_scales=5)
         self.param('trial number', trial_num=None)
     
     def evaluate(self, p):        
@@ -92,6 +94,8 @@ if __name__=='__main__':
     parser.add_argument('--func', dest='function_name', type=str, default='himmelblau')
     parser.add_argument('--agent', dest='agent_type', type=str, default='ssp-rand')
     parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=151)
+    parser.add_argument('--hex-rots', dest='hex_rots', type=int, default=5)
+    parser.add_argument('--hex-scales', dest='hex_scales', type=int, default=5)
     parser.add_argument('--len-scale', dest='len_scale', type=float, default=4)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=100)
     parser.add_argument('--num-trials', dest='num_trials', type=int, default=1)
@@ -117,6 +121,8 @@ if __name__=='__main__':
                   'seed':seed, 
                   'verbose':False,
                   'ssp_dim':args.ssp_dim,
+                  'n_rotates':args.hex_rots,
+                  'n_scales':args.hex_scales,
                   'len_scale':args.len_scale
                   }
         r = SamplingTrial().run(**params)
