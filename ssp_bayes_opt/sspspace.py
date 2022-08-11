@@ -154,8 +154,9 @@ class SSPSpace:
         assert x.shape[1] == self.phase_matrix.shape[1], (f'Expected data to have ' 
                                                          f'{self.phase_matrix.shape[1]} '
                                                          f'features, got {x.shape[1]}.')
-#         x= x.reshape(self.domain_dim, -1)
-        data =  np.exp( 1.j * self.phase_matrix @ (x / self.length_scale).T )
+        ls_mat = np.atleast_2d(np.diag(1 / self.length_scale.flatten()))
+        scaled_x = x @ ls_mat
+        data = np.exp(1.j * self.phase_matrix @ scaled_x.T)
         return data.T
     
     # def encode_as_SSP(self,x):
@@ -456,6 +457,8 @@ class HexagonalSSPSpace(SSPSpace):
     def __init__(self,  domain_dim:int,ssp_dim: int=151, n_rotates:int=5, n_scales:int=5, 
                  scale_min=0.1, scale_max=3,
                  domain_bounds=None, length_scale=1):
+        self.n_rotates = n_rotates
+        self.n_scales = n_scales
         if (n_rotates==5) & (n_scales==5) & (ssp_dim!=151): # user wants to define ssp with total dim, not number of simplex rotates and scales
             n_rotates = int(np.sqrt((ssp_dim-1)/(2*(domain_dim+1))))
             n_scales = n_rotates
@@ -469,6 +472,7 @@ class HexagonalSSPSpace(SSPSpace):
 
         scales = np.linspace(scale_min,scale_max,n_scales)
         phases_scaled = np.vstack([phases_hex*i for i in scales])
+
         
         if (n_rotates==1):
             phases_scaled_rotated = phases_scaled

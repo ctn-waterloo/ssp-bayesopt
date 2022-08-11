@@ -53,12 +53,23 @@ class NonstationarySSPSpace:
         return data
 
     def make_mask(self):
-        scale_mask = np.ones((self.ssp_space.n_scales, len(self.regions)))
+
+        if self.ssp_space.domain_dim == 1:
+            n_scales = self.ssp_space.n_scales + self.ssp_space.n_rotates
+            n_rotates = 1
+        else:
+            n_scales = self.ssp_space.n_scales
+            n_rotates = self.ssp_space.n_rotates
+
+        scale_mask = np.ones((n_scales, len(self.regions)))
 
         for r_idx, r in enumerate(self.regions):
             scale_mask[r.scales, r_idx] = 0
-        mask_half = np.tile(np.repeat(scale_mask, 3, axis=0),
-                            (self.ssp_space.n_rotates, 1))
+
+        mask_half = np.tile(np.repeat(scale_mask, 
+                                      self.ssp_space.domain_dim+1, 
+                                      axis=0),
+                            (n_rotates, 1))
         mask = np.vstack([np.ones((1,len(self.regions))),
                           mask_half,
                           np.flip(mask_half, axis=0)])
