@@ -8,7 +8,7 @@ from collections.abc import Callable
 
 sample_points_cache = {}
 
-def factory(function_name: str) -> Tuple[Callable, dict, int]:
+def factory(function_name: str, function_dim:int=None) -> Tuple[Callable, dict, int]:
     '''
     Returns the target functions for testing the SSP Bayes optimization algorithm.
     @param function_name the name of the function.  One of:
@@ -55,9 +55,10 @@ def factory(function_name: str) -> Tuple[Callable, dict, int]:
     elif function_name=='ackley':
         return ackley, np.array([[-5,5], [-5,5]]), 500
     elif re.match('rosenbrock', function_name):
-        num = re.search('\d+', function_name)
+#         num = re.search('\d+', function_name)
+        num = function_dim
         assert num is not None
-        dim = int(num[0])
+        dim = num #int(num[0])
         return rosenbrock, np.array([[-10,10] for i in range(dim)]), 500 # actually theres no range, just need to cover 1,1,..,1
     elif function_name=='beale':
         return beale, np.array([[-4.5,4.5], [-4.5,4.5]]), 500
