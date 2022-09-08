@@ -41,6 +41,7 @@ class SSPSpace:
         self.domain_dim = domain_dim
         self.ssp_dim = ssp_dim
         self.length_scale = length_scale * np.ones((self.domain_dim,1))
+        self.decoder_model = None
         
         if domain_bounds is not None:
             assert domain_bounds.shape[0] == domain_dim
@@ -192,11 +193,10 @@ class SSPSpace:
         x : np.ndarray
             The decoded point
         '''
-#         if samples is None:
-#             sample_ssps, sample_points = self.get_sample_pts_and_ssps(method=sampling_method, 
-#                     num_points_per_dim=num_samples)
-#         else:
-        if samples is not None:
+        if samples is None:
+            sample_ssps, sample_points = self.get_sample_pts_and_ssps(method=sampling_method, 
+                    num_points_per_dim=num_samples)
+        else:
             sample_ssps, sample_points = samples
             assert sample_ssps.shape[1] == ssp.shape[1]
 
@@ -230,6 +230,26 @@ class SSPSpace:
                             method='L-BFGS-B',
                             bounds=self.domain_bounds)
             return soln.x
+        elif method=='network':
+            if self.decoder_model is None:
+                raise Exception('Network not trained for decoding. You must first call train_decoder_net')
+            return self.decoder_model.predict(ssp)
+        elif method=='network-optim':
+            if self.decoder_model is None:
+                raise Exception('Network not trained for decoding. You must first call train_decoder_net')
+            x0 = self.decoder_model.predict(ssp)
+            
+
+            solns = np.zeros(x0.shape)
+            for i in range(x0.shape[0]):
+                def min_func(x,target=ssp[i,:]):
+                    x_ssp = self.encode(np.atleast_2d(x))
+                    return -np.inner(x_ssp, target).flatten()
+                soln = minimize(min_func, x0[i,:], 
+                            method='L-BFGS-B',
+                            bounds=self.domain_bounds)
+                solns[i,:] = soln.x
+            return solns
         else:
             raise NotImplementedError(f'Unrecognized decoding method: {method}')
 
@@ -276,15 +296,9 @@ class SSPSpace:
 
         
     def clean_up(self,ssp,method='from-set'):
-        if method=='least-squares':
-            x = self.decode(ssp,method)
-            return self.encode(x)
-        elif method=='from-set':
-            sample_ssps = self.get_sample_ssps(500)
-            sims = sample_ssps.T @ ssp
-            return sample_ssps[:,np.argmax(sims)]
-        else:
-            raise NotImplementedError()
+        x = self.decode(ssp,method)
+        return self.encode(x)
+        
         
     def get_sample_points(self, samples_per_dim=100, method='length-scale'):
         '''
@@ -330,16 +344,22 @@ class SSPSpace:
             return retval
 
         elif method=='sobol':
-            num_points = np.prod(num_pts_per_dim)
+            num_points = np.prod(samples_per_dim)
 
             sampler = qmc.Sobol(d=self.domain_dim) 
             lbounds = bounds[:,0]
             ubounds = bounds[:,1]
             u_sample_points = sampler.random(num_points)
             sample_points = qmc.scale(u_sample_points, lbounds, ubounds)
+        elif method=='Rd':
+            num_points = np.prod(samples_per_dim)
+            u_sample_points = _Rd_sampling(num_points, self.domain_dim)
+            lbounds = bounds[:,0]
+            ubounds = bounds[:,1]
+            sample_points = qmc.scale(u_sample_points, lbounds, ubounds)
         else:
             raise NotImplementedError(f'Sampling method {method} is not implemented')
-        return sample_points.T 
+        return sample_points 
         
     
     def get_sample_ssps(self,num_points): 
@@ -409,6 +429,32 @@ class SSPSpace:
         else:
             raise NotImplementedError()
         return im
+    
+    def train_decoder_net(self,n_training_pts=200000,n_hidden_units = 12,
+                          learning_rate=1e-3,n_epochs = 20):
+        import tensorflow as tf
+        import sklearn
+        from tensorflow import keras
+        from tensorflow.keras import layers, regularizers
+        
+        sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_points_per_dim=n_training_pts,
+                                                                           method='Rd')
+        
+        model = keras.Sequential([
+             layers.Dense(self.ssp_dim, activation="relu", name="layer1"),# layers.Dropout(.1),
+             layers.Dense(n_hidden_units, activation="relu", name="layer2"), # kernel_regularizer=regularizers.L1L2(l1=1e-5, l2=1e-4)),
+             layers.Dense(self.domain_dim, name="output"),
+            ])
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            loss='mean_squared_error')
+        shuffled_ssps, shuffled_pts = sklearn.utils.shuffle(sample_ssps, sample_points)
+        history = model.fit(shuffled_ssps, shuffled_pts,
+            epochs=n_epochs,verbose=0, validation_split = 0.1)
+        
+        self.decoder_model = model
+        return history
+        
             
 class RandomSSPSpace(SSPSpace):
     '''
@@ -646,3 +692,19 @@ def _proj_sub_SSP(n,N,sublen=3):
     W = np.fft.fft(np.eye(2*sublen + 1))
     B = invW @ np.fft.ifftshift(FB) @ W
     return B.real
+
+def _Rd_sampling(n,d,seed=0.5):
+    def phi(d): 
+        x=2.0000 
+        for i in range(10): 
+          x = pow(1+x,1/(d+1)) 
+        return x
+    g = phi(d) 
+    alpha = np.zeros(d) 
+    for j in range(d): 
+      alpha[j] = pow(1/g,j+1) %1 
+    z = np.zeros((n, d)) 
+    for i in range(n):
+        z[i] = seed + alpha*(i+1)
+    z = z %1
+    return z
