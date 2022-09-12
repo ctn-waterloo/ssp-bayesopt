@@ -189,13 +189,14 @@ class SSPSpace:
         x : np.ndarray
             The decoded point
         '''
-        if samples is None:
-            sample_ssps, sample_points = self.get_sample_pts_and_ssps(method=sampling_method, 
-                    num_points_per_dim=num_samples)
-        else:
-            sample_ssps, sample_points = samples
+        if (method=='direct-optim') | (method=='from-set'):
+            if samples is None:
+                sample_ssps, sample_points = self.get_sample_pts_and_ssps(method=sampling_method, 
+                        num_points_per_dim=num_samples)
+            else:
+                sample_ssps, sample_points = samples
+                assert sample_ssps.shape[1] == ssp.shape[1]
             
-        assert sample_ssps.shape[1] == ssp.shape[1]
 
         unit_ssp = ssp / np.linalg.norm(ssp)
         
@@ -216,6 +217,26 @@ class SSPSpace:
                             method='L-BFGS-B',
                             bounds=self.domain_bounds)
             return soln.x
+        elif method=='network':
+            if self.decoder_model is None:
+                raise Exception('Network not trained for decoding. You must first call train_decoder_net')
+            return self.decoder_model.predict(ssp)
+        elif method=='network-optim':
+            if self.decoder_model is None:
+                raise Exception('Network not trained for decoding. You must first call train_decoder_net')
+            x0 = self.decoder_model.predict(ssp)
+            
+
+            solns = np.zeros(x0.shape)
+            for i in range(x0.shape[0]):
+                def min_func(x,target=ssp[i,:]):
+                    x_ssp = self.encode(np.atleast_2d(x))
+                    return -np.inner(x_ssp, target).flatten()
+                soln = minimize(min_func, x0[i,:], 
+                            method='L-BFGS-B',
+                            bounds=self.domain_bounds)
+                solns[i,:] = soln.x
+            return solns
         else:
             raise NotImplementedError(f'Unrecognized decoding method: {method}')
         
@@ -280,6 +301,12 @@ class SSPSpace:
             lbounds = bounds[:,0]
             ubounds = bounds[:,1]
             u_sample_points = sampler.random(num_points)
+            sample_points = qmc.scale(u_sample_points, lbounds, ubounds).T
+        elif method=='Rd':
+            num_points = np.prod(samples_per_dim)
+            u_sample_points = _Rd_sampling(num_points, self.domain_dim)
+            lbounds = bounds[:,0]
+            ubounds = bounds[:,1]
             sample_points = qmc.scale(u_sample_points, lbounds, ubounds).T
         else:
             raise NotImplementedError(f'Sampling method {method} is not implemented')
@@ -355,6 +382,50 @@ class SSPSpace:
         else:
             raise NotImplementedError()
         return im
+    
+    def train_decoder_net(self,n_training_pts=200000,n_hidden_units = 8,
+                          learning_rate=1e-3,n_epochs = 20, load_file=True, save_file=True):
+        import tensorflow as tf
+        import sklearn
+        from tensorflow import keras
+        from tensorflow.keras import layers, regularizers
+        
+        if (type(self).__name__ == 'HexagonalSSPSpace'):
+            path_name = './saved_decoder_nets/domaindim' + str(self.domain_dim) + '_lenscale' + str(self.length_scale[0]) + '_nscales' + str(self.n_scales) + '_nrotates' + str(self.n_rotates) + '_scale_min' + str(self.scale_min) + '_scalemax' + str(self.scale_max)
+        else:
+            #warnings.warn("Cannot load decoder net for non HexagonalSSPSpace class")
+            load_file = False
+            save_file=False
+        
+        
+        if load_file:
+            try:
+                self.decoder_model = keras.models.load_model(path_name)
+                return
+            except:
+                pass
+
+        model = keras.Sequential([
+             layers.Dense(self.ssp_dim, activation="relu", name="layer1"),# layers.Dropout(.1),
+             layers.Dense(n_hidden_units, activation="relu", name="layer2"), # kernel_regularizer=regularizers.L1L2(l1=1e-5, l2=1e-4)),
+             layers.Dense(self.domain_dim, name="output"),
+            ])
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            loss='mean_squared_error')
+        
+        sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_points_per_dim=n_training_pts,
+                                                                           method='Rd')
+        shuffled_ssps, shuffled_pts = sklearn.utils.shuffle(sample_ssps, sample_points)
+        history = model.fit(shuffled_ssps, shuffled_pts,
+            epochs=n_epochs,verbose=0, validation_split = 0.1)
+        
+        if save_file:
+           model.save(path_name)
+
+            
+        self.decoder_model = model
+        return history
             
 class RandomSSPSpace(SSPSpace):
     '''
@@ -478,7 +549,11 @@ class HexagonalSSPSpace(SSPSpace):
         
         self.grid_basis_dim = domain_dim + 1
         self.num_grids = n_rotates*n_scales
-
+        self.scale_min = scale_min
+        self.scale_max = scale_max
+        self.n_scales = n_scales
+        self.n_rotates = n_rotates
+        
         scales = np.linspace(scale_min,scale_max,n_scales)
         phases_scaled = np.vstack([phases_hex*i for i in scales])
         
@@ -493,7 +568,7 @@ class HexagonalSSPSpace(SSPSpace):
                         np.stack([np.sin(angles), np.cos(angles)], axis=1)], axis=1)
             phases_scaled_rotated = (R_mats @ phases_scaled.T).transpose(0,2,1).reshape(-1,domain_dim)
         else:
-            R_mats = special_ortho_group.rvs(domain_dim, size=n_rotates)
+            R_mats = special_ortho_group.rvs(domain_dim, size=n_rotates, seed=1)
             phases_scaled_rotated = (R_mats @ phases_scaled.T).transpose(0,2,1).reshape(-1,domain_dim)
         
         axis_matrix = _constructaxisfromphases(phases_scaled_rotated)
@@ -654,3 +729,19 @@ def _proj_sub_SSP(n,N,sublen=3):
     W = np.fft.fft(np.eye(2*sublen + 1))
     B = invW @ np.fft.ifftshift(FB) @ W
     return B.real
+
+def _Rd_sampling(n,d,seed=0.5):
+    def phi(d): 
+        x=2.0000 
+        for i in range(10): 
+          x = pow(1+x,1/(d+1)) 
+        return x
+    g = phi(d) 
+    alpha = np.zeros(d) 
+    for j in range(d): 
+      alpha[j] = pow(1/g,j+1) %1 
+    z = np.zeros((n, d)) 
+    for i in range(n):
+        z[i] = seed + alpha*(i+1)
+    z = z %1
+    return z

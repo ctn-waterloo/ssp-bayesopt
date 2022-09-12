@@ -44,7 +44,7 @@ class SamplingTrial(pytry.Trial):
         start = time.thread_time_ns()
         optimizer.maximize(init_points=p.num_init_samples, n_iter=budget,
                            agent_type='ssp-multi',ssp_dim=p.ssp_dim, x_dim=pt_dim, traj_len=traj_len,n_agents=n_agents,
-                           length_scales=[10,10])
+                           length_scale=[10,10])
         elapsed_time = time.thread_time_ns() - start
 
         vals = np.zeros((p.num_init_samples + budget,))

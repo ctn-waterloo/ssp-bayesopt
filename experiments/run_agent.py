@@ -75,8 +75,7 @@ class SamplingTrial(pytry.Trial):
             regret=regrets,
             sample_locs=sample_locs,
             elapsed_time=elapsed_time,
-            times = optimizer.times,
-            selected_len_scale = optimizer.length_scale,
+            times = optimizer.times,#selected_len_scale = optimizer.length_scale,
             budget=budget,
             vals=vals,
             mus=None,
@@ -90,7 +89,7 @@ if __name__=='__main__':
     parser = ArgumentParser()
 
     parser.add_argument('--func', dest='function_name', type=str, default='himmelblau')
-    parser.add_argument('--agent', dest='agent_type', type=str, default='ssp-rand')
+    parser.add_argument('--agent', dest='agent_type', type=str, default='ssp-hex')
     parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=151)
     parser.add_argument('--len-scale', dest='len_scale', type=float, default=4)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=100)
