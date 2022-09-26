@@ -125,9 +125,11 @@ class BayesianOptimization:
             
         elif 'multi' in agent_type:
             logger.info('Creating Multi-Agent Trajectory Domain')
-            domain = agents.domains.MultiTrajectoryDomain(kwargs['n_agents'], kwargs['traj_len'], 
+            domain = agents.domains.MultiTrajectoryDomain(kwargs['n_agents'], 
+                                                     kwargs['traj_len'], 
                                                      kwargs['x_dim'],
-                                                     self.bounds)
+                                                     self.bounds,
+                                                     kwargs.pop('goals',None))
         else:
             logger.info('Creating Rectangular Domain')
             domain = agents.domains.BoundedDomain(self.bounds)
