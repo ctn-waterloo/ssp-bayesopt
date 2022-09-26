@@ -82,6 +82,9 @@ class SSPTrajectoryAgent(Agent):
                                         'length-scale',
         )
         
+    def length_scale(self):
+        return self.ssp_x_space.length_scale
+
     def eval(self, xs):
         phis = self.encode(xs)
         mu, var = self.blr.predict(phis)
