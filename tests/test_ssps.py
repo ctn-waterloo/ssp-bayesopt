@@ -3,6 +3,8 @@ import scipy
 
 import pytest
 
+import time
+
 from ssp_bayes_opt import sspspace
 
 def make_hex_space(domain_dim=2, ls=1, bounds = 15*np.array([[-1,1],[-1,1]])):
@@ -59,7 +61,11 @@ def test_hex_direct_optim_decode():
     ssp_space = make_hex_space()
     S0 = ssp_space.encode(test_x)
     assert S0.shape == (1, ssp_space.ssp_dim)
+    start = time.time_ns()
     recov_x = ssp_space.decode(S0, method='direct-optim')
+    duration = time.time_ns() - start
+    print(duration * 1e-9)
+    exit()
     assert np.all(np.isclose(test_x, recov_x))
 
 def test_rand_direct_optim_decode():
@@ -70,7 +76,23 @@ def test_rand_direct_optim_decode():
     recov_x = rand_ssp_space.decode(S0, method='direct-optim')
     assert np.all(np.isclose(test_x, recov_x))
 
+def test_hex_temporal_optim_decode():
+    test_x = np.atleast_2d(np.array([1.3,-3.4]))
+    ssp_space = make_hex_space()
+    S0 = ssp_space.encode(test_x)
+    assert S0.shape == (1, ssp_space.ssp_dim)
+    recov_x = ssp_space.decode(S0, method='temporal-optim')
+    assert np.all(np.isclose(test_x, recov_x))
 
+def test_rand_temporal_optim_decode():
+    test_x = np.atleast_2d(np.array([1.3,-3.4]))
+    rand_ssp_space = make_rand_space()
+    S0 = rand_ssp_space.encode(test_x)
+    assert S0.shape == (1, rand_ssp_space.ssp_dim)
+    recov_x = rand_ssp_space.decode(S0, method='temporal-optim')
+    assert np.all(np.isclose(test_x, recov_x))
+
+@pytest.mark.skip(reason='too long')
 def test_hex_small_lenscale_decode():
     test_x = np.atleast_2d(np.array([1.3,-3.4]))
     ssp_space = make_hex_space(ls=0.05)
@@ -79,6 +101,7 @@ def test_hex_small_lenscale_decode():
     recov_x = ssp_space.decode(S0, method='from-set', num_samples=500)
     assert np.all(np.isclose(test_x, recov_x, atol=1e-2))
 
+@pytest.mark.skip(reason='too long')
 def test_rand_small_lenscale_decode():
     test_x = np.atleast_2d(np.array([1.3,-3.4]))
     rand_ssp_space = make_rand_space(ls=0.05)
@@ -88,6 +111,7 @@ def test_rand_small_lenscale_decode():
     assert np.all(np.isclose(test_x, recov_x))
 
 
+@pytest.mark.skip(reason='too long')
 def test_hex_large_lenscale_decode():
     test_x = np.atleast_2d(np.array([1.3,-3.4]))
     ssp_space = make_hex_space(ls=2)
@@ -96,6 +120,7 @@ def test_hex_large_lenscale_decode():
     recov_x = ssp_space.decode(S0, method='direct-optim')
     assert np.all(np.isclose(test_x, recov_x))
 
+@pytest.mark.skip(reason='too long')
 def test_rand_large_lenscale_decode():
     test_x = np.atleast_2d(np.array([1.3,-3.4]))
     rand_ssp_space = make_rand_space(ls=2)

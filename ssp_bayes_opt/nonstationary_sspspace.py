@@ -6,8 +6,35 @@ from scipy.special import softmax
 
 from .util import sample_domain
 
-from sklearn.neural_network import MLPRegressor
+import tensorflow as tf
+# from sklearn.neural_network import MLPRegressor
 
+def make_model(input_size, num_hidden, output_size, activation='relu'):
+    model = tf.keras.Sequential([
+        tf.keras.layers.InputLayer(input_shape=(input_size,)),
+        tf.keras.layers.Dense(num_hidden, activation=activation),
+        tf.keras.layers.Dense(output_size, activation='linear')
+    ]
+    )
+    return model
+
+
+def train_network(inputs, outputs, num_hidden=512):
+
+    mlp = make_model(inputs.shape[1], num_hidden, outputs.shape[1])
+
+    early_stopping = tf.keras.callbacks.EarlyStopping(
+                            monitor='loss',
+                            patience=3
+                    )
+    mlp.compile(optimizer='adam', loss='mse')
+    history = mlp.fit(inputs, outputs,
+                    validation_split=0.2,
+                    batch_size=64, 
+                    epochs=200,
+                    verbose=True,
+                    callbacks=[early_stopping])
+    return mlp
 
 class Region:
     def __init__(self, bounds, scales):
@@ -35,8 +62,10 @@ class MLPRegion(Region):
         region_indicies = np.array([m(domain_samples) for m in memberships]).astype(float).squeeze().T
         encoded_samples = encoder.encode(domain_samples)
 
-        self.mlp = MLPRegressor(max_iter=200, early_stopping=True)
-        self.mlp.fit(encoded_samples, region_indicies)
+        self.mlp = train_network(encoded_samples, region_indicies)
+#         self.mlp = MLPRegressor(max_iter=200, early_stopping=True)
+#         self.mlp.fit(encoded_samples, region_indicies)
+
 
     def __call__(self, x):
         x_f = self.encoder.encode(x)
@@ -57,6 +86,9 @@ class SSPRegion(Region):
         bound_diff = bounds[:,1] - bounds[:,0]
         length_scales = encoder.length_scale
         samples_per_dim = np.ceil(4*np.divide(bound_diff, length_scales)).astype(int)
+#         xs = [np.linspace(1.1*b[0],1.1*b[1],2*samples_per_dim[b_idx]) for b_idx, b in enumerate(bounds)]
+#         Xs = np.meshgrid(*xs)
+#         domain_samples = np.vstack([x.flatten() for x in Xs]).T
         domain_samples = sample_domain(bounds, samples_per_dim)
         # Filter based on membership
         region_indicies = [m(domain_samples) for m in memberships]
@@ -99,10 +131,20 @@ class ExcludeRegion(Region):
         return functools.reduce(np.logical_or, membership)
 
 class NonstationarySSPSpace:
-    def __init__(self, ssp_space, regions):
+    def __init__(self, ssp_space, regions, do_decoder=False):
         self.ssp_space = ssp_space
         self.regions = regions
         self.masks = self.make_mask()
+
+
+        bound_diff = self.ssp_space.domain_bounds[:,1] - self.ssp_space.domain_bounds[:,0]
+        length_scales = self.ssp_space.length_scale
+        samples_per_dim = np.ceil(4*np.divide(bound_diff, length_scales)).astype(int)
+        domain_samples = sample_domain(self.ssp_space.domain_bounds, samples_per_dim)
+        encoded_points = self.encode(domain_samples)
+
+        if do_decoder:
+            self.decoder = train_network(encoded_points, domain_samples)
 
     def encode(self, x):
         # Get the fourier frequency components
@@ -120,6 +162,12 @@ class NonstationarySSPSpace:
 #         nonstationary_comps = np.sum(weighted_components, axis=2)
         data = np.fft.ifft(weighted_components, axis=1 ).real
         return data
+
+    def decode(self, ssp):
+        if self.decoder:
+            return self.decoder.predict(ssp)
+        else:
+            raise RuntimeWarning('Requested Decoder without specifying do_decoder')
 
     def make_mask(self):
 
