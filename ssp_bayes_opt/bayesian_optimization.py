@@ -152,10 +152,10 @@ class BayesianOptimization:
         logger.info(f'Creating {agent_type} agent')
         if agent_type=='ssp-hex':
             ssp_space = sspspace.HexagonalSSPSpace(self.data_dim, **kwargs)
-            agt = agent.SSPAgent(init_xs, init_ys,ssp_space, **kwargs) 
+            agt = agents.SSPAgent(init_xs, init_ys,ssp_space, **kwargs) 
         elif agent_type=='ssp-rand':
             ssp_space = sspspace.RandomSSPSpace(self.data_dim, **kwargs)
-            agt = agent.SSPAgent(init_xs, init_ys,ssp_space, **kwargs) 
+            agt = agents.SSPAgent(init_xs, init_ys,ssp_space, **kwargs) 
         elif agent_type=='ssp-custom':
             assert 'ssp_space' in kwargs
             agt = agents.SSPAgent(init_xs, init_ys,kwargs.get('ssp_space') )
@@ -164,11 +164,11 @@ class BayesianOptimization:
         elif agent_type=='static-gp':
             agt = agents.GPAgent(init_xs, init_ys, updating=False, **kwargs) 
         elif agent_type=='gp-matern':
-            agt = agent.GPAgent(init_xs, init_ys, 
+            agt = agents.GPAgent(init_xs, init_ys, 
                                 kernel_type='matern', 
                                 updating=False, **kwargs) 
         elif agent_type=='gp-sinc':
-            agt = agent.GPAgent(init_xs, init_ys, 
+            agt = agents.GPAgent(init_xs, init_ys, 
                                 kernel_type='sinc', 
                                 updating=False, **kwargs) 
         elif agent_type=='ssp-traj':
@@ -233,9 +233,7 @@ class BayesianOptimization:
                                                       **kwargs
                                                       )
         logging.info('Agent initialized')
-        self.length_scale = agt.length_scale()
-
-        self.lengthscale = agt.length_scale()
+        #self.length_scale = agt.length_scale()
 
         self.times = np.zeros((n_iter,))
         self.xs = []

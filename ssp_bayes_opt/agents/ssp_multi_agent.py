@@ -16,7 +16,8 @@ class SSPMultiAgent(Agent):
                  ssp_dim=151,
                  domain_bounds=None, length_scale=4,
                  gamma_c=1.0,
-                 init_pos=None):
+                 init_pos=None,
+                 decoder_method='network-optim'):
         super().__init__()
         self.num_restarts = 10
         self.n_agents = n_agents
@@ -90,10 +91,17 @@ class SSPMultiAgent(Agent):
         self.gamma_c = gamma_c
         self.sqrt_alpha = np.log(2/1e-6)
         
-        init_samples = []
-        for i in range(n_agents):
-            init_samples.append( self.ssp_x_spaces[i].get_sample_pts_and_ssps() )
-        self.init_samples = init_samples
+
+        if (decoder_method=='network') | (decoder_method=='network-optim'):
+            for i in range(n_agents):
+                self.ssp_x_spaces[i].train_decoder_net();
+            self.init_samples=[None]*n_agents
+        else:
+            init_samples = []
+            for i in range(n_agents):
+                init_samples.append( self.ssp_x_spaces[i].get_sample_pts_and_ssps() )
+            self.init_samples = init_sample
+        self.decoder_method = decoder_method
     
     def length_scale(self):
         return self.length_scales
@@ -253,5 +261,5 @@ class SSPMultiAgent(Agent):
             sspi = self.ssp_x_spaces[i].bind(self.ssp_x_spaces[i].invert(self.agent_sps[i,:]), ssp)
             for j in range(self.traj_len):
                 query = self.ssp_x_spaces[i].bind(self.ssp_t_space.invert(self.timestep_ssps[j,:]) , sspi)
-                decoded_traj[i,j,:] = self.ssp_x_spaces[i].decode(query, method='from-set',samples=self.init_samples[i])
+                decoded_traj[i,j,:] = self.ssp_x_spaces[i].decode(query, method=self.decoder_method,samples=self.init_samples[i])
         return decoded_traj.reshape(-1)

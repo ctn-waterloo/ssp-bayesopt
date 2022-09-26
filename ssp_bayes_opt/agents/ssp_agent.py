@@ -15,7 +15,7 @@ from .kernels import SincKernel
 from .agent import Agent
 
 class SSPAgent(Agent):
-    def __init__(self, init_xs, init_ys, ssp_space=None, **kwargs):
+    def __init__(self, init_xs, init_ys, ssp_space=None,decoder_method='network-optim', **kwargs):
         super().__init__()
   
         (num_pts, data_dim) = init_xs.shape
@@ -56,10 +56,13 @@ class SSPAgent(Agent):
         self.gamma_t = 0
         self.sqrt_alpha = np.log(2/1e-6)
         
-        self.init_samples = self.ssp_space.get_sample_pts_and_ssps(
-                                        2**17,
-                                        'length-scale'
-        )
+        if (decoder_method=='network') | (decoder_method=='network-optim'):
+            self.ssp_space.train_decoder_net();
+            self.init_samples=None
+        else:
+            self.init_samples = self.ssp_space.get_sample_pts_and_ssps(2**17,'length-scale')
+        self.decoder_method = decoder_method
+
     ### end __init__
 
 
@@ -160,6 +163,5 @@ class SSPAgent(Agent):
     def encode(self, x):
         return self.ssp_space.encode(x)
     
-    def decode(self, ssp):
-#         return self.ssp_space.decode(ssp,method='from-set',samples=self.init_samples)
-        return self.ssp_space.decode(ssp,method='direct-optim',samples=self.init_samples)
+    def decode(self,ssp):
+        return self.ssp_space.decode(ssp,method=self.decoder_method,samples=self.init_samples)

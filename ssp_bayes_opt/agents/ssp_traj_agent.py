@@ -14,7 +14,7 @@ class SSPTrajectoryAgent(Agent):
     def __init__(self, init_xs, init_ys, x_dim=1, traj_len=1,
                  ssp_x_space=None, ssp_t_space=None, ssp_dim=151,
                  domain_bounds=None, length_scale=4, gamma_c=1.0,
-                 init_pos=None):
+                 init_pos=None, decoder_method='network-optim'):
         super().__init__()
         self.num_restarts = 10
         self.data_dim = x_dim*traj_len
@@ -77,10 +77,12 @@ class SSPTrajectoryAgent(Agent):
         self.gamma_c = gamma_c
         self.sqrt_alpha = np.log(2/1e-6)
     
-        self.init_samples = self.ssp_x_space.get_sample_pts_and_ssps(
-                                        10000,
-                                        'length-scale',
-        )
+        if (decoder_method=='network') | (decoder_method=='network-optim'):
+            self.ssp_x_space.train_decoder_net();
+            self.init_samples=None
+        else:
+            self.init_samples = self.ssp_x_space.get_sample_pts_and_ssps(10000,'length-scale')
+        self.decoder_method = decoder_method
         
     def length_scale(self):
         return self.ssp_x_space.length_scale
@@ -235,5 +237,7 @@ class SSPTrajectoryAgent(Agent):
         for j in range(self.traj_len):
             query = self.ssp_x_space.bind(self.ssp_t_space.invert(self.timestep_ssps[j,:]) , ssp)
 #             decoded_traj[j,:] = self.ssp_x_space.decode(query, method='from-set',samples=self.init_samples)
-            decoded_traj[j,:] = self.ssp_x_space.decode(query, method='direct-optim',samples=self.init_samples)
+            decoded_traj[j,:] = self.ssp_x_space.decode(query,
+                                                        method=self.decoder_method,
+                                                        samples=self.init_samples)
         return decoded_traj.reshape(-1)
