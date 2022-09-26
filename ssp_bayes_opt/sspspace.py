@@ -568,7 +568,7 @@ class HexagonalSSPSpace(SSPSpace):
                         np.stack([np.sin(angles), np.cos(angles)], axis=1)], axis=1)
             phases_scaled_rotated = (R_mats @ phases_scaled.T).transpose(0,2,1).reshape(-1,domain_dim)
         else:
-            R_mats = special_ortho_group.rvs(domain_dim, size=n_rotates, seed=1)
+            R_mats = special_ortho_group.rvs(domain_dim, size=n_rotates, random_state=1)
             phases_scaled_rotated = (R_mats @ phases_scaled.T).transpose(0,2,1).reshape(-1,domain_dim)
         
         axis_matrix = _constructaxisfromphases(phases_scaled_rotated)
