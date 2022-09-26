@@ -49,3 +49,6 @@ class Agent:
 
     def acquisition_func(self):
         pass
+
+    def length_scale(self):
+        pass
