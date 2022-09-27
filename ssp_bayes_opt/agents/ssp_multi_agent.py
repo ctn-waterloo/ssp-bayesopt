@@ -259,7 +259,11 @@ class SSPMultiAgent(Agent):
         decoded_traj = np.zeros((self.n_agents, self.traj_len,self.x_dim))
         for i in range(self.n_agents):
             sspi = self.ssp_x_spaces[i].bind(self.ssp_x_spaces[i].invert(self.agent_sps[i,:]), ssp)
-            for j in range(self.traj_len):
-                query = self.ssp_x_spaces[i].bind(self.ssp_t_space.invert(self.timestep_ssps[j,:]) , sspi)
-                decoded_traj[i,j,:] = self.ssp_x_spaces[i].decode(query, method=self.decoder_method,samples=self.init_samples[i])
+            queries = self.ssp_x_spaces[i].bind(self.ssp_t_space.invert(self.timestep_ssps) , sspi)
+            decoded_traj[i,:,:] = self.ssp_x_spaces[i].decode(queries, 
+                                                              method=self.decoder_method,
+                                                              samples=self.init_samples[i])
+            # for j in range(self.traj_len):
+            #     query = self.ssp_x_spaces[i].bind(self.ssp_t_space.invert(self.timestep_ssps[j,:]) , sspi)
+            #     decoded_traj[i,j,:] = self.ssp_x_spaces[i].decode(query, method=self.decoder_method,samples=self.init_samples[i])
         return decoded_traj.reshape(-1)

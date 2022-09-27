@@ -283,7 +283,8 @@ class SSPSpace:
             num_pts_per_dim = [samples_per_dim for _ in range(bounds.shape[0])]
         elif method == 'length-scale':
             num_pts_per_dim = [2*int(np.ceil((b[1]-b[0])/self.length_scale[b_idx])) for b_idx, b in enumerate(bounds)]
-
+        else:
+            num_pts_per_dim = samples_per_dim 
 
         if method=='grid' or method=='length-scale':
             xxs = np.meshgrid(*[np.linspace(bounds[i,0], 
@@ -353,7 +354,8 @@ class SSPSpace:
         return np.fft.ifft(np.fft.fft(a, axis=1) * np.fft.fft(b,axis=1), axis=1).real
     
     def invert(self,a):
-        return a[-np.arange(len(a))]
+        a = np.atleast_2d(a)
+        return a[:,-np.arange(self.ssp_dim)]
     
     def similarity_plot(self,ssp,n_grid=100,plot_type='heatmap',ax=None,**kwargs):
         import matplotlib.pyplot as plt

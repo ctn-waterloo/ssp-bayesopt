@@ -231,10 +231,14 @@ class SSPTrajectoryAgent(Agent):
         
     def decode(self,ssp):
         decoded_traj = np.zeros((self.traj_len,self.x_dim))
-        for j in range(self.traj_len):
-            query = self.ssp_x_space.bind(self.ssp_t_space.invert(self.timestep_ssps[j,:]) , ssp)
-#             decoded_traj[j,:] = self.ssp_x_space.decode(query, method='from-set',samples=self.init_samples)
-            decoded_traj[j,:] = self.ssp_x_space.decode(query,
-                                                        method=self.decoder_method,
-                                                        samples=self.init_samples)
+        quries = self.ssp_x_space.bind(self.ssp_t_space.invert(self.timestep_ssps) , ssp)
+        decoded_traj = self.ssp_x_space.decode(quries,
+                                                    method=self.decoder_method,
+                                                    samples=self.init_samples)
+#         for j in range(self.traj_len):
+#             query = self.ssp_x_space.bind(self.ssp_t_space.invert(self.timestep_ssps[j,:]) , ssp)
+# #             decoded_traj[j,:] = self.ssp_x_space.decode(query, method='from-set',samples=self.init_samples)
+#             decoded_traj[j,:] = self.ssp_x_space.decode(query,
+#                                                         method=self.decoder_method,
+#                                                         samples=self.init_samples)
         return decoded_traj.reshape(-1)
