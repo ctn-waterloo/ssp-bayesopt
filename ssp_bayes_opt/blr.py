@@ -23,8 +23,11 @@ class BayesianLinearRegression:
 #         assert np.isfinite(phis).all(), 'Received a non-finite value'
 
         if self.beta is None:
-            assert len(ts) > 1, f'Expected more than one initial example, got {len(ts)}.'
-            var_ts = np.var(ts)
+#             assert len(ts) > 1, f'Expected more than one initial example, got {len(ts)}.'
+            if len(ts) > 1:
+                var_ts = np.var(ts)
+            else:
+                var_ts = np.abs(np.copy(ts[0]))
             self.beta = 1. / var_ts
         S_inv = self.S_inv + self.beta * np.dot(phis.T, phis)
         

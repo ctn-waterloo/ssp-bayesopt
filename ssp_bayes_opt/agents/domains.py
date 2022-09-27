@@ -41,8 +41,41 @@ class BoundedDomain(Domain):
     ### end sample
 ### end class ###
 
+
+class MultiTrajectoryDomain(Domain):
+    def __init__(self, n_agents:int, trajectory_length:int, spatial_dim:int, 
+                 bounds:np.ndarray):
+   
+        self.n_agents=n_agents
+        self.traj_len = trajectory_length
+#         self.domain_bounds = bounds
+        self.domain_bounds = np.array([bounds[:,0].min() * np.ones(spatial_dim), 
+                             bounds[:,1].max() * np.ones(spatial_dim)]).T
+ 
+        self.spatial_dim = spatial_dim
+        self.sampler = qmc.Sobol(d=self.spatial_dim) 
+
+#         print('dims: ', self.traj_len, self.domain_bounds.shape)
+#         print('bounds: ', self.domain_bounds)
+#         exit()
+
+
+    def sample(self, num_points:int=10, method:str='sobol'):
+        if not method == 'sobol':
+            raise NotImplementedError(f'{method} not implemented')
+        ### end if
+
+        u_sample_points = self.sampler.random(num_points * self.traj_len * self.n_agents)
+        sample_points = qmc.scale(u_sample_points,
+                                  self.domain_bounds[:,0], 
+                                  self.domain_bounds[:,1])
+
+        return sample_points.reshape(num_points,
+                                     self.traj_len * self.spatial_dim * self.n_agents)
+
 class TrajectoryDomain(Domain):
-    def __init__(self, trajectory_length:int, spatial_dim:int, bounds:np.ndarray):
+    def __init__(self, trajectory_length:int, spatial_dim:int, 
+                 bounds:np.ndarray):
         self.traj_len = trajectory_length
 #         self.domain_bounds = bounds
         self.domain_bounds = np.array([bounds[:,0].min() * np.ones(spatial_dim), 
@@ -65,5 +98,8 @@ class TrajectoryDomain(Domain):
         sample_points = qmc.scale(u_sample_points,
                                   self.domain_bounds[:,0], 
                                   self.domain_bounds[:,1])
+
         return sample_points.reshape(num_points,
                                      self.traj_len * self.spatial_dim)
+    ### end sample 
+

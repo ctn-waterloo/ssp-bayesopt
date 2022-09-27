@@ -1,6 +1,16 @@
 import numpy as np
 import time
 
+import logging 
+import sys
+
+logger = logging.getLogger()
+# logger.setLevel(logging.DEBUG)
+# 
+# handler = logging.StreamHandler(sys.stdout)
+# handler.setLevel(logging.DEBUG)
+# logger.addHandler(handler)
+
 from . import agents
 from . import sspspace
 
@@ -11,7 +21,8 @@ from typing import Callable
 class BayesianOptimization:
     def __init__(self, f: Callable[...,float] =None, bounds: np.ndarray=None,
                  log_and_plot_f: Callable[...,float] =None,
-                 random_state: int =None, verbose: bool=False):
+                 random_state: int =None, verbose: bool=False,
+                 sampling_seed: int =None):
         '''
         Initializes the Bayesian Optimization object 
 
@@ -29,6 +40,9 @@ class BayesianOptimization:
 
         random_state : int 
             A seed for the random number generator.
+
+        sampling_seed : int
+            A seed for the Sobol sampler for agent initialization.
 
         log_and_plot_f : Callable
             A function for logging and plotting.
@@ -49,10 +63,11 @@ class BayesianOptimization:
         if not random_state is None:
             np.random.seed(random_state)
 
-        if f.__code__.co_argcount == 1:
+        if hasattr(f, '__code__') and f.__code__.co_argcount == 1:
             self.target = lambda x, info=None: f(x)
         else:
             self.target = f
+        self.sampling_seed = sampling_seed 
         self.bounds = bounds
         self.log_and_plot_f = log_and_plot_f
 
@@ -98,17 +113,29 @@ class BayesianOptimization:
             The values of the target function at init_xs
             
         '''
-    
+
+        assert init_points > 1, f'Need to sample more than one point when initializing agents, got {init_points}'
+   
+
         if 'traj' in agent_type:
+            logger.info('Creating Trajectory Domain')
             domain = agents.domains.TrajectoryDomain(kwargs['traj_len'], 
                                                      kwargs['x_dim'],
                                                      self.bounds)
             
+        elif 'multi' in agent_type:
+            logger.info('Creating Multi-Agent Trajectory Domain')
+            domain = agents.domains.MultiTrajectoryDomain(kwargs['n_agents'], kwargs['traj_len'], 
+                                                     kwargs['x_dim'],
+                                                     self.bounds)
         else:
+            logger.info('Creating Rectangular Domain')
             domain = agents.domains.BoundedDomain(self.bounds)
             
-        
+       
+        logger.info('Sampling from domain')
         init_xs = domain.sample(init_points)
+        logger.info('Evaluating Domain Samples')
         init_ys = np.array(
                 [self.target(np.atleast_2d(x), str(itr))
                  for itr, x in enumerate(init_xs)]).reshape((init_points,-1))
@@ -120,12 +147,13 @@ class BayesianOptimization:
 
 
         # Initialize the agent
+        logger.info(f'Creating {agent_type} agent')
         if agent_type=='ssp-hex':
             ssp_space = sspspace.HexagonalSSPSpace(self.data_dim, **kwargs)
-            agt = agents.SSPAgent(init_xs, init_ys,ssp_space) 
+            agt = agents.SSPAgent(init_xs, init_ys,ssp_space, **kwargs) 
         elif agent_type=='ssp-rand':
             ssp_space = sspspace.RandomSSPSpace(self.data_dim, **kwargs)
-            agt = agents.SSPAgent(init_xs, init_ys,ssp_space) 
+            agt = agents.SSPAgent(init_xs, init_ys,ssp_space, **kwargs) 
         elif agent_type=='ssp-custom':
             assert 'ssp_space' in kwargs
             agt = agents.SSPAgent(init_xs, init_ys,kwargs.get('ssp_space') )
@@ -133,12 +161,25 @@ class BayesianOptimization:
             agt = agents.GPAgent(init_xs, init_ys,**kwargs) 
         elif agent_type=='static-gp':
             agt = agents.GPAgent(init_xs, init_ys, updating=False, **kwargs) 
+        elif agent_type=='gp-matern':
+            agt = agents.GPAgent(init_xs, init_ys, 
+                                kernel_type='matern', 
+                                updating=False, **kwargs) 
+        elif agent_type=='gp-sinc':
+            agt = agents.GPAgent(init_xs, init_ys, 
+                                kernel_type='sinc', 
+                                updating=False, **kwargs) 
         elif agent_type=='ssp-traj':
             agt = agents.SSPTrajectoryAgent(init_xs, init_ys, **kwargs) 
             init_xs = agt.init_xs
             init_ys = agt.init_ys
+        elif agent_type=='ssp-multi':
+            agt = agents.SSPMultiAgent(init_xs, init_ys, **kwargs) 
+            init_xs = agt.init_xs
+            init_ys = agt.init_ys
         else:
             raise NotImplementedError(f'{agent_type} agent not implemented')
+        logger.info(f'{type(agt).__name__} Agent created')
         return agt, init_xs, init_ys
 
 
@@ -182,11 +223,15 @@ class BayesianOptimization:
 
         # print(np.mean(np.linalg.norm(sample_xs - (sample_ssps @ self.ssp_to_domain_mat),axis=1)))
 
+        logger.info('Maximizing')
+        
         agt, init_xs, init_ys = self.initialize_agent(init_points,
                                                       agent_type,
                                                       domain_bounds=self.bounds,
                                                       **kwargs
                                                       )
+        logging.info('Agent initialized')
+        #self.length_scale = agt.length_scale()
 
         self.times = np.zeros((n_iter,))
         self.xs = []
@@ -218,19 +263,23 @@ class BayesianOptimization:
                
                 x_init = np.random.uniform(low=lbounds, high=ubounds, size=(len(ubounds),))
 
-                if agent_type=='gp':
+                if agent_type=='gp-matern' or agent_type=='gp-sinc':
                     # Do bounded optimization to ensure x stays in bound
+                    start = time.thread_time_ns()
                     soln = minimize(optim_func, x_init,
                                     jac=jac_func, 
                                     method='L-BFGS-B',
                                     bounds=self.bounds)
+                    self.times[t] = time.thread_time_ns() - start
                     solnx = np.copy(soln.x)
                 else: ## ssp agent
 #                     phi_init = agt.encode(x_init)
                     phi_init = agt.initial_guess()
+                    start = time.thread_time_ns()
                     soln = minimize(optim_func, phi_init,
                                     jac=jac_func, 
                                     method='L-BFGS-B')
+                    self.times[t] = time.thread_time_ns() - start
                     solnx = agt.decode(np.copy(np.atleast_2d(soln.x)))
                 vals.append(-soln.fun)
                 solns.append(solnx)
@@ -257,9 +306,11 @@ class BayesianOptimization:
             self.agt = agt
 
     def _sample_domain(self, num_points: int=10) -> np.ndarray:
-        sampler = qmc.Sobol(d=self.data_dim) 
+        sampler = qmc.Sobol(d=self.data_dim, seed=self.sampling_seed) 
         u_sample_points = sampler.random(num_points)
-        sample_points = qmc.scale(u_sample_points, self.bounds[:,0], self.bounds[:,1])
+        sample_points = qmc.scale(u_sample_points, 
+                                  self.bounds[:,0],
+                                  self.bounds[:,1])
         return sample_points
 
     @property 

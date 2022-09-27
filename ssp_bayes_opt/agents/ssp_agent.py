@@ -4,30 +4,45 @@ from scipy.optimize import minimize
 from sklearn.model_selection import KFold
 import warnings
 
+from sklearn.gaussian_process.kernels import Matern
+from sklearn.gaussian_process import GaussianProcessRegressor 
 
 from .. import sspspace 
 from .. import blr
+from .kernels import SincKernel
 
 
 from .agent import Agent
 
 class SSPAgent(Agent):
-    def __init__(self, init_xs, init_ys, ssp_space=None):
+    def __init__(self, init_xs, init_ys, ssp_space=None,decoder_method='network-optim', **kwargs):
         super().__init__()
   
-        self.num_restarts = 10
         (num_pts, data_dim) = init_xs.shape
         self.data_dim = data_dim
 
         if ssp_space is None:
-            ssp_space = sspspace.HexagonalSSPSpace(data_dim,ssp_dim=151, n_rotates=5, n_scales=5, 
-                 scale_min=2*np.pi/np.sqrt(6) - 0.5, scale_max=2*np.pi/np.sqrt(6) + 0.5,
-                 domain_bounds=None, length_scale=5)
-            # Optimize the length scales
-            ssp_space.update_lengthscale(self._optimize_lengthscale(init_xs, init_ys))
-            print('Selected Lengthscale: ', ssp_space.length_scale)
-        
+            ssp_space = sspspace.HexagonalSSPSpace(
+                                data_dim,
+                                ssp_dim=151, 
+                                n_rotates=5, 
+                                n_scales=5, 
+                                scale_min=2*np.pi/np.sqrt(6) - 0.5, 
+                                scale_max=2*np.pi/np.sqrt(6) + 0.5, 
+                                domain_bounds=None, 
+                                length_scale=5,
+            )
+        ### end if
         self.ssp_space = ssp_space
+
+        # Optimize the length scales
+        if not 'length_scale' in kwargs or kwargs.get('length_scale') < 0:
+            self.ssp_space.update_lengthscale(self._optimize_lengthscale(init_xs, init_ys))
+        else:
+            self.ssp_space.update_lengthscale(kwargs.get('length_scale', 4))
+        ### end if
+        print('Selected Lengthscale: ', ssp_space.length_scale)
+        
         
 
         # Encode the initial sample points 
@@ -41,44 +56,34 @@ class SSPAgent(Agent):
         self.gamma_t = 0
         self.sqrt_alpha = np.log(2/1e-6)
         
-        self.init_samples = self.ssp_space.get_sample_pts_and_ssps(300**data_dim,'grid')
-
-        # Cache for the input xs.
-#         self.phis = None
+        if (decoder_method=='network') | (decoder_method=='network-optim'):
+            self.ssp_space.train_decoder_net();
+            self.init_samples=None
+        else:
+            self.init_samples = self.ssp_space.get_sample_pts_and_ssps(2**17,'length-scale')
+        self.decoder_method = decoder_method
 
     ### end __init__
 
+
     def _optimize_lengthscale(self, init_xs, init_ys):
-        ls_0 = np.array([[8.]]) 
 
-        def min_func(length_scale, xs=init_xs, ys=init_ys,
-                        ssp_space=self.ssp_space):
-            errors = []
-            kfold = KFold(n_splits=min(xs.shape[0], 50))
-            ssp_space.update_lengthscale(length_scale)
-
-            for train_idx, test_idx in kfold.split(xs):
-                train_x, test_x = xs[train_idx], xs[test_idx]
-                train_y, test_y = ys[train_idx], ys[test_idx]
-
-                train_phis = ssp_space.encode(train_x)
-                test_phis = ssp_space.encode(test_x)
-
-                b = blr.BayesianLinearRegression(ssp_space.ssp_dim)
-                b.update(train_phis, train_y)
-                mu, var = b.predict(test_phis)
-                diff = test_y.flatten() - mu.flatten()
-                loss = -0.5*np.log(var) - np.divide(np.power(diff,2),var)
-                errors.append(np.sum(-loss))
-            ### end for
-            return np.sum(errors)
-        ### end min_func
-
-        retval = minimize(min_func, x0=ls_0, method='L-BFGS-B',
-                          bounds=[(1/np.sqrt(init_xs.shape[0]),None)],
-                          )
-        return np.abs(retval.x) 
-
+        ## fit to the initial values
+        fit_gp = GaussianProcessRegressor(
+                    kernel=SincKernel(
+                        length_scale_bounds=(
+                            1/np.sqrt(init_xs.shape[0]+1), 
+                            1e5)
+                        ),
+                    alpha=1e-6,
+                    normalize_y=True,
+                    n_restarts_optimizer=20,
+                    random_state=0,
+                )
+        fit_gp.fit(init_xs, init_ys)
+        lenscale = np.exp(fit_gp.kernel_.theta)
+        return lenscale
+    ### end _optimize_lengthscale
 
     def eval(self, xs):
         phis = self.encode(xs)
@@ -94,17 +99,24 @@ class SSPAgent(Agent):
         # From the approximate solution of dot(m,x) + x^T Sigma x
         return self.blr.sample()
 
+
     def acquisition_func(self):
         '''
         return objective_func, jacobian_func
         '''
-        # TODO: Currently returning (objective_func, None) to be fixed when 
-        # I finish the derivation
+
+        optim_norm_margin = 4
 
         def min_func(phi, m=self.blr.m,
                         sigma=self.blr.S,
                         gamma=self.gamma_t,
-                        beta_inv=1/self.blr.beta):
+                        beta_inv=1/self.blr.beta,
+                        norm_margin=optim_norm_margin):
+
+            phi_norm = np.linalg.norm(phi)
+            if phi_norm > norm_margin:
+                phi = norm_margin * phi / phi_norm
+            ### end if
             val = phi.T @ m
             mi = np.sqrt(gamma + beta_inv + phi.T @ sigma @ phi) - np.sqrt(gamma)
             return -(val + mi).flatten()
@@ -113,42 +125,20 @@ class SSPAgent(Agent):
         def gradient(phi, m=self.blr.m,
                       sigma=self.blr.S,
                       gamma=self.gamma_t,
-                      beta_inv=1/self.blr.beta):
-            sqr = (phi.T @ sigma @ phi) 
+                      beta_inv=1/self.blr.beta,
+                      norm_margin=optim_norm_margin):
+
+            phi_norm = np.linalg.norm(phi)
+            if phi_norm > norm_margin:
+                phi = norm_margin * phi / phi_norm
+            ### end if
+            sig_phi = sigma @ phi
+            sqr = (phi.T @ sig_phi ) 
             scale = np.sqrt(sqr + gamma + beta_inv)
-            retval = -(m.flatten() + sigma @ phi / scale)
+            retval = -(m.flatten() + sig_phi / scale)
             return retval
 
         return min_func, gradient
-    
-    def acquisition_func_v2(self):
-        '''
-        return objective_func, jacobian_func
-        '''
-
-        def optim_func(x, m=self.blr.m,
-                       sigma=self.blr.S,
-                       gamma=self.gamma_t,
-                       beta_inv=1/self.blr.beta
-                       ):
-            ptr = self.encode(x)
-            val = ptr @ m
-            mi = np.sqrt(gamma + beta_inv + ptr @ sigma @ ptr.T) - np.sqrt(gamma)
-            return -(val + mi).flatten()
-        ### end optim_func
-
-        def jac_func(x, m=self.blr.m,
-                     sigma=self.blr.S,
-                     gamma=self.gamma_t,
-                     beta_inv=1/self.blr.beta
-                     ):
-            ptr, grad_ptr = self.ssp_space.encode_and_deriv(x)
-            sqr = (ptr @ sigma @ ptr.T) 
-            scale = np.sqrt(sqr + gamma + beta_inv)
-            retval = grad_ptr.squeeze().T @ -(m + sigma @ ptr.T / scale) 
-            return retval
-        ### end gradient
-        return optim_func, jac_func 
 
     def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float):
         '''
@@ -170,8 +160,8 @@ class SSPAgent(Agent):
         # Update gamma
         self.gamma_t = self.gamma_t + sigma_t
 
-    def encode(self,x):
+    def encode(self, x):
         return self.ssp_space.encode(x)
     
     def decode(self,ssp):
-        return self.ssp_space.decode(ssp,method='from-set',samples=self.init_samples)
+        return self.ssp_space.decode(ssp,method=self.decoder_method,samples=self.init_samples)

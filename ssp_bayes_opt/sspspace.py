@@ -163,7 +163,7 @@ class SSPSpace:
     
  
     def decode(self,ssp,method='from-set',sampling_method='grid',
-               num_samples =1000, samples=None): # other args for specfic methods
+               num_samples =300, samples=None): # other args for specfic methods
         '''
         Transforms ssp representation back into domain representation.
 
@@ -178,7 +178,7 @@ class SSPSpace:
             does an initial coarse sampling and then optimizes the decoded
             value starting from the initial best match in the coarse sampling.
 
-        sampling_method : {'grid'}
+        sampling_method : {'grid'|'length-scale'|'sobol'}
             Evenly distributes samples along the domain axes
 
         num_samples : int
@@ -189,51 +189,56 @@ class SSPSpace:
         x : np.ndarray
             The decoded point
         '''
-        if samples is None:
-            sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_samples,sampling_method)
-        else:
-            sample_ssps, sample_points = samples
+        if (method=='direct-optim') | (method=='from-set'):
+            if samples is None:
+                sample_ssps, sample_points = self.get_sample_pts_and_ssps(method=sampling_method, 
+                        num_points_per_dim=num_samples)
+            else:
+                sample_ssps, sample_points = samples
+                assert sample_ssps.shape[1] == ssp.shape[1]
             
-        assert sample_ssps.shape[1] == ssp.shape[1]
+
+        unit_ssp = ssp / np.linalg.norm(ssp)
         
-        if method=='least-squares':
-            x = np.linalg.lstsq(self.phase_matrix, (1.j*np.log(np.fft.fft(ssp,axis=1))).real.T)[0]
-            return x
-        elif method=='from-set': ## ONLY ONE THAT WORKS WELL
-            sims = sample_ssps @ ssp.T
+        if method=='from-set': 
+            sims = sample_ssps @ unit_ssp.T
             return sample_points[np.argmax(sims),:]
         elif method=='direct-optim':
-            x0 = self.decode(ssp, method='from-set',sampling_method=sampling_method, num_samples=num_samples, samples=samples)
+            x0 = self.decode(unit_ssp, 
+                             method='from-set',
+                             sampling_method='length-scale', 
+                             num_samples=num_samples, samples=samples)
+
             def min_func(x,target=ssp):
                 x_ssp = self.encode(np.atleast_2d(x))
                 return -np.inner(x_ssp, target).flatten()
-            soln = minimize(min_func, x0, method='L-BFGS-B',bounds=self.domain_bounds)
-            return soln.x
-        elif method=='grad_descent':
-            x = self.decode(ssp, method='from-set',sampling_method=sampling_method, num_samples=num_samples, samples=samples)
-            fssp = np.fft.fft(ssp,axis=1)
-            ls_mat = np.diag(1/self.length_scale.flatten())
-            for j in range(10):
-                scaled_x = x @ ls_mat
-                x_enc = np.exp(1.j * self.phase_matrix @ scaled_x)
-                grad_mat = (1.j * (self.phase_matrix @ ls_mat).T * x_enc)
-                grad =  (grad_mat @ fssp.T).flatten()
-                x = x - 0.1*grad.real
-            return x
-        elif method=='nonlin-reg':
-            x = self.decode(ssp, method='from-set',sampling_method=sampling_method, num_samples=num_samples, samples=samples)
-            fssp = np.fft.fft(ssp,axis=1)
-            dy = np.hstack([fssp.real, fssp.imag])
 
-            ls_mat = np.diag(1/self.length_scale.flatten())
-            for j in range(10):
-                J = np.vstack([self.phase_matrix * np.sin(self.phase_matrix @ x @ ls_mat).reshape(1,-1),
-                               -self.phase_matrix * np.cos(self.phase_matrix @ x @ ls_mat).reshape(1,-1)])
-                soln = np.linalg.pinv(J.T @ J) @ J.T @ dy
-                x = x + soln
-            return x
+            soln = minimize(min_func, x0, 
+                            method='L-BFGS-B',
+                            bounds=self.domain_bounds)
+            return soln.x
+        elif method=='network':
+            if self.decoder_model is None:
+                raise Exception('Network not trained for decoding. You must first call train_decoder_net')
+            return self.decoder_model.predict(ssp)
+        elif method=='network-optim':
+            if self.decoder_model is None:
+                raise Exception('Network not trained for decoding. You must first call train_decoder_net')
+            x0 = self.decoder_model.predict(ssp)
+            
+
+            solns = np.zeros(x0.shape)
+            for i in range(x0.shape[0]):
+                def min_func(x,target=ssp[i,:]):
+                    x_ssp = self.encode(np.atleast_2d(x))
+                    return -np.inner(x_ssp, target).flatten()
+                soln = minimize(min_func, x0[i,:], 
+                            method='L-BFGS-B',
+                            bounds=self.domain_bounds)
+                solns[i,:] = soln.x
+            return solns
         else:
-            raise NotImplementedError()
+            raise NotImplementedError(f'Unrecognized decoding method: {method}')
         
     def clean_up(self,ssp,method='from-set'):
         if method=='least-squares':
@@ -246,33 +251,66 @@ class SSPSpace:
         else:
             raise NotImplementedError()
         
-    def get_sample_points(self,num_points,method='grid'):
+    def get_sample_points(self, samples_per_dim=100, method='length-scale'):
+        '''
+        Identifies points in the domain of the SSP encoding that 
+        will be used to determine optimal decoding.
+
+        Parameters
+        ----------
+
+        method: {'grid'|'length-scale'|'sobol'}
+            The way to select samples from the domain. 
+            'grid' uniformly spaces samples_per_dim points on the domain
+            'sobol' decodes using samples_per_dim**data_dim points generated 
+                using a sobol sampling
+            'length-scale' uses the selected lengthscale to determine the number
+                of sample points generated per dimension.
+
+        Returns
+        -------
+
+        sample_pts : np.ndarray 
+            A (num_samples, domain_dim) array of candiate decoding points.
+        '''
+
         if self.domain_bounds is None:
             bounds = np.vstack([-10*np.ones(self.domain_dim), 10*np.ones(self.domain_dim)]).T
         else:
             bounds = self.domain_bounds
-        if method=='grid':
-            n_per_dim = int(num_points**(1/self.domain_dim))
-            if n_per_dim**self.domain_dim != num_points:
-                warnings.warn((f'Evenly distributing points over a '
-                               f'{self.domain_dim} grid requires numbers '
-                               f'of samples to be powers of {self.domain_dim}.'
-                               f'Requested {num_points} samples, returning '
-                               f'{n_per_dim**self.domain_dim}'), RuntimeWarning)
-            ### end if
-            xs = np.linspace(bounds[:,0],bounds[:,1],n_per_dim)
-            xxs = np.meshgrid(*[xs[:,i] for i in range(self.domain_dim)])
+
+        if method == 'grid':
+            num_pts_per_dim = [samples_per_dim for _ in range(bounds.shape[0])]
+        elif method == 'length-scale':
+            num_pts_per_dim = [2*int(np.ceil((b[1]-b[0])/self.length_scale[b_idx])) for b_idx, b in enumerate(bounds)]
+        else:
+            num_pts_per_dim = samples_per_dim 
+
+        if method=='grid' or method=='length-scale':
+            xxs = np.meshgrid(*[np.linspace(bounds[i,0], 
+                                            bounds[i,1],
+                                            num_pts_per_dim[i]
+                                        ) for i in range(self.domain_dim)])
             retval = np.array([x.reshape(-1) for x in xxs]).T
             assert retval.shape[1] == self.domain_dim, f'Expected {self.domain_dim}d data, got {retval.shape[1]}d data'
             return retval
+
         elif method=='sobol':
+            num_points = np.prod(num_pts_per_dim)
+
             sampler = qmc.Sobol(d=self.domain_dim) 
             lbounds = bounds[:,0]
             ubounds = bounds[:,1]
             u_sample_points = sampler.random(num_points)
-            sample_points = qmc.scale(u_sample_points, lbounds, ubounds)
+            sample_points = qmc.scale(u_sample_points, lbounds, ubounds).T
+        elif method=='Rd':
+            num_points = np.prod(samples_per_dim)
+            u_sample_points = _Rd_sampling(num_points, self.domain_dim)
+            lbounds = bounds[:,0]
+            ubounds = bounds[:,1]
+            sample_points = qmc.scale(u_sample_points, lbounds, ubounds).T
         else:
-            raise NotImplementedError()
+            raise NotImplementedError(f'Sampling method {method} is not implemented')
         return sample_points.T 
         
     
@@ -281,13 +319,19 @@ class SSPSpace:
         sample_ssps = self.encode(sample_points)
         return sample_ssps
     
-    def get_sample_pts_and_ssps(self,num_points,method='grid'): 
-        sample_points = self.get_sample_points(num_points,method)
-        expected_points = (int(num_points**(1/self.domain_dim))**self.domain_dim)
-        assert sample_points.shape[0] == expected_points, f'Expected {expected_points} samples, got {sample_points.shape[0]}.'
+    def get_sample_pts_and_ssps(self,num_points_per_dim=100, method='grid'): 
+        sample_points = self.get_sample_points(
+                                        method=method, 
+                                        samples_per_dim=num_points_per_dim
+                                    )
+        if method == 'grid':
+            expected_points = int(num_points_per_dim**(self.domain_dim))
+            assert sample_points.shape[0] == expected_points, f'Expected {expected_points} samples, got {sample_points.shape[0]}.'
 
         sample_ssps = self.encode(sample_points)
-        assert sample_ssps.shape[0] == expected_points
+
+        if method == 'grid':
+            assert sample_ssps.shape[0] == expected_points
 
         return sample_ssps, sample_points
     
@@ -310,7 +354,8 @@ class SSPSpace:
         return np.fft.ifft(np.fft.fft(a, axis=1) * np.fft.fft(b,axis=1), axis=1).real
     
     def invert(self,a):
-        return a[-np.arange(len(a))]
+        a = np.atleast_2d(a)
+        return a[:,-np.arange(self.ssp_dim)]
     
     def similarity_plot(self,ssp,n_grid=100,plot_type='heatmap',ax=None,**kwargs):
         import matplotlib.pyplot as plt
@@ -339,6 +384,50 @@ class SSPSpace:
         else:
             raise NotImplementedError()
         return im
+    
+    def train_decoder_net(self,n_training_pts=200000,n_hidden_units = 8,
+                          learning_rate=1e-3,n_epochs = 20, load_file=True, save_file=True):
+        import tensorflow as tf
+        import sklearn
+        from tensorflow import keras
+        from tensorflow.keras import layers, regularizers
+        
+        if (type(self).__name__ == 'HexagonalSSPSpace'):
+            path_name = './saved_decoder_nets/domaindim' + str(self.domain_dim) + '_lenscale' + str(self.length_scale[0]) + '_nscales' + str(self.n_scales) + '_nrotates' + str(self.n_rotates) + '_scale_min' + str(self.scale_min) + '_scalemax' + str(self.scale_max)
+        else:
+            #warnings.warn("Cannot load decoder net for non HexagonalSSPSpace class")
+            load_file = False
+            save_file=False
+        
+        
+        if load_file:
+            try:
+                self.decoder_model = keras.models.load_model(path_name)
+                return
+            except:
+                pass
+
+        model = keras.Sequential([
+             layers.Dense(self.ssp_dim, activation="relu", name="layer1"),# layers.Dropout(.1),
+             layers.Dense(n_hidden_units, activation="relu", name="layer2"), # kernel_regularizer=regularizers.L1L2(l1=1e-5, l2=1e-4)),
+             layers.Dense(self.domain_dim, name="output"),
+            ])
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            loss='mean_squared_error')
+        
+        sample_ssps, sample_points = self.get_sample_pts_and_ssps(num_points_per_dim=n_training_pts,
+                                                                           method='Rd')
+        shuffled_ssps, shuffled_pts = sklearn.utils.shuffle(sample_ssps, sample_points)
+        history = model.fit(shuffled_ssps, shuffled_pts,
+            epochs=n_epochs,verbose=0, validation_split = 0.1)
+        
+        if save_file:
+           model.save(path_name)
+
+            
+        self.decoder_model = model
+        return history
             
 class RandomSSPSpace(SSPSpace):
     '''
@@ -376,8 +465,73 @@ class RandomSSPSpace(SSPSpace):
         for i in range(domain_dim):
             axis_matrix[:,i] = make_good_unitary(ssp_dim)
 
-        super().__init__(domain_dim,axis_matrix.shape[0],axis_matrix=axis_matrix,
-                       domain_bounds=domain_bounds,length_scale=length_scale)
+        super().__init__(domain_dim, 
+                         axis_matrix.shape[0],
+                         axis_matrix=axis_matrix,
+                         domain_bounds=domain_bounds,
+                         length_scale=length_scale,
+                         )
+### end class RandomSSPSpace ###
+
+class GaussianSSPSpace(SSPSpace):
+    '''
+    Creates an SSP space using randomly generated frequency components.
+    '''
+    def __init__(self, 
+                 domain_dim: int,
+                 ssp_dim: int,
+                 domain_bounds=None,
+                 length_scale=1,
+                 rng=np.random.default_rng()):
+
+        partial_phases = rng.normal(loc=0,
+                                    scale=1,
+                                    size=(ssp_dim//2, domain_dim)
+                                    )#*2*np.pi - np.pi
+        #partial_phases = rng.random((ssp_dim // 2, domain_dim)) * 2 * np.pi - np.pi
+        axis_matrix = _constructaxisfromphases(partial_phases)
+#         ### TODO: should the rng default argument for make_good_unitary be the 
+#         # rng passed in through the default __init__ argument?
+#         def make_good_unitary(dim, eps=1e-3, rng=np.random):
+#             a = rng.normal(loc=0, scale=np.pi, size=dim)#size=(dim - 1) // 2)
+#             phi = a
+# #             phi = (eps + a * (1 - 2 * eps))
+# #             sign = rng.choice((-1, +1), len(a))
+# #             phi = sign * (eps + a * (1 - 2 * eps))
+# #             assert np.all(np.abs(phi) >= eps)
+# #             assert np.all(np.abs(phi) <= (1 - eps))
+#         
+#             fv = np.zeros(dim, dtype='complex64')
+#             fv = np.cos(phi) + 1j * np.sin(phi)
+# #             fv[0] = 1
+# #             fv[1:(dim + 1) // 2] = np.cos(phi) + 1j * np.sin(phi)
+# #             fv[-1:dim // 2:-1] = np.conj(fv[1:(dim + 1) // 2])
+#             if dim % 2 == 0:
+#                 fv[dim // 2] = 1
+#             else:
+#                 fv[0] = 1
+#         
+# #             assert np.allclose(np.abs(fv), 1)
+#             v = np.fft.ifft(fv)
+#             
+#             v = v.real
+# #             assert np.allclose(np.fft.fft(v), fv)
+# #             assert np.allclose(np.linalg.norm(v), 1)
+#             return v
+# 
+#         axis_matrix = np.zeros((ssp_dim,domain_dim))
+#         for i in range(domain_dim):
+#             axis_matrix[:,i] = make_good_unitary(ssp_dim)
+# 
+        super().__init__(domain_dim,
+                         axis_matrix.shape[0],
+                         axis_matrix=axis_matrix,
+                         domain_bounds=domain_bounds,
+                         length_scale=length_scale,
+                         )
+### end class GaussianSSPSpace ###
+
+
         
 class HexagonalSSPSpace(SSPSpace):
     '''
@@ -397,7 +551,11 @@ class HexagonalSSPSpace(SSPSpace):
         
         self.grid_basis_dim = domain_dim + 1
         self.num_grids = n_rotates*n_scales
-
+        self.scale_min = scale_min
+        self.scale_max = scale_max
+        self.n_scales = n_scales
+        self.n_rotates = n_rotates
+        
         scales = np.linspace(scale_min,scale_max,n_scales)
         phases_scaled = np.vstack([phases_hex*i for i in scales])
         
@@ -412,7 +570,7 @@ class HexagonalSSPSpace(SSPSpace):
                         np.stack([np.sin(angles), np.cos(angles)], axis=1)], axis=1)
             phases_scaled_rotated = (R_mats @ phases_scaled.T).transpose(0,2,1).reshape(-1,domain_dim)
         else:
-            R_mats = special_ortho_group.rvs(domain_dim, size=n_rotates)
+            R_mats = special_ortho_group.rvs(domain_dim, size=n_rotates, random_state=1)
             phases_scaled_rotated = (R_mats @ phases_scaled.T).transpose(0,2,1).reshape(-1,domain_dim)
         
         axis_matrix = _constructaxisfromphases(phases_scaled_rotated)
@@ -573,3 +731,19 @@ def _proj_sub_SSP(n,N,sublen=3):
     W = np.fft.fft(np.eye(2*sublen + 1))
     B = invW @ np.fft.ifftshift(FB) @ W
     return B.real
+
+def _Rd_sampling(n,d,seed=0.5):
+    def phi(d): 
+        x=2.0000 
+        for i in range(10): 
+          x = pow(1+x,1/(d+1)) 
+        return x
+    g = phi(d) 
+    alpha = np.zeros(d) 
+    for j in range(d): 
+      alpha[j] = pow(1/g,j+1) %1 
+    z = np.zeros((n, d)) 
+    for i in range(n):
+        z[i] = seed + alpha*(i+1)
+    z = z %1
+    return z
