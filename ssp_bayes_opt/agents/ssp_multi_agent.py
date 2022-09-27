@@ -99,8 +99,8 @@ class SSPMultiAgent(Agent):
         else:
             init_samples = []
             for i in range(n_agents):
-                init_samples.append( self.ssp_x_spaces[i].get_sample_pts_and_ssps() )
-            self.init_samples = init_sample
+                init_samples.append( self.ssp_x_spaces[i].get_sample_pts_and_ssps(method='length-scale') )
+            self.init_samples = init_samples
         self.decoder_method = decoder_method
     
     def length_scale(self):
