@@ -99,7 +99,7 @@ class SSPMultiAgent(Agent):
         else:
             init_samples = []
             for i in range(n_agents):
-                init_samples.append( self.ssp_x_spaces[i].get_sample_pts_and_ssps(method='length-scale') )
+                init_samples.append( self.ssp_x_spaces[i].get_sample_pts_and_ssps(2**17, method='length-scale') )
             self.init_samples = init_samples
         self.decoder_method = decoder_method
     
