@@ -25,7 +25,7 @@ setup(
             ],
         install_requires=[
             'numpy>=1.21.2',
-            'scipy',
+            'scipy==1.7.3',
             'sklearn',
             'pytest',
             'mypy',
