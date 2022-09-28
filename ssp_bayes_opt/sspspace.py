@@ -386,6 +386,19 @@ class SSPSpace:
     def train_decoder_net(self,n_training_pts=200000,n_hidden_units = 8,
                           learning_rate=1e-3,n_epochs = 20, load_file=True, save_file=True):
         import tensorflow as tf
+
+        gpus = tf.config.experimental.list_physical_devices('GPU')
+        if gpus:
+            try:
+                for gpu in gpus:
+                    tf.config.experimental.set_memory_growth(gpu, True)
+                logical_gpus = tf.config.experimental.list_logical_devices('GPU')
+                print(len(gpus), "Physical GPUs,", len(logical_gpus), 'Logical GPUs')
+            except RuntimeError as e:
+                # memory growth must be set before GPUs have been initialized.
+                print(e)
+        ### end if
+
         import sklearn
         from tensorflow import keras
         from tensorflow.keras import layers, regularizers
@@ -568,7 +581,7 @@ class HexagonalSSPSpace(SSPSpace):
                         np.stack([np.sin(angles), np.cos(angles)], axis=1)], axis=1)
             phases_scaled_rotated = (R_mats @ phases_scaled.T).transpose(0,2,1).reshape(-1,domain_dim)
         else:
-            R_mats = special_ortho_group.rvs(domain_dim, size=n_rotates, seed=1)
+            R_mats = special_ortho_group.rvs(domain_dim, size=n_rotates, random_state=1)
             phases_scaled_rotated = (R_mats @ phases_scaled.T).transpose(0,2,1).reshape(-1,domain_dim)
         
         axis_matrix = _constructaxisfromphases(phases_scaled_rotated)
