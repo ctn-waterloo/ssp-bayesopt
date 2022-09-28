@@ -195,28 +195,36 @@ class SSPSpace:
                         num_points_per_dim=num_samples)
             else:
                 sample_ssps, sample_points = samples
-                assert sample_ssps.shape[1] == ssp.shape[1]
+                assert sample_ssps.shape[1] == ssp.shape[1], f'Expected {sample_ssps.shape} dim, got {ssp.shape}'
             
 
-        unit_ssp = ssp / np.linalg.norm(ssp)
+#         unit_ssp = ssp / np.linalg.norm(ssp, axis=1)
+        unit_ssp = np.zeros(ssp.shape)
+        for s_idx, s in enumerate(ssp):
+            unit_ssp[s_idx,:] = s / np.linalg.norm(s)
         
         if method=='from-set': 
             sims = sample_ssps @ unit_ssp.T
             return sample_points[np.argmax(sims),:]
         elif method=='direct-optim':
-            x0 = self.decode(unit_ssp, 
-                             method='from-set',
-                             sampling_method='length-scale', 
-                             num_samples=num_samples, samples=samples)
-
-            def min_func(x,target=ssp):
+            def min_func(x,target):
                 x_ssp = self.encode(np.atleast_2d(x))
                 return -np.inner(x_ssp, target).flatten()
 
-            soln = minimize(min_func, x0, 
-                            method='L-BFGS-B',
-                            bounds=self.domain_bounds)
-            return soln.x
+            retvals = np.zeros((ssp.shape[0],self.domain_dim))
+            for s_idx, u_ssp in enumerate(unit_ssp):
+                x0 = self.decode(np.atleast_2d(u_ssp),
+                                 method='from-set',
+                                 sampling_method='length-scale', 
+                                 num_samples=num_samples, samples=samples)
+
+
+                soln = minimize(min_func, x0,
+                                args=(np.atleast_2d(u_ssp),),
+                                method='L-BFGS-B',
+                                bounds=self.domain_bounds)
+                retvals[s_idx,:] = soln.x
+            return retvals #soln.x
         elif method=='network':
             if self.decoder_model is None:
                 raise Exception('Network not trained for decoding. You must first call train_decoder_net')
