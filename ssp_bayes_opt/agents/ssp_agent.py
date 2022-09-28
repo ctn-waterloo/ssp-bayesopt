@@ -152,7 +152,7 @@ class SSPAgent(Agent):
             x_val = x_t.reshape(1, x_t.shape[0])
             y_val = y_t.reshape(1, y_t.shape[0])
         ### end if
-    
+
         # Update BLR
         phi = np.atleast_2d(self.encode(x_val).squeeze())
         self.blr.update(phi, y_val)

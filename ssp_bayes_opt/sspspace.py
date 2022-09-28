@@ -195,28 +195,36 @@ class SSPSpace:
                         num_points_per_dim=num_samples)
             else:
                 sample_ssps, sample_points = samples
-                assert sample_ssps.shape[1] == ssp.shape[1]
+                assert sample_ssps.shape[1] == ssp.shape[1], f'Expected {sample_ssps.shape} dim, got {ssp.shape}'
             
 
-        unit_ssp = ssp / np.linalg.norm(ssp)
+#         unit_ssp = ssp / np.linalg.norm(ssp, axis=1)
+        unit_ssp = np.zeros(ssp.shape)
+        for s_idx, s in enumerate(ssp):
+            unit_ssp[s_idx,:] = s / np.linalg.norm(s)
         
         if method=='from-set': 
             sims = sample_ssps @ unit_ssp.T
             return sample_points[np.argmax(sims),:]
         elif method=='direct-optim':
-            x0 = self.decode(unit_ssp, 
-                             method='from-set',
-                             sampling_method='length-scale', 
-                             num_samples=num_samples, samples=samples)
-
-            def min_func(x,target=ssp):
+            def min_func(x,target):
                 x_ssp = self.encode(np.atleast_2d(x))
                 return -np.inner(x_ssp, target).flatten()
 
-            soln = minimize(min_func, x0, 
-                            method='L-BFGS-B',
-                            bounds=self.domain_bounds)
-            return soln.x
+            retvals = np.zeros((ssp.shape[0],self.domain_dim))
+            for s_idx, u_ssp in enumerate(unit_ssp):
+                x0 = self.decode(np.atleast_2d(u_ssp),
+                                 method='from-set',
+                                 sampling_method='length-scale', 
+                                 num_samples=num_samples, samples=samples)
+
+
+                soln = minimize(min_func, x0,
+                                args=(np.atleast_2d(u_ssp),),
+                                method='L-BFGS-B',
+                                bounds=self.domain_bounds)
+                retvals[s_idx,:] = soln.x
+            return retvals #soln.x
         elif method=='network':
             if self.decoder_model is None:
                 raise Exception('Network not trained for decoding. You must first call train_decoder_net')
@@ -283,7 +291,8 @@ class SSPSpace:
             num_pts_per_dim = [samples_per_dim for _ in range(bounds.shape[0])]
         elif method == 'length-scale':
             num_pts_per_dim = [2*int(np.ceil((b[1]-b[0])/self.length_scale[b_idx])) for b_idx, b in enumerate(bounds)]
-
+        else:
+            num_pts_per_dim = samples_per_dim 
 
         if method=='grid' or method=='length-scale':
             xxs = np.meshgrid(*[np.linspace(bounds[i,0], 
@@ -353,7 +362,8 @@ class SSPSpace:
         return np.fft.ifft(np.fft.fft(a, axis=1) * np.fft.fft(b,axis=1), axis=1).real
     
     def invert(self,a):
-        return a[-np.arange(len(a))]
+        a = np.atleast_2d(a)
+        return a[:,-np.arange(self.ssp_dim)]
     
     def similarity_plot(self,ssp,n_grid=100,plot_type='heatmap',ax=None,**kwargs):
         import matplotlib.pyplot as plt
