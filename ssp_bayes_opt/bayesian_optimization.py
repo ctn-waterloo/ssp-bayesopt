@@ -114,7 +114,7 @@ class BayesianOptimization:
             
         '''
 
-        assert init_points > 1, f'Need to sample more than one point when initializing agents, got {init_points}'
+        #assert init_points > 1, f'Need to sample more than one point when initializing agents, got {init_points}'
    
 
         if 'traj' in agent_type:
