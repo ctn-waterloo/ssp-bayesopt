@@ -134,7 +134,10 @@ class BayesianOptimization:
             
        
         logger.info('Sampling from domain')
-        init_xs = domain.sample(init_points)
+        if isinstance(init_points, int):
+            init_xs = domain.sample(init_points)
+        else:
+            init_xs = np.copy(init_points)
         logger.info('Evaluating Domain Samples')
         init_ys = np.array(
                 [self.target(np.atleast_2d(x), str(itr))
