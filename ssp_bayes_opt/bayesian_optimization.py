@@ -286,7 +286,7 @@ class BayesianOptimization:
                 self.times[t] = time.thread_time_ns() - start
             ## END timing section
 
-            optimization_status = f'{t}'
+            optimization_status = f'{t+init_xs.shape[0]}'
 
             best_val_idx = np.argmax(vals)
             x_t = np.atleast_2d(solns[best_val_idx].flatten())
