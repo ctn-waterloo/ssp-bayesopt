@@ -143,7 +143,7 @@ class BayesianOptimization:
             init_xs = np.copy(init_points[0])
             n_init_points = init_xs.shape[0]
         logger.info('Evaluating Domain Samples')
-        if isinstance(init_points, tuple) and len(init_points) > 1:
+        if isinstance(init_points, tuple) and init_points[1] is not None:
             init_ys = init_points[1]
         else:
             init_ys = np.array(
