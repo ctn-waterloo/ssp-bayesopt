@@ -16,6 +16,7 @@ class SSPMultiAgent(Agent):
                  ssp_dim=151,
                  domain_bounds=None, length_scale=4,
                  gamma_c=1.0,
+                 beta_ucb=np.log(2/1e-6),
                  init_pos=None,
                  decoder_method='network-optim'):
         super().__init__()
@@ -89,8 +90,7 @@ class SSPMultiAgent(Agent):
         # MI params
         self.gamma_t = 0
         self.gamma_c = gamma_c
-        self.sqrt_alpha = np.log(2/1e-6)
-        
+        self.sqrt_alpha = beta_ucb 
 
         if (decoder_method=='network') | (decoder_method=='network-optim'):
             for i in range(n_agents):
