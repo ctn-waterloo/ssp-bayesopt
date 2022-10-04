@@ -396,25 +396,14 @@ class SSPSpace:
     def train_decoder_net(self,n_training_pts=200000,n_hidden_units = 8,
                           learning_rate=1e-3,n_epochs = 20, load_file=True, save_file=True):
         import tensorflow as tf
-
-        gpus = tf.config.experimental.list_physical_devices('GPU')
-        if gpus:
-            try:
-                for gpu in gpus:
-                    tf.config.experimental.set_memory_growth(gpu, True)
-                logical_gpus = tf.config.experimental.list_logical_devices('GPU')
-                print(len(gpus), "Physical GPUs,", len(logical_gpus), 'Logical GPUs')
-            except RuntimeError as e:
-                # memory growth must be set before GPUs have been initialized.
-                print(e)
-        ### end if
+        tf.config.set_visible_devices([],'GPU')
 
         import sklearn
         from tensorflow import keras
         from tensorflow.keras import layers, regularizers
         
         if (type(self).__name__ == 'HexagonalSSPSpace'):
-            path_name = './saved_decoder_nets/domaindim' + str(self.domain_dim) + '_lenscale' + str(self.length_scale[0]) + '_nscales' + str(self.n_scales) + '_nrotates' + str(self.n_rotates) + '_scale_min' + str(self.scale_min) + '_scalemax' + str(self.scale_max)
+            path_name = './saved_decoder_nets/domaindim' + str(self.domain_dim) + '_lenscale' + str(self.length_scale[0]) + '_nscales' + str(self.n_scales) + '_nrotates' + str(self.n_rotates) + '_scale_min' + str(self.scale_min) + '_scalemax' + str(self.scale_max) +'.h5'
         else:
             #warnings.warn("Cannot load decoder net for non HexagonalSSPSpace class")
             load_file = False
@@ -425,7 +414,9 @@ class SSPSpace:
             try:
                 self.decoder_model = keras.models.load_model(path_name)
                 return
-            except:
+            except BaseException as be:
+                print('Error loading decoder:')
+                print(be)
                 pass
 
         model = keras.Sequential([
@@ -441,7 +432,7 @@ class SSPSpace:
                                                                            method='Rd')
         shuffled_ssps, shuffled_pts = sklearn.utils.shuffle(sample_ssps, sample_points)
         history = model.fit(shuffled_ssps, shuffled_pts,
-            epochs=n_epochs,verbose=0, validation_split = 0.1)
+            epochs=n_epochs,verbose=True, validation_split = 0.1)
         
         if save_file:
            model.save(path_name)
