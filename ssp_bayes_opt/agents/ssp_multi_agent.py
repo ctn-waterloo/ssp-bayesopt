@@ -189,10 +189,18 @@ class SSPMultiAgent(Agent):
         # TODO: Currently returning (objective_func, None) to be fixed when 
         # I finish the derivation
 
+        optim_norm_margin = 5
         def min_func(phi, m=self.blr.m,# + self.constraint_ssp,
                         sigma=self.blr.S,
                         gamma=self.gamma_t,
-                        beta_inv=1/self.blr.beta):
+                        beta_inv=1/self.blr.beta,
+                        norm_margin=optim_norm_margin):
+
+            phi_norm = np.linalg.norm(phi)
+            if np.abs(phi_norm - norm_margin) >= 1:
+                phi = norm_margin * phi / phi_norm
+            ### end if
+
             val = phi.T @ m
             mi = np.sqrt(gamma + beta_inv + phi.T @ sigma @ phi) - np.sqrt(gamma)
             return -(val + mi).flatten()
@@ -201,7 +209,13 @@ class SSPMultiAgent(Agent):
         def gradient(phi, m=self.blr.m,# + self.constraint_ssp,
                       sigma=self.blr.S,
                       gamma=self.gamma_t,
-                      beta_inv=1/self.blr.beta):
+                      beta_inv=1/self.blr.beta,
+                      norm_margin=optim_norm_margin):
+
+            phi_norm = np.linalg.norm(phi)
+            if np.abs(phi_norm - norm_margin) >= 1:
+                phi = norm_margin * phi / phi_norm
+            ### end if
             sqr = (phi.T @ sigma @ phi) 
             scale = np.sqrt(sqr + gamma + beta_inv)
             retval = -(m.flatten() + sigma @ phi / scale)
@@ -223,6 +237,7 @@ class SSPMultiAgent(Agent):
     
         # Update BLR
         phi = np.atleast_2d(self.encode(x_val).squeeze())
+#         print('!!!encoding vector mag: ', np.linalg.norm(phi))
         self.blr.update(phi, y_val)
         
         # Update gamma
