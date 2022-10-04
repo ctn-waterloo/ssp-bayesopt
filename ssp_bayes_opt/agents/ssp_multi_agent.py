@@ -242,6 +242,7 @@ class SSPMultiAgent(Agent):
         
         # Update gamma
         self.gamma_t = self.gamma_t + self.gamma_c*sigma_t
+        print(f'!!!!! gamma_t = {self.gamma_t}')
 
     def encode(self,x):
         '''

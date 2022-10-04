@@ -140,12 +140,15 @@ class BayesianOptimization:
             init_xs = domain.sample(init_points)
             n_init_points = init_points
         else:
-            init_xs = np.copy(init_points)
-            n_init_points = init_points.shape[0]
+            init_xs = np.copy(init_points[0])
+            n_init_points = init_xs.shape[0]
         logger.info('Evaluating Domain Samples')
-        init_ys = np.array(
-                [self.target(np.atleast_2d(x), str(itr))
-                 for itr, x in enumerate(init_xs)]).reshape((n_init_points,-1))
+        if isinstance(init_points, tuple) and len(init_points) > 1:
+            init_ys = init_points[1]
+        else:
+            init_ys = np.array(
+                    [self.target(np.atleast_2d(x), str(itr))
+                     for itr, x in enumerate(init_xs)]).reshape((n_init_points,-1))
 
         # Initialize the agent
         logger.info(f'Creating {agent_type} agent')
@@ -296,7 +299,7 @@ class BayesianOptimization:
             
             mu_t, var_t, phi_t = agt.eval(x_t)
 
-            print(f'| {t}\t | {y_t}, {phi_t}\t | {x_t}\t |')
+            print(f'| step {t}\t | {y_t}, {np.sqrt(var_t)}, {phi_t}\t ')#| {x_t}\t |')
             agt.update(x_t, y_t, var_t)
 
             # Log actions
