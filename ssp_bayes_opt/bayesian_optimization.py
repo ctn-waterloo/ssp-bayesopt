@@ -306,7 +306,7 @@ class BayesianOptimization:
             self.xs.append(np.copy(x_t))
             self.ys.append(np.copy(y_t))
             if self.log_and_plot_f is not None:
-                self.log_and_plot_f(np.vstack(self.xs), np.vstack(self.ys), t)
+                self.log_and_plot_f(np.vstack(self.xs), np.vstack(self.ys), t + init_xs.shape[0])
             self.agt = agt
 
     def _sample_domain(self, num_points: int=10) -> np.ndarray:
