@@ -193,6 +193,7 @@ class SSPMultiAgent(Agent):
         def min_func(phi, m=self.blr.m,# + self.constraint_ssp,
                         sigma=self.blr.S,
                         gamma=self.gamma_t,
+                        sqrt_alpha=self.sqrt_alpha,
                         beta_inv=1/self.blr.beta,
                         norm_margin=optim_norm_margin):
 
@@ -202,13 +203,14 @@ class SSPMultiAgent(Agent):
             ### end if
 
             val = phi.T @ m
-            mi = np.sqrt(gamma + beta_inv + phi.T @ sigma @ phi) - np.sqrt(gamma)
+            mi = sqrt_alpha * (np.sqrt(gamma + beta_inv + phi.T @ sigma @ phi) - np.sqrt(gamma))
             return -(val + mi).flatten()
 
 
         def gradient(phi, m=self.blr.m,# + self.constraint_ssp,
                       sigma=self.blr.S,
                       gamma=self.gamma_t,
+                      sqrt_alpha=self.sqrt_alpha,
                       beta_inv=1/self.blr.beta,
                       norm_margin=optim_norm_margin):
 
@@ -218,7 +220,7 @@ class SSPMultiAgent(Agent):
             ### end if
             sqr = (phi.T @ sigma @ phi) 
             scale = np.sqrt(sqr + gamma + beta_inv)
-            retval = -(m.flatten() + sigma @ phi / scale)
+            retval = -(m.flatten() + sqrt_alpha * sigma @ phi / scale)
             return retval
 
         return min_func, gradient
