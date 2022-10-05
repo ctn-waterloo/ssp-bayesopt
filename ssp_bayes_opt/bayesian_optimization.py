@@ -316,7 +316,7 @@ class BayesianOptimization:
             mu_t, var_t, phi_t = agt.eval(x_t)
 
             print(f'| step {t+init_xs.shape[0]}\t | {y_t}, {np.sqrt(var_t)}, {phi_t}\t ')#| {x_t}\t |')
-            agt.update(x_t, y_t, var_t)
+            agt.update(x_t, y_t, var_t, step_num=t + init_xs.shape[0])
 
             # Log actions
             self.xs.append(np.copy(x_t))

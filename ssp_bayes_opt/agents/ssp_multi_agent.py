@@ -202,7 +202,6 @@ class SSPMultiAgent(Agent):
                         norm_margin=self.phi_norm_bounds):
 
             phi_norm = np.linalg.norm(phi)
-#             phi_norm_scale = 1. / phi_norm
             phi_norm_scale = np.mean(norm_margin) / phi_norm
             phi = phi_norm_scale * phi 
 
@@ -218,11 +217,7 @@ class SSPMultiAgent(Agent):
                       beta_inv=1/self.blr.beta,
                       norm_margin=self.phi_norm_bounds):
 
-#             if np.abs(phi_norm - norm_margin) >= 1:
-#                 phi = norm_margin * phi / phi_norm
-#             ### end if
             phi_norm = np.linalg.norm(phi)
-#             phi_norm_scale = 1. / phi_norm
             phi_norm_scale = np.mean(norm_margin) / phi_norm
             phi = phi_norm_scale * phi 
 
@@ -233,7 +228,7 @@ class SSPMultiAgent(Agent):
 
         return min_func, gradient
     
-    def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float):
+    def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float, step_num=0):
         '''
         Updates the state of the Bayesian Linear Regression.
         '''
@@ -257,7 +252,15 @@ class SSPMultiAgent(Agent):
         self.blr.update(phi, y_val)
         
         # Update gamma
-        self.gamma_t = self.gamma_t + self.gamma_c*sigma_t
+        if isinstance(self.gamma_c, (int, float)):
+            self.gamma_t = self.gamma_t + self.gamma_c*sigma_t
+        elif callable(self.gamma_c):
+            self.gamma_t = self.gamma_t + self.gamma_c(step_num) * sigma_t
+        else:
+            msg = f'unable to use {self.gamma_c}, expected number of callable'
+            print(msg)
+            raise RuntimeError(msg)
+
 
     def encode(self,x):
         '''
