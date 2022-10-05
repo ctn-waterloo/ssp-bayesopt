@@ -252,6 +252,13 @@ class BayesianOptimization:
 
         print('| iter\t | target\t | x\t |')
         print('-------------------------------')
+    
+#         sorted_idxs = np.argsort(init_ys.flatten())[::-1]
+#         best_phi = agt.encode(init_xs[sorted_idxs[:num_restarts],:])
+#         best_phi_score = init_ys[sorted_idxs[:num_restarts]]
+        best_phi = np.random.normal(size=(num_restarts, agt.ssp_dim))
+        best_phi /= np.linalg.norm(best_phi, axis=1)[:,np.newaxis]
+        best_phi_score = np.ones((num_restarts,)) * -np.inf
         for t in range(n_iter):
             ## Begin timing section
             if hasattr(time, 'thread_time_ns'):
@@ -263,11 +270,12 @@ class BayesianOptimization:
             # Use optimization to find a sample location
             solns = []
             vals = []
-            for _ in range(num_restarts):
-               
-                x_init = np.random.uniform(low=lbounds, high=ubounds, size=(len(ubounds),))
+            best_phi = np.random.normal(size=(num_restarts, agt.ssp_dim))
+            best_phi /= np.linalg.norm(best_phi, axis=1)[:,np.newaxis]
+            for restart_idx in range(num_restarts):
 
                 if agent_type=='gp-matern' or agent_type=='gp-sinc':
+                    x_init = np.random.uniform(low=lbounds, high=ubounds, size=(len(ubounds),))
                     # Do bounded optimization to ensure x stays in bound
                     start = time.thread_time_ns()
                     soln = minimize(optim_func, x_init,
@@ -277,18 +285,20 @@ class BayesianOptimization:
                     self.times[t] = time.thread_time_ns() - start
                     solnx = np.copy(soln.x)
                 else: ## ssp agent
-#                     phi_init = agt.encode(x_init)
+#                     phi_init = np.copy(best_phi[restart_idx,:])
                     phi_init = agt.initial_guess()
                     start = time.thread_time_ns()
                     soln = minimize(optim_func, phi_init,
                                     jac=jac_func, 
                                     method='L-BFGS-B')
-                    self.times[t] = time.thread_time_ns() - start
+                    if hasattr(time, 'thread_time_ns'):
+                        self.times[t] = time.thread_time_ns() - start
+                    # TODO: move this outside the num_restarts loop
                     solnx = agt.decode(np.copy(np.atleast_2d(soln.x)))
                 vals.append(-soln.fun)
                 solns.append(solnx)
-            if hasattr(time, 'thread_time_ns'):
-                self.times[t] = time.thread_time_ns() - start
+#             if hasattr(time, 'thread_time_ns'):
+#                 self.times[t] = time.thread_time_ns() - start
             ## END timing section
 
             optimization_status = f'{t+init_xs.shape[0]}'
@@ -296,6 +306,13 @@ class BayesianOptimization:
             best_val_idx = np.argmax(vals)
             x_t = np.atleast_2d(solns[best_val_idx].flatten())
             y_t = np.atleast_2d(self.target(x_t, optimization_status))
+
+            if y_t.flatten() >= best_phi_score.min():
+                worst_idx = best_phi_score.argmin()
+                best_phi_score[worst_idx] = y_t
+                best_phi[worst_idx,:] = np.copy(agt.encode(x_t))
+            ### end if
+            print('!!! best phi score', best_phi_score)
             
             mu_t, var_t, phi_t = agt.eval(x_t)
 
