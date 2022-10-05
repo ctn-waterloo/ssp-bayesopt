@@ -202,11 +202,9 @@ class SSPMultiAgent(Agent):
                         norm_margin=self.phi_norm_bounds):
 
             phi_norm = np.linalg.norm(phi)
-#             phi_norm_scale = np.clip(phi_norm, norm_margin[0], norm_margin[1]) / phi_norm
+#             phi_norm_scale = 1. / phi_norm
             phi_norm_scale = np.mean(norm_margin) / phi_norm
             phi = phi_norm_scale * phi 
-#             print('!!!! norm bounds', norm_margin)
-#             print('!!!! phi_norm', np.linalg.norm(phi))
 
             val = phi.T @ m
             mi = sqrt_alpha * (np.sqrt(gamma + beta_inv + phi.T @ sigma @ phi) - np.sqrt(gamma))
@@ -224,7 +222,7 @@ class SSPMultiAgent(Agent):
 #                 phi = norm_margin * phi / phi_norm
 #             ### end if
             phi_norm = np.linalg.norm(phi)
-#             phi_norm_scale = np.clip(phi_norm, norm_margin[0], norm_margin[1]) / phi_norm
+#             phi_norm_scale = 1. / phi_norm
             phi_norm_scale = np.mean(norm_margin) / phi_norm
             phi = phi_norm_scale * phi 
 
@@ -256,9 +254,6 @@ class SSPMultiAgent(Agent):
         if phi_norm > self.phi_norm_bounds[1]:
             self.phi_norm_bounds[1] = phi_norm
     
-        print('!!! update phi norm ', np.linalg.norm(phi))
-        print('!!! update norm bounds ', self.phi_norm_bounds)
-
         self.blr.update(phi, y_val)
         
         # Update gamma

@@ -312,11 +312,10 @@ class BayesianOptimization:
                 best_phi_score[worst_idx] = y_t
                 best_phi[worst_idx,:] = np.copy(agt.encode(x_t))
             ### end if
-            print('!!! best phi score', best_phi_score)
             
             mu_t, var_t, phi_t = agt.eval(x_t)
 
-            print(f'| step {t}\t | {y_t}, {np.sqrt(var_t)}, {phi_t}\t ')#| {x_t}\t |')
+            print(f'| step {t+init_xs.shape[0]}\t | {y_t}, {np.sqrt(var_t)}, {phi_t}\t ')#| {x_t}\t |')
             agt.update(x_t, y_t, var_t)
 
             # Log actions
