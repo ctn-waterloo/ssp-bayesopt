@@ -20,6 +20,7 @@ class SSPMultiAgent(Agent):
                  init_pos=None,
                  decoder_method='network-optim'):
         super().__init__()
+        self.ssp_dim = ssp_dim
         self.num_restarts = 10
         self.n_agents = n_agents
         self.data_dim = x_dim*traj_len*n_agents
@@ -59,6 +60,10 @@ class SSPMultiAgent(Agent):
         
         # Encode the initial sample points 
         init_phis = self.encode(init_xs)
+        norms = np.linalg.norm(init_phis, axis=1)
+
+        self.phi_norm_bounds = [norms.min(), norms.max()]
+#         print('!!! norm_bounds', self.phi_norm_bounds)
 
 
         self.init_xs = init_xs
@@ -189,18 +194,19 @@ class SSPMultiAgent(Agent):
         # TODO: Currently returning (objective_func, None) to be fixed when 
         # I finish the derivation
 
-        optim_norm_margin = 5
         def min_func(phi, m=self.blr.m,# + self.constraint_ssp,
                         sigma=self.blr.S,
                         gamma=self.gamma_t,
                         sqrt_alpha=self.sqrt_alpha,
                         beta_inv=1/self.blr.beta,
-                        norm_margin=optim_norm_margin):
+                        norm_margin=self.phi_norm_bounds):
 
             phi_norm = np.linalg.norm(phi)
-            if np.abs(phi_norm - norm_margin) >= 1:
-                phi = norm_margin * phi / phi_norm
-            ### end if
+#             phi_norm_scale = np.clip(phi_norm, norm_margin[0], norm_margin[1]) / phi_norm
+            phi_norm_scale = np.mean(norm_margin) / phi_norm
+            phi = phi_norm_scale * phi 
+#             print('!!!! norm bounds', norm_margin)
+#             print('!!!! phi_norm', np.linalg.norm(phi))
 
             val = phi.T @ m
             mi = sqrt_alpha * (np.sqrt(gamma + beta_inv + phi.T @ sigma @ phi) - np.sqrt(gamma))
@@ -212,12 +218,16 @@ class SSPMultiAgent(Agent):
                       gamma=self.gamma_t,
                       sqrt_alpha=self.sqrt_alpha,
                       beta_inv=1/self.blr.beta,
-                      norm_margin=optim_norm_margin):
+                      norm_margin=self.phi_norm_bounds):
 
+#             if np.abs(phi_norm - norm_margin) >= 1:
+#                 phi = norm_margin * phi / phi_norm
+#             ### end if
             phi_norm = np.linalg.norm(phi)
-            if np.abs(phi_norm - norm_margin) >= 1:
-                phi = norm_margin * phi / phi_norm
-            ### end if
+#             phi_norm_scale = np.clip(phi_norm, norm_margin[0], norm_margin[1]) / phi_norm
+            phi_norm_scale = np.mean(norm_margin) / phi_norm
+            phi = phi_norm_scale * phi 
+
             sqr = (phi.T @ sigma @ phi) 
             scale = np.sqrt(sqr + gamma + beta_inv)
             retval = -(m.flatten() + sqrt_alpha * sigma @ phi / scale)
@@ -239,12 +249,20 @@ class SSPMultiAgent(Agent):
     
         # Update BLR
         phi = np.atleast_2d(self.encode(x_val).squeeze())
-#         print('!!!encoding vector mag: ', np.linalg.norm(phi))
+
+        phi_norm = np.linalg.norm(phi)
+        if phi_norm < self.phi_norm_bounds[0]:
+            self.phi_norm_bounds[0] = phi_norm
+        if phi_norm > self.phi_norm_bounds[1]:
+            self.phi_norm_bounds[1] = phi_norm
+    
+        print('!!! update phi norm ', np.linalg.norm(phi))
+        print('!!! update norm bounds ', self.phi_norm_bounds)
+
         self.blr.update(phi, y_val)
         
         # Update gamma
         self.gamma_t = self.gamma_t + self.gamma_c*sigma_t
-        print(f'!!!!! gamma_t = {self.gamma_t}')
 
     def encode(self,x):
         '''
