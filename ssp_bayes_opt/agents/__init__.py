@@ -1,6 +1,7 @@
 from .ssp_agent import SSPAgent
 from .ssp_traj_agent import SSPTrajectoryAgent
 from .ssp_multi_agent import SSPMultiAgent
+from .ssp_context_agent import SSPContinuousContextualAgent, SSPDiscreteContextualAgent
 from .gp_agent import GPAgent
 
 from .. import sspspace

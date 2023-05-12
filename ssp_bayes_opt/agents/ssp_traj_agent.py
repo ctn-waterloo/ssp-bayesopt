@@ -190,7 +190,7 @@ class SSPTrajectoryAgent(Agent):
 
         return min_func, gradient
     
-    def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float):
+    def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float, step_num=0, info=None):
         '''
         Updates the state of the Bayesian Linear Regression.
         '''
@@ -207,7 +207,15 @@ class SSPTrajectoryAgent(Agent):
         self.blr.update(phi, y_val)
         
         # Update gamma
-        self.gamma_t = self.gamma_t + self.gamma_c*sigma_t
+        #self.gamma_t = self.gamma_t + self.gamma_c*sigma_t
+        if isinstance(self.gamma_c, (int, float)):
+            self.gamma_t = self.gamma_t + self.gamma_c*sigma_t
+        elif callable(self.gamma_c):
+            self.gamma_t = self.gamma_t + self.gamma_c(step_num) * sigma_t
+        else:
+            msg = f'unable to use {self.gamma_c}, expected number of callable'
+            print(msg)
+            raise RuntimeError(msg)
 
     def encode(self,x):
         '''

@@ -14,7 +14,7 @@ class SSPMultiAgent(Agent):
     def __init__(self, init_xs, init_ys, n_agents, x_dim=1, traj_len=1,
                  ssp_x_spaces=None, ssp_t_space=None,
                  ssp_dim=151,
-                 domain_bounds=None, length_scale=4,
+                 domain_bounds=None, length_scale=4, #time_length_scale=1,
                  gamma_c=1.0,
                  beta_ucb=np.log(2/1e-6),
                  init_pos=None,
@@ -228,7 +228,7 @@ class SSPMultiAgent(Agent):
 
         return min_func, gradient
     
-    def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float, step_num=0):
+    def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float, step_num=0, info=None):
         '''
         Updates the state of the Bayesian Linear Regression.
         '''

@@ -35,7 +35,7 @@ importlib.reload(ssp_bayes_opt)
 
 class SamplingTrial(pytry.Trial):
     def params(self):
-        self.param('function', function_name='himmelblau')
+        self.param('function', function_name='branin-hoo')
         self.param('agent_type', agent_type='ssp-hex')
         self.param('num initial samples', num_init_samples=10)
         self.param('number of sample points', num_samples=100)
@@ -119,3 +119,5 @@ if __name__=='__main__':
                   'len_scale':args.len_scale
                   }
         r = SamplingTrial().run(**params)
+        plt.figure()
+        plt.plot( r['regret'])

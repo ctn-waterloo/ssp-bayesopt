@@ -41,7 +41,7 @@ class Agent:
     def eval(self, xs):
         pass
 
-    def update(self, x_t, y_t, sigma_t):
+    def update(self, x_t, y_t, sigma_t, step_num, info):
         pass
 
     def untrusted(self, x, badness=None):

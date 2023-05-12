@@ -41,6 +41,24 @@ class BoundedDomain(Domain):
     ### end sample
 ### end class ###
 
+class DiscreteContextDomain(Domain):
+    def __init__(self, bounds):
+        self.bounds = bounds[:-1,:]
+        self.context_size = int(bounds[-1,1])
+        self.data_dim = self.bounds.shape[0] 
+        self.sampler = qmc.Sobol(d=self.data_dim) 
+    
+    def sample(self, num_points: int=10, method:str='sobol') -> np.ndarray:
+        if not method == 'sobol':
+            raise NotImplementedError(f'{method} not implemented')
+        ### end if
+        u_sample_points = self.sampler.random(num_points)
+        sample_points = qmc.scale(u_sample_points, 
+                                  self.bounds[:,0],
+                                  self.bounds[:,1])
+        sample_contexts = np.random.randint(self.context_size, size=(num_points,1))
+        return np.hstack([sample_points, sample_contexts])
+
 
 class MultiTrajectoryDomain(Domain):
     def __init__(self, n_agents:int, trajectory_length:int, spatial_dim:int, 

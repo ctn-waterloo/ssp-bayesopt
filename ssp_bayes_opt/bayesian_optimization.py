@@ -64,7 +64,7 @@ class BayesianOptimization:
             np.random.seed(random_state)
 
         if hasattr(f, '__code__') and f.__code__.co_argcount == 1:
-            self.target = lambda x, info=None: f(x)
+            self.target = lambda x, info=None: (f(x), None)
         else:
             self.target = f
         self.sampling_seed = sampling_seed 
@@ -130,6 +130,9 @@ class BayesianOptimization:
                                                      kwargs['x_dim'],
                                                      self.bounds,
                                                      kwargs.pop('goals',None))
+        elif 'discrete-context' in agent_type:
+            logger.info('Creating Discrete Contextual Domain')
+            domain = agents.domains.DiscreteContextDomain(self.bounds)
         else:
             logger.info('Creating Rectangular Domain')
             domain = agents.domains.BoundedDomain(self.bounds)
@@ -147,7 +150,7 @@ class BayesianOptimization:
             init_ys = init_points[1]
         else:
             init_ys = np.array(
-                    [self.target(np.atleast_2d(x), str(itr))
+                    [self.target(np.atleast_2d(x), str(itr))[0]
                      for itr, x in enumerate(init_xs)]).reshape((n_init_points,-1))
 
         # Initialize the agent
@@ -181,6 +184,34 @@ class BayesianOptimization:
             agt = agents.SSPMultiAgent(init_xs, init_ys, **kwargs) 
             init_xs = agt.init_xs
             init_ys = agt.init_ys
+        elif agent_type=='ssp-discrete-context':
+            init_context = self.target.reset()
+            context_size = self.bounds[-1,1]
+            kwargs.pop('domain_bounds', None)
+            ssp_space = sspspace.HexagonalSSPSpace(self.data_dim-1, domain_bounds = self.bounds[:-1,:], **kwargs)
+            context_space = sspspace.SPSpace(context_size, ssp_space.ssp_dim)
+            agt = agents.SSPDiscreteContextualAgent(init_xs, init_ys, init_context,context_size, ssp_space,
+                                                    context_space,  **kwargs) 
+        elif agent_type=='ssp-continuous-context':
+            init_context = self.target.reset()
+            context_dim = len(init_context)
+            action_dim = self.data_dim - context_dim
+            #kwargs.pop('domain_bounds', None)
+            # ssp_space = sspspace.HexagonalSSPSpace(data_dim, 
+            #                                     domain_bounds =  self.bounds[:data_dim,:], **kwargs)
+            # if 'context_length_scale' in kwargs:
+            #     kwargs.pop('length_scale',  kwargs.get('context_length_scale'))
+            # context_ssp_space = sspspace.RandomSSPSpace(context_dim,
+            #                                             domain_bounds =  self.bounds[data_dim:,:],**kwargs)
+            ssp_space = sspspace.HexagonalSSPSpace( self.data_dim, **kwargs)
+            
+            action_space = sspspace.SSPSpace(action_dim, ssp_space.ssp_dim, 
+                                             phase_matrix = ssp_space.phase_matrix[:,:action_dim],
+                                             domain_bounds = self.bounds[:action_dim,:], length_scale = kwargs.get('length_scale'))
+            context_ssp_space = sspspace.SSPSpace(context_dim, ssp_space.ssp_dim, 
+                                                        phase_matrix = ssp_space.phase_matrix[:,action_dim:],
+                                                        domain_bounds =  self.bounds[action_dim:,:],length_scale = kwargs.get('context_length_scale'))
+            agt = agents.SSPContinuousContextualAgent(init_xs, init_ys, init_context, action_space, context_ssp_space,  **kwargs) 
         else:
             raise NotImplementedError(f'{agent_type} agent not implemented')
         logger.info(f'{type(agt).__name__} Agent created')
@@ -256,7 +287,7 @@ class BayesianOptimization:
 #         sorted_idxs = np.argsort(init_ys.flatten())[::-1]
 #         best_phi = agt.encode(init_xs[sorted_idxs[:num_restarts],:])
 #         best_phi_score = init_ys[sorted_idxs[:num_restarts]]
-        best_phi = np.random.normal(size=(num_restarts, agt.ssp_dim))
+        best_phi = np.random.normal(size=(num_restarts, agt.ssp_space.ssp_dim))
         best_phi /= np.linalg.norm(best_phi, axis=1)[:,np.newaxis]
         best_phi_score = np.ones((num_restarts,)) * -np.inf
         for t in range(n_iter):
@@ -270,7 +301,7 @@ class BayesianOptimization:
             # Use optimization to find a sample location
             solns = []
             vals = []
-            best_phi = np.random.normal(size=(num_restarts, agt.ssp_dim))
+            best_phi = np.random.normal(size=(num_restarts, agt.ssp_space.ssp_dim))
             best_phi /= np.linalg.norm(best_phi, axis=1)[:,np.newaxis]
             for restart_idx in range(num_restarts):
 
@@ -305,8 +336,8 @@ class BayesianOptimization:
 
             best_val_idx = np.argmax(vals)
             x_t = np.atleast_2d(solns[best_val_idx].flatten())
-            y_t = np.atleast_2d(self.target(x_t, optimization_status))
-
+            y_t, info = self.target(x_t, optimization_status)
+            y_t = np.atleast_2d(y_t)
             if y_t.flatten() >= best_phi_score.min():
                 worst_idx = best_phi_score.argmin()
                 best_phi_score[worst_idx] = y_t
@@ -316,10 +347,10 @@ class BayesianOptimization:
             mu_t, var_t, phi_t = agt.eval(x_t)
 
             print(f'| step {t+init_xs.shape[0]}\t | {y_t}, {np.sqrt(var_t)}, {phi_t}\t ')#| {x_t}\t |')
-            agt.update(x_t, y_t, var_t, step_num=t + init_xs.shape[0])
+            agt.update(x_t, y_t, var_t, step_num=t + init_xs.shape[0], info=info)
 
             # Log actions
-            self.xs.append(np.copy(x_t))
+            self.xs.append(np.copy(x_t).flatten())
             self.ys.append(np.copy(y_t))
             if self.log_and_plot_f is not None:
                 self.log_and_plot_f(np.vstack(self.xs), np.vstack(self.ys), t + init_xs.shape[0])

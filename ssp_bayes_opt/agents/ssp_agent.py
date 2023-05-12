@@ -15,7 +15,7 @@ from .kernels import SincKernel
 from .agent import Agent
 
 class SSPAgent(Agent):
-    def __init__(self, init_xs, init_ys, ssp_space=None,decoder_method='network-optim', **kwargs):
+    def __init__(self, init_xs, init_ys, ssp_space=None,decoder_method='network-optim',gamma_c=1., **kwargs):
         super().__init__()
   
         (num_pts, data_dim) = init_xs.shape
@@ -62,7 +62,7 @@ class SSPAgent(Agent):
         else:
             self.init_samples = self.ssp_space.get_sample_pts_and_ssps(2**17,'length-scale')
         self.decoder_method = decoder_method
-
+        self.gamma_c = gamma_c
     ### end __init__
 
 
@@ -140,7 +140,7 @@ class SSPAgent(Agent):
 
         return min_func, gradient
 
-    def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float):
+    def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float, step_num=0, info=None):
         '''
         Updates the state of the Bayesian Linear Regression.
         '''
@@ -158,7 +158,15 @@ class SSPAgent(Agent):
         self.blr.update(phi, y_val)
         
         # Update gamma
-        self.gamma_t = self.gamma_t + sigma_t
+        #self.gamma_t = self.gamma_t + sigma_t
+        if isinstance(self.gamma_c, (int, float)):
+            self.gamma_t = self.gamma_t + self.gamma_c*sigma_t
+        elif callable(self.gamma_c):
+            self.gamma_t = self.gamma_t + self.gamma_c(step_num) * sigma_t
+        else:
+            msg = f'unable to use {self.gamma_c}, expected number of callable'
+            print(msg)
+            raise RuntimeError(msg)
 
     def encode(self, x):
         return self.ssp_space.encode(x)

@@ -8,7 +8,7 @@ from sklearn.preprocessing import StandardScaler
 from .agent import Agent
 
 class GPAgent(Agent):
-    def __init__(self, init_xs, init_ys, updating=True):
+    def __init__(self, init_xs, init_ys, gamm_c = 1.0, updating=True):
         super().__init__()
         # Store observations
         self.xs = init_xs
@@ -43,6 +43,7 @@ class GPAgent(Agent):
 
         self.gamma_t = 0
         self.sqrt_alpha = np.log(2/1e-6)
+        self.gamma_c = gamma_c
     ### end __init__
 
     def eval(self, xs):
@@ -51,10 +52,18 @@ class GPAgent(Agent):
         phi = self.sqrt_alpha * (np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t))
         return mu, var, phi 
 
-    def update(self, x_t, y_t, sigma_t):
+    def update(self, x_t, y_t, sigma_t, step_num=0, info=None):
         self.xs = np.vstack((self.xs, x_t))
         self.ys = np.vstack((self.ys, y_t))
-        self.gamma_t = self.gamma_t + sigma_t
+        #self.gamma_t = self.gamma_t + sigma_t
+        if isinstance(self.gamma_c, (int, float)):
+            self.gamma_t = self.gamma_t + self.gamma_c*sigma_t
+        elif callable(self.gamma_c):
+            self.gamma_t = self.gamma_t + self.gamma_c(step_num) * sigma_t
+        else:
+            msg = f'unable to use {self.gamma_c}, expected number of callable'
+            print(msg)
+            raise RuntimeError(msg)
     
         self.gp.fit(self.xs, self.ys)
     ### end update

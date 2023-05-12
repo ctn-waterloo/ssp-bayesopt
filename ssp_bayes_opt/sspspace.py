@@ -5,6 +5,61 @@ from scipy.optimize import minimize
 
 import warnings
 
+class SPSpace:
+    def __init__(self, domain_size: int, dim: int, rng=None):
+        self.domain_size = int(domain_size)
+        self.dim = int(dim)
+        if rng is None:
+            rng = np.random.RandomState()
+        self.rng = rng
+        self.vectors = self.make_unitary(self.rng.randn(self.domain_size,self.dim))
+        self.vectors[0,:] = self.make_unitary(self.rng.randn(1,self.dim))
+        for j in range(self.domain_size):
+            q = self.vectors[j,:]/np.linalg.norm(self.vectors[j,:])
+            for k in range(j+1,self.domain_size):
+                self.vectors[k,:] = self.vectors[k,:] - (q.T @ self.vectors[k,:])*q
+        #self.make_unitary(self.rng.randn(self.domain_size,self.dim))
+            
+    def encode(self, i):
+        return self.vectors[i.reshape(-1)]
+    
+    def decode(self, v, **kwargs):
+        sims = self.vectors @ v.T
+        return np.argmax(sims, axis=0)
+    
+    def clean_up(self, v, **kwargs):
+        sims = self.vectors @ v.T
+        return self.vectors[np.argmax(sims, axis=0)]
+    
+    def normalize(self,v):
+        return v/np.sqrt(np.sum(v**2))
+    
+    def make_unitary(self,v):
+        fv = np.fft.fft(v, axis=1)
+        fv = fv/np.sqrt(fv.real**2 + fv.imag**2)
+        return np.fft.ifft(fv, axis=1).real  
+    
+    def identity(self):
+        s = np.zeros(self.dim)
+        s[0] = 1
+        return s
+    
+    def bind(self,a,b):
+        a = np.atleast_2d(a)
+        b = np.atleast_2d(b)
+        return np.fft.ifft(np.fft.fft(a, axis=1) * np.fft.fft(b,axis=1), axis=1).real
+    
+    def invert(self,a):
+        a = np.atleast_2d(a)
+        return a[:,-np.arange(self.dim)]
+    
+    def get_binding_matrix(self,v):
+        C = np.zeros((self.dim, self.dim))
+        for i in range(self.dim):
+            for j in range(self.dim):
+                C[i,j] = v[:,(i - j) % self.dim] 
+        return C
+
 class SSPSpace:
     def __init__(self, domain_dim: int, ssp_dim: int, axis_matrix=None, phase_matrix=None,
                  domain_bounds=None, length_scale=1):
@@ -365,6 +420,13 @@ class SSPSpace:
         a = np.atleast_2d(a)
         return a[:,-np.arange(self.ssp_dim)]
     
+    def get_binding_matrix(self,v):
+        C = np.zeros((self.ssp_dim, self.ssp_dim))
+        for i in range(self.ssp_dim):
+            for j in range(self.ssp_dim):
+                C[i,j] = v[:,(i - j) % self.ssp_dim] 
+        return C
+    
     def similarity_plot(self,ssp,n_grid=100,plot_type='heatmap',ax=None,**kwargs):
         import matplotlib.pyplot as plt
         if ax is None:
@@ -445,7 +507,8 @@ class RandomSSPSpace(SSPSpace):
     '''
     Creates an SSP space using randomly generated frequency components.
     '''
-    def __init__(self, domain_dim: int, ssp_dim: int,  domain_bounds=None, length_scale=1, rng=np.random.default_rng()):
+    def __init__(self, domain_dim: int, ssp_dim: int,  domain_bounds=None, 
+                 length_scale=1, rng=np.random.default_rng(),**kwargs):
 #         partial_phases = rng.random.rand(ssp_dim//2,domain_dim)*2*np.pi - np.pi
         
         
@@ -485,64 +548,6 @@ class RandomSSPSpace(SSPSpace):
                          )
 ### end class RandomSSPSpace ###
 
-class GaussianSSPSpace(SSPSpace):
-    '''
-    Creates an SSP space using randomly generated frequency components.
-    '''
-    def __init__(self, 
-                 domain_dim: int,
-                 ssp_dim: int,
-                 domain_bounds=None,
-                 length_scale=1,
-                 rng=np.random.default_rng()):
-
-        partial_phases = rng.normal(loc=0,
-                                    scale=1,
-                                    size=(ssp_dim//2, domain_dim)
-                                    )#*2*np.pi - np.pi
-        #partial_phases = rng.random((ssp_dim // 2, domain_dim)) * 2 * np.pi - np.pi
-        axis_matrix = _constructaxisfromphases(partial_phases)
-#         ### TODO: should the rng default argument for make_good_unitary be the 
-#         # rng passed in through the default __init__ argument?
-#         def make_good_unitary(dim, eps=1e-3, rng=np.random):
-#             a = rng.normal(loc=0, scale=np.pi, size=dim)#size=(dim - 1) // 2)
-#             phi = a
-# #             phi = (eps + a * (1 - 2 * eps))
-# #             sign = rng.choice((-1, +1), len(a))
-# #             phi = sign * (eps + a * (1 - 2 * eps))
-# #             assert np.all(np.abs(phi) >= eps)
-# #             assert np.all(np.abs(phi) <= (1 - eps))
-#         
-#             fv = np.zeros(dim, dtype='complex64')
-#             fv = np.cos(phi) + 1j * np.sin(phi)
-# #             fv[0] = 1
-# #             fv[1:(dim + 1) // 2] = np.cos(phi) + 1j * np.sin(phi)
-# #             fv[-1:dim // 2:-1] = np.conj(fv[1:(dim + 1) // 2])
-#             if dim % 2 == 0:
-#                 fv[dim // 2] = 1
-#             else:
-#                 fv[0] = 1
-#         
-# #             assert np.allclose(np.abs(fv), 1)
-#             v = np.fft.ifft(fv)
-#             
-#             v = v.real
-# #             assert np.allclose(np.fft.fft(v), fv)
-# #             assert np.allclose(np.linalg.norm(v), 1)
-#             return v
-# 
-#         axis_matrix = np.zeros((ssp_dim,domain_dim))
-#         for i in range(domain_dim):
-#             axis_matrix[:,i] = make_good_unitary(ssp_dim)
-# 
-        super().__init__(domain_dim,
-                         axis_matrix.shape[0],
-                         axis_matrix=axis_matrix,
-                         domain_bounds=domain_bounds,
-                         length_scale=length_scale,
-                         )
-### end class GaussianSSPSpace ###
-
 
         
 class HexagonalSSPSpace(SSPSpace):
@@ -552,7 +557,7 @@ class HexagonalSSPSpace(SSPSpace):
     '''
     def __init__(self,  domain_dim:int,ssp_dim: int=151, n_rotates:int=5, n_scales:int=5, 
                  scale_min=0.1, scale_max=3,
-                 domain_bounds=None, length_scale=1):
+                 domain_bounds=None, length_scale=1, **kwargs):
         if (n_rotates==5) & (n_scales==5) & (ssp_dim!=151): # user wants to define ssp with total dim, not number of simplex rotates and scales
             n_rotates = int(np.sqrt((ssp_dim-1)/(2*(domain_dim+1))))
             n_scales = n_rotates
