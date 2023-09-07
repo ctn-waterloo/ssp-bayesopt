@@ -14,6 +14,7 @@ class SSPTrajectoryAgent(Agent):
     def __init__(self, init_xs, init_ys, x_dim=1, traj_len=1,
                  ssp_x_space=None, ssp_t_space=None, ssp_dim=151,
                  domain_bounds=None, length_scale=4, gamma_c=1.0,
+                 beta_ucb=np.log(2/1e-6),
                  init_pos=None, decoder_method='network-optim'):
         super().__init__()
         self.num_restarts = 10
@@ -31,7 +32,7 @@ class SSPTrajectoryAgent(Agent):
         if ssp_t_space is None:
             ssp_t_space = sspspace.RandomSSPSpace(1,ssp_dim=ssp_x_space.ssp_dim,
                  domain_bounds=np.array([[0,self.traj_len]]), length_scale=1)
-        
+        self.ssp_dim = ssp_x_space.ssp_dim
         self.ssp_x_space = ssp_x_space
         self.ssp_t_space = ssp_t_space
         
@@ -190,7 +191,7 @@ class SSPTrajectoryAgent(Agent):
 
         return min_func, gradient
     
-    def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float):
+    def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float,step_num=0):
         '''
         Updates the state of the Bayesian Linear Regression.
         '''
@@ -207,7 +208,16 @@ class SSPTrajectoryAgent(Agent):
         self.blr.update(phi, y_val)
         
         # Update gamma
-        self.gamma_t = self.gamma_t + self.gamma_c*sigma_t
+        # self.gamma_t = self.gamma_t + self.gamma_c*sigma_t
+        # Update gamma
+        if isinstance(self.gamma_c, (int, float)):
+            self.gamma_t = self.gamma_t + self.gamma_c*sigma_t
+        elif callable(self.gamma_c):
+            self.gamma_t = self.gamma_t + self.gamma_c(step_num) * sigma_t
+        else:
+            msg = f'unable to use {self.gamma_c}, expected number of callable'
+            print(msg)
+            raise RuntimeError(msg)
 
     def encode(self,x):
         '''

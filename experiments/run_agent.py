@@ -58,7 +58,8 @@ class SamplingTrial(pytry.Trial):
                            num_restarts=1,
                            agent_type=p.agent_type,
                            ssp_dim=p.ssp_dim,
-                           length_scale=p.len_scale)
+                           length_scale=p.len_scale,
+                           decoder_method='direct-optim')
         elapsed_time = time.thread_time_ns() - start
 
         vals = np.zeros((p.num_init_samples + budget,))
@@ -101,7 +102,7 @@ if __name__=='__main__':
     
     args = parser.parse_args()
 
-    random.seed(1)
+    # random.seed(1)
     seeds = [random.randint(1,100000) for _ in range(args.num_trials)]
 
     data_path = os.path.join(args.data_dir,args.function_name,args.agent_type)

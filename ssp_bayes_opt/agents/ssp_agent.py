@@ -15,25 +15,19 @@ from .kernels import SincKernel
 from .agent import Agent
 
 class SSPAgent(Agent):
-    def __init__(self, init_xs, init_ys, ssp_space=None,decoder_method='network-optim', **kwargs):
+    def __init__(self, init_xs, init_ys, ssp_space,
+                 decoder_method='network-optim',
+                gamma_c=1.0,
+                beta_ucb=np.log(2/1e-6),
+                 **kwargs):
         super().__init__()
   
         (num_pts, data_dim) = init_xs.shape
         self.data_dim = data_dim
 
-        if ssp_space is None:
-            ssp_space = sspspace.HexagonalSSPSpace(
-                                data_dim,
-                                ssp_dim=151, 
-                                n_rotates=5, 
-                                n_scales=5, 
-                                scale_min=2*np.pi/np.sqrt(6) - 0.5, 
-                                scale_max=2*np.pi/np.sqrt(6) + 0.5, 
-                                domain_bounds=None, 
-                                length_scale=5,
-            )
         ### end if
         self.ssp_space = ssp_space
+        self.ssp_dim= ssp_space.ssp_dim
 
         # Optimize the length scales
         if not 'length_scale' in kwargs or kwargs.get('length_scale') < 0:
@@ -54,7 +48,8 @@ class SSPAgent(Agent):
 
         # MI params
         self.gamma_t = 0
-        self.sqrt_alpha = np.log(2/1e-6)
+        self.gamma_c = gamma_c
+        self.sqrt_alpha = beta_ucb
         
         if (decoder_method=='network') | (decoder_method=='network-optim'):
             self.ssp_space.train_decoder_net();
@@ -140,7 +135,7 @@ class SSPAgent(Agent):
 
         return min_func, gradient
 
-    def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float):
+    def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float, step_num=0):
         '''
         Updates the state of the Bayesian Linear Regression.
         '''
@@ -158,7 +153,15 @@ class SSPAgent(Agent):
         self.blr.update(phi, y_val)
         
         # Update gamma
-        self.gamma_t = self.gamma_t + sigma_t
+        if isinstance(self.gamma_c, (int, float)):
+            self.gamma_t = self.gamma_t + self.gamma_c*sigma_t
+        elif callable(self.gamma_c):
+            self.gamma_t = self.gamma_t + self.gamma_c(step_num) * sigma_t
+        else:
+            msg = f'unable to use {self.gamma_c}, expected number of callable'
+            print(msg)
+            raise RuntimeError(msg)
+
 
     def encode(self, x):
         return self.ssp_space.encode(x)

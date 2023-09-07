@@ -3,6 +3,7 @@ import time
 
 import logging 
 import sys
+from scipy.stats import qmc
 
 logger = logging.getLogger()
 # logger.setLevel(logging.DEBUG)
@@ -256,8 +257,6 @@ class BayesianOptimization:
 #         sorted_idxs = np.argsort(init_ys.flatten())[::-1]
 #         best_phi = agt.encode(init_xs[sorted_idxs[:num_restarts],:])
 #         best_phi_score = init_ys[sorted_idxs[:num_restarts]]
-        best_phi = np.random.normal(size=(num_restarts, agt.ssp_dim))
-        best_phi /= np.linalg.norm(best_phi, axis=1)[:,np.newaxis]
         best_phi_score = np.ones((num_restarts,)) * -np.inf
         for t in range(n_iter):
             ## Begin timing section
@@ -270,8 +269,7 @@ class BayesianOptimization:
             # Use optimization to find a sample location
             solns = []
             vals = []
-            best_phi = np.random.normal(size=(num_restarts, agt.ssp_dim))
-            best_phi /= np.linalg.norm(best_phi, axis=1)[:,np.newaxis]
+
             for restart_idx in range(num_restarts):
 
                 if agent_type=='gp-matern' or agent_type=='gp-sinc':
@@ -310,7 +308,6 @@ class BayesianOptimization:
             if y_t.flatten() >= best_phi_score.min():
                 worst_idx = best_phi_score.argmin()
                 best_phi_score[worst_idx] = y_t
-                best_phi[worst_idx,:] = np.copy(agt.encode(x_t))
             ### end if
             
             mu_t, var_t, phi_t = agt.eval(x_t)

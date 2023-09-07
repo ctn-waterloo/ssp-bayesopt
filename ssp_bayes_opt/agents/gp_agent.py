@@ -1,36 +1,58 @@
 import numpy as np
-
+import warnings
 # import GP modules
 from sklearn.gaussian_process.kernels import Matern
 from sklearn.gaussian_process import GaussianProcessRegressor 
 from sklearn.preprocessing import StandardScaler 
 
 from .agent import Agent
+from .kernels import SincKernel
+
 
 class GPAgent(Agent):
-    def __init__(self, init_xs, init_ys, updating=True):
+    def __init__(self, init_xs, init_ys,  kernel_type='sinc', 
+                 updating=True, 
+                 gamma_c=1.0,
+                  beta_ucb=np.log(2/1e-6), **kwargs):
         super().__init__()
         # Store observations
         self.xs = init_xs
         self.ys = init_ys
         # create the gp
-
+        
+        
         ## Create the GP to use during optimization.
         if updating:
-            kern = Matern(nu=2.5)
+            if kernel_type == 'matern':
+                kern = Matern(nu=2.5) 
+            elif kernel_type == 'sinc':
+                kern = SincKernel()
         else:
             ## fit to the initial values
+            if kernel_type == 'matern':
+                fit_kern = Matern(nu=2.5) 
+            elif kernel_type == 'sinc': 
+                fit_kern = SincKernel(length_scale_bounds=(
+                                        1/np.sqrt(init_xs.shape[0]+1),
+                                        1e5)
+                                 )
             fit_gp = GaussianProcessRegressor(
-                        kernel=Matern(nu=2.5),
+                        kernel=fit_kern,
                         alpha=1e-6,
                         normalize_y=True,
-                        n_restarts_optimizer=5,
-                        random_state=None,
+                        n_restarts_optimizer=20,
+                        random_state=0,
                     )
             fit_gp.fit(self.xs, self.ys)
-            kern = Matern(nu=2.5,
-                          length_scale=np.exp(fit_gp.kernel_.theta),
-                          length_scale_bounds='fixed')
+            if kernel_type == 'matern':
+                kern = Matern(nu=2.5,
+                              length_scale=np.exp(fit_gp.kernel_.theta),
+                              length_scale_bounds='fixed')
+            elif kernel_type == 'sinc':
+                kern = SincKernel(length_scale=np.exp(fit_gp.kernel_.theta),
+                                  length_scale_bounds='fixed')
+
+        
         ### end if
         self.gp = GaussianProcessRegressor(
                     kernel=kern,
@@ -42,7 +64,8 @@ class GPAgent(Agent):
         self.gp.fit(self.xs, self.ys)
 
         self.gamma_t = 0
-        self.sqrt_alpha = np.log(2/1e-6)
+        self.gamma_c =gamma_c
+        self.sqrt_alpha = beta_ucb
     ### end __init__
 
     def eval(self, xs):
@@ -51,10 +74,20 @@ class GPAgent(Agent):
         phi = self.sqrt_alpha * (np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t))
         return mu, var, phi 
 
-    def update(self, x_t, y_t, sigma_t):
+    def update(self, x_t, y_t, sigma_t, step_num=0):
         self.xs = np.vstack((self.xs, x_t))
         self.ys = np.vstack((self.ys, y_t))
-        self.gamma_t = self.gamma_t + sigma_t
+        # self.gamma_t = self.gamma_t + sigma_t
+        
+        # Update gamma
+        if isinstance(self.gamma_c, (int, float)):
+            self.gamma_t = self.gamma_t + self.gamma_c*sigma_t
+        elif callable(self.gamma_c):
+            self.gamma_t = self.gamma_t + self.gamma_c(step_num) * sigma_t
+        else:
+            msg = f'unable to use {self.gamma_c}, expected number of callable'
+            print(msg)
+            raise RuntimeError(msg)
     
         self.gp.fit(self.xs, self.ys)
     ### end update
