@@ -1,5 +1,7 @@
 # Project specific
 
+/data
+
 tests/data/
 util/plots/
 *.npy
