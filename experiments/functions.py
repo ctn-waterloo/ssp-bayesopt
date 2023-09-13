@@ -58,7 +58,7 @@ def factory(function_name: str) -> Tuple[Callable, dict, int]:
         num = re.search('\d+', function_name)
         assert num is not None
         dim = int(num[0])
-        return rosenbrock, np.array([[-10,10] for i in range(dim)]), 500 # actually theres no range, just need to cover 1,1,..,1
+        return rosenbrock, np.array([[-5,5] for i in range(dim)]), 500 # actually theres no range, just need to cover 1,1,..,1
     elif function_name=='beale':
         return beale, np.array([[-4.5,4.5], [-4.5,4.5]]), 500
     elif function_name=='easom':

@@ -22,10 +22,7 @@ function_maximum_value = {
     'rosenbrock': 0,
     'beale': 0,
     'easom': 1,
-    'mccormick': 1.9133,
-    'styblinski-tang1': 39.16599,
-    'styblinski-tang2': 39.16599*2,
-    'styblinski-tang3': 39.16599*3 #1 dim ****
+    'mccormick': 1.9133
 }
 
 import ssp_bayes_opt
@@ -41,6 +38,8 @@ class SamplingTrial(pytry.Trial):
         self.param('number of sample points', num_samples=100)
         self.param('ssp length scale', len_scale=4)
         self.param('ssp dim', ssp_dim=151)
+        self.param('n_scales', n_scales=5)
+        self.param('n_rotates', n_rotates=5)
         self.param('trial number', trial_num=None)
     
     def evaluate(self, p):        
@@ -58,6 +57,8 @@ class SamplingTrial(pytry.Trial):
                            num_restarts=1,
                            agent_type=p.agent_type,
                            ssp_dim=p.ssp_dim,
+                           n_scales = p.n_scales,
+                           n_rotates = p.n_rotates,
                            length_scale=p.len_scale,
                            decoder_method='direct-optim')
         elapsed_time = time.thread_time_ns() - start
@@ -69,7 +70,15 @@ class SamplingTrial(pytry.Trial):
             vals[i] = res['target']
             sample_locs.append(res['params'])
             
-        regrets = function_maximum_value[p.function_name] - vals
+        if "styblinski-tang" in p.function_name:
+            true_max_val = 39.16599*pbounds.shape[0]
+        elif "rastrigin" in p.function_name:
+            true_max_val = 0
+        elif "rosenbrock " in p.function_name:
+            true_max_val = 0
+        else:
+            true_max_val = function_maximum_value[p.function_name] 
+        regrets = true_max_val - vals
         print(optimizer.max)
         
         return dict(
