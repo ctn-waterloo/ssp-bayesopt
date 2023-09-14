@@ -6,6 +6,6 @@ for func in "branin-hoo" "himmelblau" "goldstein-price"
 do
 	for agt in "ssp-rand" "ssp-hex" "gp-sinc" "gp-matern"
 	do
-		python run_agent.py --agent $agt --num-trials 40 --func $func --data-dir $dest_dir --len-scale -1 --ssp-dim 151
+		python run_agent.py --agent $agt --num-trials 50 --func $func --data-dir $dest_dir --len-scale -1 --ssp-dim 151
 	done
 done

@@ -91,6 +91,7 @@ class SamplingTrial(pytry.Trial):
             mus=None,
             variances=None,
             acquisition=None,
+            total_time = optimizer.total_time
         )
 
 
