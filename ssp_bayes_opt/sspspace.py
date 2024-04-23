@@ -205,7 +205,7 @@ class SSPSpace:
         
         if method=='from-set': 
             sims = sample_ssps @ unit_ssp.T
-            return sample_points[np.argmax(sims),:]
+            return sample_points[np.argmax(sims,axis=0),:]
         elif method=='direct-optim':
             def min_func(x,target):
                 x_ssp = self.encode(np.atleast_2d(x))
