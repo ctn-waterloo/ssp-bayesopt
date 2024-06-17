@@ -8,6 +8,6 @@ do
     echo $dest_dir
 	for agt in "ssp-rand" "ssp-hex"
 	do
-		python run_agent.py --agent $agt --num-trials 10 --func $func_name --data-dir $dest_dir --len-scale -1 --ssp-dim $dim
+		python run_agent.py --agent $agt --num-trials 50 --func $func_name --data-dir $dest_dir --len-scale -1 --ssp-dim $dim
 	done
 done

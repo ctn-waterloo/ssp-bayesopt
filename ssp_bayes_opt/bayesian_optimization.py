@@ -253,6 +253,7 @@ class BayesianOptimization:
 
         print('| iter\t | target\t | x\t |')
         print('-------------------------------')
+        full_start = time.thread_time_ns()
     
 #         sorted_idxs = np.argsort(init_ys.flatten())[::-1]
 #         best_phi = agt.encode(init_xs[sorted_idxs[:num_restarts],:])
@@ -321,6 +322,8 @@ class BayesianOptimization:
             if self.log_and_plot_f is not None:
                 self.log_and_plot_f(np.vstack(self.xs), np.vstack(self.ys), t + init_xs.shape[0])
             self.agt = agt
+            
+        self.total_time = time.thread_time_ns() - full_start
 
     def _sample_domain(self, num_points: int=10) -> np.ndarray:
         sampler = qmc.Sobol(d=self.data_dim, seed=self.sampling_seed) 

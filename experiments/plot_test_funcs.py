@@ -130,9 +130,10 @@ for i,func in enumerate(funcs):
         regrets = np.divide(np.cumsum(regrets, axis=1), matlib.repmat(range(1,budget+1), num_trials,1))
         plt_datass.append( get_mean_and_ci(regrets).copy() )
     plt_datas.append(plt_datass)
-        
+
+time_func = "branin-hoo"        
 for j,agt in enumerate(agts):
-    data = pd.DataFrame(read(folder + funcs[-1] + '/' + agt))
+    data = pd.DataFrame(read(folder + time_func + '/' + agt))
     times= np.array([data['times'][k] for k in range(len(data['times']))])* 1e-9
     t_plt_datas.append(get_mean_and_ci( times )  )   
 
@@ -154,10 +155,9 @@ for i,func in enumerate(funcs):
     axs[i].set_ylabel("Average Regret")
 axs[1].legend()
     
-
-axs[-1].set_title('Sample Selection Time: ' + funcs[i].title())
+axs[-1].set_title('Sample Selection Time: ' + time_func.title())
 for j,agt in enumerate(agts):
-    data = pd.DataFrame(read(folder + func + '/' + agt))
+    data = pd.DataFrame(read(folder + time_func + '/' + agt))
     times= np.array([data['times'][k] for k in range(len(data['times']))])* 1e-9
     plt_data = t_plt_datas[j]
     axs[-1].fill_between(np.arange(times.shape[1]), plt_data["upper_bound"], plt_data["lower_bound"], alpha=.2, color=cols[j])
