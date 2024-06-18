@@ -27,6 +27,7 @@ setup(
             'numpy>=1.24.4',
             'scipy==1.10.1',
             'scikit-learn',
+            'tensorflow==2.7.0',
             'pytest',
             'mypy',
             'typing-extensions'
