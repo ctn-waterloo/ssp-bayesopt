@@ -174,6 +174,8 @@ class BayesianOptimization:
             agt = agents.GPAgent(init_xs, init_ys, 
                                 kernel_type='sinc', 
                                 updating=False, **kwargs) 
+        elif agent_type=='disc-domain':
+            agt = agents.DiscretizedDomainAgent(init_xs, init_ys, bounds=self.bounds, **kwargs)
         elif agent_type=='ssp-traj':
             agt = agents.SSPTrajectoryAgent(init_xs, init_ys, **kwargs) 
             init_xs = agt.init_xs
@@ -243,8 +245,8 @@ class BayesianOptimization:
         self.ys = []
 
         for x,y in zip(init_xs, init_ys):
-            self.xs.append(x)
-            self.ys.append(y)
+            self.xs.append(np.atleast_2d(x))
+            self.ys.append(np.atleast_2d(y))
 
 
         # Extract the upper and lower bounds of domain for sampling.
@@ -281,6 +283,11 @@ class BayesianOptimization:
                                     jac=jac_func, 
                                     method='L-BFGS-B',
                                     bounds=self.bounds)
+                    self.times[t] = time.thread_time_ns() - start
+                    solnx = np.copy(soln.x)
+                elif agent_type=='disc-domain':
+                    start = time.thread_time_ns()
+                    soln = agt.sample()
                     self.times[t] = time.thread_time_ns() - start
                     solnx = np.copy(soln.x)
                 else: ## ssp agent
@@ -320,7 +327,7 @@ class BayesianOptimization:
             self.xs.append(np.copy(x_t))
             self.ys.append(np.copy(y_t))
             if self.log_and_plot_f is not None:
-                self.log_and_plot_f(np.vstack(self.xs), np.vstack(self.ys), t + init_xs.shape[0])
+                self.log_and_plot_f(np.vstack(self.xs), np.vstack(self.ys), self.times, t + init_xs.shape[0])
             self.agt = agt
             
         self.total_time = time.thread_time_ns() - full_start
