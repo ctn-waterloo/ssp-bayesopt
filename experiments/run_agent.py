@@ -60,14 +60,15 @@ class SamplingTrial(pytry.Trial):
                            n_scales = p.n_scales,
                            n_rotates = p.n_rotates,
                            length_scale=p.len_scale,
-                           decoder_method='direct-optim')
+                           decoder_method='direct-optim',
+                           )
         elapsed_time = time.thread_time_ns() - start
 
         vals = np.zeros((p.num_init_samples + budget,))
         sample_locs = []
         
         for i, res in enumerate(optimizer.res):
-            vals[i] = res['target']
+            vals[i] = res['target'][0][0]
             sample_locs.append(res['params'])
             
         if "styblinski-tang" in p.function_name:
@@ -80,7 +81,7 @@ class SamplingTrial(pytry.Trial):
             true_max_val = function_maximum_value[p.function_name] 
         regrets = true_max_val - vals
         print(optimizer.max)
-        
+
         return dict(
             regret=regrets,
             sample_locs=sample_locs,
@@ -91,7 +92,7 @@ class SamplingTrial(pytry.Trial):
             mus=None,
             variances=None,
             acquisition=None,
-            total_time = optimizer.total_time
+            total_time = optimizer.total_time,
         )
 
 
@@ -127,6 +128,6 @@ if __name__=='__main__':
                   'seed':seed, 
                   'verbose':False,
                   'ssp_dim':args.ssp_dim,
-                  'len_scale':args.len_scale
+                  'len_scale':args.len_scale,
                   }
         r = SamplingTrial().run(**params)
