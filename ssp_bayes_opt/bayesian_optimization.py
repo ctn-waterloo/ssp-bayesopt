@@ -175,7 +175,12 @@ class BayesianOptimization:
                                 kernel_type='sinc', 
                                 updating=False, **kwargs) 
         elif agent_type=='disc-domain':
-            agt = agents.DiscretizedDomainAgent(init_xs, init_ys, bounds=self.bounds, **kwargs)
+            agt = agents.DiscretizedDomainAgent(
+                    init_xs, 
+                    init_ys, 
+                    bounds=self.bounds, 
+                    **kwargs,
+                    )
         elif agent_type=='ssp-traj':
             agt = agents.SSPTrajectoryAgent(init_xs, init_ys, **kwargs) 
             init_xs = agt.init_xs
