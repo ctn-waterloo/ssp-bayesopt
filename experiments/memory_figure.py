@@ -23,9 +23,10 @@ folder = '/run/media/furlong/Data/ssp-bayesopt/memory-test/'
 funcs = ["himmelblau" , "goldstein-price","branin-hoo"]
 fig_let = ['A','B','C']
 let_pos = [0, 0.32, 0.635]
-agts=[ "gp-matern", "gp-sinc", "ssp-hex","ssp-rand"]
+# agts=[ "gp-matern", "gp-sinc", "ssp-hex","ssp-rand"]
+agts=[ "gp-ucb-matern", "gp-ucb-sinc", "ssp-hex","ssp-rand"]
 # labels=['SSP-BO-Hex','SSP-BO-Rand','GP-MI-sinc', 'GP-MI-Matern']
-labels=['GP-MI-Matern', 'GP-MI-Sinc', 'SSP-BO-Hex','SSP-BO-Rand']
+labels=['GP-UCB-Matern', 'GP-UCB-Sinc', 'SSP-BO-Hex','SSP-BO-Rand']
 cols = [utils.reds[0], utils.greens[0], utils.blues[0], utils.oranges[0]]
 linestys = ['-.',':','-','--']
 
@@ -67,7 +68,7 @@ for f_idx, mem_func in enumerate(funcs):
             plt.ylabel(r'$\Delta$ Memory (MB)')
             plt.legend()
         elif f_idx == 2:
-            plt.gca().annotate(r'GP-BO', 
+            plt.gca().annotate(r'GP-MI', 
              xy=(175,0.3), xycoords='data',
              xytext=(20,0.5), textcoords='data',
              arrowprops=dict(arrowstyle='->', connectionstyle='arc3, rad=0.3', shrinkA=0.05))
