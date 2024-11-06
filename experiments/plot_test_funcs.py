@@ -111,10 +111,15 @@ def npz(fn):
 # 7.1413in 3.48761in
 
 
-folder = os.path.abspath(os.path.join(os.getcwd(), os.pardir)) + '/data/test-funcs/'
+# folder = os.path.abspath(os.path.join(os.getcwd(), os.pardir)) + '/data/test-funcs/'
 funcs = ["himmelblau" , "goldstein-price","branin-hoo"]
-agts=[ "ssp-hex","ssp-rand" ,"gp-sinc", "gp-matern"]
-labels=['SSP-BO-Hex','SSP-BO-Rand','GP-MI-sinc', 'GP-MI-Matern']
+
+folder = '/run/media/furlong/Data/ssp-bayesopt/timing-test/direct-optim/'
+# agts=[ "ssp-hex","ssp-rand" ,"gp-sinc", "gp-matern"]
+# labels=['SSP-BO-Hex','SSP-BO-Rand','GP-MI-sinc', 'GP-MI-Matern']
+# folder = '/run/media/furlong/Data/ssp-bayesopt/memory-test/'
+agts=[ "ssp-hex","ssp-rand" ,"gp-ucb-sinc", "gp-ucb-matern"]
+labels=['SSP-BO-Hex','SSP-BO-Rand','GP-UCB-sinc', 'GP-UCB-Matern']
 cols = [utils.blues[0], utils.oranges[0], utils.greens[0],  utils.reds[0]]
 linestys = ['-','--',':','-.']
 
@@ -172,6 +177,7 @@ fig.text(0.5,0.95, '\\textbf{B}', size=12, va="baseline", ha="left")
 fig.text(0.03,0.49, '\\textbf{C}', size=12, va="baseline", ha="left")
 fig.text(0.5,0.49, '\\textbf{D}', size=12, va="baseline", ha="left")
 
-utils.save(fig, 'test-func_regret.pdf')
+# utils.save(fig, 'test-func_regret.pdf')
+plt.show()
 
 
