@@ -10,11 +10,11 @@ mpl.rc_file(os.path.join(os.path.dirname(__file__), 'matplotlibrc'))
 mpl.rcParams["text.usetex"] = True
 mpl.rcParams["text.latex.preamble"] = r"""
     \usepackage{siunitx}
-    \usepackage{libertine}
-    \usepackage{libertinust1math}
+    %\usepackage{libertine}
+    %\usepackage{libertinust1math}
     \usepackage{mathrsfs}
     \usepackage{amssymb}
-    \renewcommand*\familydefault{\sfdefault}
+    %\renewcommand*\familydefault{\sfdefault}
     \renewcommand{\vec}[1]{\mathbf{#1}}
     \newcommand{\mat}[1]{\mathbf{#1}}
 """
