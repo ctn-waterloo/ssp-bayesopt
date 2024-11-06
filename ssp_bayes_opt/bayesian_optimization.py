@@ -6,11 +6,11 @@ import sys
 from scipy.stats import qmc
 
 logger = logging.getLogger()
-# logger.setLevel(logging.DEBUG)
-# 
-# handler = logging.StreamHandler(sys.stdout)
-# handler.setLevel(logging.DEBUG)
-# logger.addHandler(handler)
+logger.setLevel(logging.DEBUG)
+
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.DEBUG)
+logger.addHandler(handler)
 
 from . import agents
 from . import sspspace
@@ -18,6 +18,13 @@ from . import sspspace
 # from scipy.stats import qmc
 from scipy.optimize import minimize, Bounds
 from typing import Callable
+
+from guppy import hpy
+
+def get_memory_usage(h):
+    return h.heap().size / 1024 ** 2
+#     mem_info = psutil.Process().memory_info()
+#     return (mem_info.rss / 1024.**2, mem_info.vms / 1024 ** 2)
 
 class BayesianOptimization:
     def __init__(self, f: Callable[...,float] =None, bounds: np.ndarray=None,
@@ -143,10 +150,13 @@ class BayesianOptimization:
         else:
             init_xs = np.copy(init_points[0])
             n_init_points = init_xs.shape[0]
+
         logger.info('Evaluating Domain Samples')
         if isinstance(init_points, tuple) and init_points[1] is not None:
+            logger.info('Loading Pre-evaluated Samples')
             init_ys = init_points[1]
         else:
+            logger.info('Executing Target Function')
             init_ys = np.array(
                     [self.target(np.atleast_2d(x), str(itr))
                      for itr, x in enumerate(init_xs)]).reshape((n_init_points,-1))
@@ -170,8 +180,16 @@ class BayesianOptimization:
             agt = agents.GPAgent(init_xs, init_ys, 
                                 kernel_type='matern', 
                                 updating=False, **kwargs) 
+        elif agent_type=='gp-ucb-matern':
+            agt = agents.GPUCBAgent(init_xs, init_ys, 
+                                kernel_type='matern', 
+                                updating=False, **kwargs) 
         elif agent_type=='gp-sinc':
             agt = agents.GPAgent(init_xs, init_ys, 
+                                kernel_type='sinc', 
+                                updating=False, **kwargs) 
+        elif agent_type=='gp-ucb-sinc':
+            agt = agents.GPUCBAgent(init_xs, init_ys, 
                                 kernel_type='sinc', 
                                 updating=False, **kwargs) 
         elif agent_type=='ssp-traj':
@@ -229,7 +247,7 @@ class BayesianOptimization:
         # print(np.mean(np.linalg.norm(sample_xs - (sample_ssps @ self.ssp_to_domain_mat),axis=1)))
 
         logger.info('Maximizing')
-        
+       
         agt, init_xs, init_ys = self.initialize_agent(init_points,
                                                       agent_type,
                                                       domain_bounds=self.bounds,
@@ -239,12 +257,13 @@ class BayesianOptimization:
         #self.length_scale = agt.length_scale()
 
         self.times = np.zeros((n_iter,))
-        self.xs = []
-        self.ys = []
+        self.memory = np.zeros((n_iter,1)) 
+        self.xs = np.zeros((n_iter + init_xs.shape[0], init_xs.shape[1]))
+        self.ys = np.zeros((n_iter + init_xs.shape[0],))
 
-        for x,y in zip(init_xs, init_ys):
-            self.xs.append(x)
-            self.ys.append(y)
+        for row_idx, (x,y) in enumerate(zip(init_xs, init_ys)):
+            self.xs[row_idx] = x
+            self.ys[row_idx] = y
 
 
         # Extract the upper and lower bounds of domain for sampling.
@@ -259,7 +278,14 @@ class BayesianOptimization:
 #         best_phi = agt.encode(init_xs[sorted_idxs[:num_restarts],:])
 #         best_phi_score = init_ys[sorted_idxs[:num_restarts]]
         best_phi_score = np.ones((num_restarts,)) * -np.inf
+        solns = np.zeros((num_restarts,init_xs.shape[1]))
+        vals = np.zeros((num_restarts,))
+
+        gp_agent_types = ['gp-matern','gp-ucb-matern','gp-sinc','gp-ucb-sinc']
+        heap = hpy()
+        heap.setref()
         for t in range(n_iter):
+#             heap.setref()
             ## Begin timing section
             if hasattr(time, 'thread_time_ns'):
                 start = time.thread_time_ns()
@@ -268,12 +294,9 @@ class BayesianOptimization:
             optim_func, jac_func = agt.acquisition_func()
 
             # Use optimization to find a sample location
-            solns = []
-            vals = []
-
             for restart_idx in range(num_restarts):
 
-                if agent_type=='gp-matern' or agent_type=='gp-sinc':
+                if agent_type in gp_agent_types:
                     x_init = np.random.uniform(low=lbounds, high=ubounds, size=(len(ubounds),))
                     # Do bounded optimization to ensure x stays in bound
                     start = time.thread_time_ns()
@@ -294,15 +317,15 @@ class BayesianOptimization:
                         self.times[t] = time.thread_time_ns() - start
                     # TODO: move this outside the num_restarts loop
                     solnx = agt.decode(np.copy(np.atleast_2d(soln.x)))
-                vals.append(-soln.fun)
-                solns.append(solnx)
+                vals[restart_idx] = -soln.fun
+                solns[restart_idx] = solnx
 #             if hasattr(time, 'thread_time_ns'):
 #                 self.times[t] = time.thread_time_ns() - start
             ## END timing section
 
             optimization_status = f'{t+init_xs.shape[0]}'
 
-            best_val_idx = np.argmax(vals)
+            best_val_idx = np.argmax(vals[:(t+1)])
             x_t = np.atleast_2d(solns[best_val_idx].flatten())
             y_t = np.atleast_2d(self.target(x_t, optimization_status))
 
@@ -314,13 +337,18 @@ class BayesianOptimization:
             mu_t, var_t, phi_t = agt.eval(x_t)
 
             print(f'| step {t+init_xs.shape[0]}\t | {y_t}, {np.sqrt(var_t)}, {phi_t}\t ')#| {x_t}\t |')
+            update_start = time.thread_time_ns()
             agt.update(x_t, y_t, var_t, step_num=t + init_xs.shape[0])
+            self.times[t] += time.thread_time_ns() - update_start
+
+            self.memory[t,0] = get_memory_usage(heap)
 
             # Log actions
-            self.xs.append(np.copy(x_t))
-            self.ys.append(np.copy(y_t))
+            t_now = t + init_xs.shape[0]
+            self.xs[t_now] = np.copy(x_t)
+            self.ys[t_now] = np.copy(y_t)
             if self.log_and_plot_f is not None:
-                self.log_and_plot_f(np.vstack(self.xs), np.vstack(self.ys), t + init_xs.shape[0])
+                self.log_and_plot_f(np.vstack(self.xs[:t_now+1]), np.vstack(self.ys[:t_now+1]),times=self.times, trial=t_now, memory=self.memory)
             self.agt = agt
             
         self.total_time = time.thread_time_ns() - full_start
