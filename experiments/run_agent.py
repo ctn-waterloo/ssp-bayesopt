@@ -37,6 +37,7 @@ class SamplingTrial(pytry.Trial):
         self.param('num initial samples', num_init_samples=10)
         self.param('number of sample points', num_samples=100)
         self.param('ssp length scale', len_scale=4)
+        self.param('UCB Beta', beta_ucb=1.0)
         self.param('ssp dim', ssp_dim=151)
         self.param('n_scales', n_scales=5)
         self.param('n_rotates', n_rotates=5)
@@ -49,6 +50,7 @@ class SamplingTrial(pytry.Trial):
         optimizer = ssp_bayes_opt.BayesianOptimization(f=target,
                                                        bounds=pbounds, 
                                                        verbose=p.verbose,
+
                                                        sampling_seed=p.seed)
         
         start = time.thread_time_ns()
@@ -60,7 +62,10 @@ class SamplingTrial(pytry.Trial):
                            n_scales = p.n_scales,
                            n_rotates = p.n_rotates,
                            length_scale=p.len_scale,
-                           decoder_method='direct-optim')
+#                            decoder_method='direct-optim',
+                           decoder_method='network-optim',
+                           beta_ucb=p.beta_ucb,
+                           )
         elapsed_time = time.thread_time_ns() - start
 
         vals = np.zeros((p.num_init_samples + budget,))
@@ -86,6 +91,7 @@ class SamplingTrial(pytry.Trial):
             sample_locs=sample_locs,
             elapsed_time=elapsed_time,
             times = optimizer.times,#selected_len_scale = optimizer.length_scale,
+            memory = optimizer.memory,
             budget=budget,
             vals=vals,
             mus=None,
@@ -104,6 +110,7 @@ if __name__=='__main__':
     parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=151)
     parser.add_argument('--len-scale', dest='len_scale', type=float, default=4)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=100)
+    parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=1.0)
     parser.add_argument('--num-trials', dest='num_trials', type=int, default=1)
     parser.add_argument('--data-dir', dest='data_dir', type=str, default='/home/ns2dumon/Documents/ssp-bayesopt/experiments/data/')
 
@@ -127,6 +134,7 @@ if __name__=='__main__':
                   'seed':seed, 
                   'verbose':False,
                   'ssp_dim':args.ssp_dim,
-                  'len_scale':args.len_scale
+                  'len_scale':args.len_scale,
+                  'beta_ucb':args.beta_ucb,
                   }
         r = SamplingTrial().run(**params)
