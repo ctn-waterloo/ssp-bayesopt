@@ -1,6 +1,10 @@
 #!/bin/bash
 
-dest_dir="/home/ns2dumon/Documents/ssp-bayesopt/data/test-funcs"
+# dest_dir="/home/ns2dumon/Documents/ssp-bayesopt/data/test-funcs"
+# dest_dir="/run/media/furlong/Data/ssp-bayesopt/timing-test"
+dest_dir="/run/media/furlong/Data/ssp-bayesopt/memory-test"
+
+
 echo $dest_dir
 for func in "branin-hoo" "himmelblau" "goldstein-price"
 do
