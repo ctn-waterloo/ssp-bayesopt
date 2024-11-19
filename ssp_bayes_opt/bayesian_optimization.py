@@ -238,12 +238,15 @@ class BayesianOptimization:
         #self.length_scale = agt.length_scale()
 
         self.times = np.zeros((n_iter,))
-        self.xs = []
-        self.ys = []
+        self.memory = np.ones((n_iter,))
 
-        for x,y in zip(init_xs, init_ys):
-            self.xs.append(x)
-            self.ys.append(y)
+
+        self.xs = np.zeros((n_iter + init_xs.shape[0], init_xs.shape[1]))
+        self.ys = np.zeros((n_iter + init_xs.shape[0],))
+
+        for row_idx, (x,y) in enumerate(zip(init_xs, init_ys)):
+            self.xs[row_idx] = x
+            self.ys[row_idx] = y
 
 
         # Extract the upper and lower bounds of domain for sampling.
@@ -278,7 +281,7 @@ class BayesianOptimization:
                     x_init = np.random.uniform(low=lbounds, high=ubounds, size=(len(ubounds),))
                     # Do bounded optimization to ensure x stays in bound
                     start = time.thread_time_ns()
-                    soln = minimize(optim_func, x_init,
+                    soln = minimize(optim_func, x_init.flatten(),
                                     jac=jac_func, 
                                     method='L-BFGS-B',
                                     bounds=self.bounds)
@@ -288,7 +291,7 @@ class BayesianOptimization:
 #                     phi_init = np.copy(best_phi[restart_idx,:])
                     phi_init = agt.initial_guess()
                     start = time.thread_time_ns()
-                    soln = minimize(optim_func, phi_init,
+                    soln = minimize(optim_func, phi_init.flatten(),
                                     jac=jac_func, 
                                     method='L-BFGS-B')
                     if hasattr(time, 'thread_time_ns'):
@@ -319,10 +322,18 @@ class BayesianOptimization:
             agt.update(x_t, y_t, var_t, step_num=t + init_xs.shape[0])
 
             # Log actions
-            self.xs.append(np.copy(x_t))
-            self.ys.append(np.copy(y_t))
+            t_now = t + init_xs.shape[0]
+            self.xs[t_now] = np.copy(x_t)
+            self.ys[t_now] = np.copy(y_t)
             if self.log_and_plot_f is not None:
-                self.log_and_plot_f(np.vstack(self.xs), np.vstack(self.ys), t + init_xs.shape[0])
+#                 self.log_and_plot_f(np.vstack(self.xs), np.vstack(self.ys), t + init_xs.shape[0], trial=t_now, memory=self.memory)
+                self.log_and_plot_f(
+                    np.vstack(self.xs[:t_now+1]), 
+                    np.vstack(self.ys[:t_now+1]),
+                    times=self.times, 
+                    trial=t_now, 
+                    memory=self.memory
+                )
             self.agt = agt
 
     def _sample_domain(self, num_points: int=10) -> np.ndarray:
