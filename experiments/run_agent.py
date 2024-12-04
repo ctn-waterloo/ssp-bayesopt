@@ -62,8 +62,8 @@ class SamplingTrial(pytry.Trial):
                            n_scales = p.n_scales,
                            n_rotates = p.n_rotates,
                            length_scale=p.len_scale,
-#                            decoder_method='direct-optim',
-                           decoder_method='network-optim',
+                           decoder_method='direct-optim',
+#                            decoder_method='network-optim',
                            beta_ucb=p.beta_ucb,
                            )
         elapsed_time = time.thread_time_ns() - start
