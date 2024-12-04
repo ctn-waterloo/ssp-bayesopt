@@ -25,7 +25,13 @@ function_maximum_value = {
     'mccormick': 1.9133,
     'styblinski-tang1': 39.16599,
     'styblinski-tang2': 39.16599*2,
-    'styblinski-tang3': 39.16599*3 #1 dim ****
+    'styblinski-tang3': 39.16599*3, #1 dim ****
+    'styblinski-tang4': 39.16599*4, #1 dim ****
+    'styblinski-tang5': 39.16599*5, #1 dim ****
+    'styblinski-tang6': 39.16599*6, #1 dim ****
+    'styblinski-tang7': 39.16599*7, #1 dim ****
+    'styblinski-tang8': 39.16599*8, #1 dim ****
+    'styblinski-tang9': 39.16599*9, #1 dim ****
 }
 
 import ssp_bayes_opt
@@ -58,7 +64,9 @@ class SamplingTrial(pytry.Trial):
                            num_restarts=1,
                            agent_type=p.agent_type,
                            ssp_dim=p.ssp_dim,
-                           length_scale=p.len_scale)
+                           length_scale=p.len_scale,
+                           decoder_method='direct-optim',
+                           )
         elapsed_time = time.thread_time_ns() - start
 
         vals = np.zeros((p.num_init_samples + budget,))
