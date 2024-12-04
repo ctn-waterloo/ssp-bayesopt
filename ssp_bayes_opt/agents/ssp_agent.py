@@ -15,7 +15,7 @@ from .kernels import SincKernel
 from .agent import Agent
 
 class SSPAgent(Agent):
-    def __init__(self, init_xs, init_ys, ssp_space=None,decoder_method='network-optim', **kwargs):
+    def __init__(self, init_xs, init_ys, ssp_space=None,decoder_method='direct-optim', **kwargs):
         super().__init__()
   
         (num_pts, data_dim) = init_xs.shape
