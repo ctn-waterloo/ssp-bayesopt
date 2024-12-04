@@ -15,12 +15,19 @@ ssp_dims = (2*(dims+1)*(ns*n_scales) + 1).astype(int)
 ssp_dims = 1 + 2**np.array([5, 6, 7, 8, 9, 10])
 # ssp_dim = 300
 
+num_trials = 10
+
 #         dest_dir="/home/ns2dumon/Documents/ssp-bayesopt/data/var-dim-sensitivity/" + str(dim) + "/"
 for i,dim in enumerate(dims):
     # run the gp model
     dest_dir=f"/run/media/furlong/Data/bo-ssp/var-dim-sensitivity/{dim}/" 
     os.system("python run_agent.py --agent gp-matern" 
-            + " --num-trials 30 --func " + func_name + str(dim) 
+            + f" --num-trials {num_trials} --func " + func_name + str(dim) 
+            + " --data-dir " + dest_dir 
+            + " --len-scale -1 "
+        )
+    os.system("python run_agent.py --agent gp-sinc" 
+            + f" --num-trials {num_trials} --func " + func_name + str(dim) 
             + " --data-dir " + dest_dir 
             + " --len-scale -1 "
         )
@@ -29,7 +36,7 @@ for i,dim in enumerate(dims):
         ssp_dest_dir = dest_dir + f'{ssp_dim}/'
         for agt in ["ssp-rand"]: #"ssp-hex", "gp-sinc" 
             os.system("python run_agent.py --agent " + agt
-                    + " --num-trials 30 --func " + func_name + str(dim) 
+                    + f" --num-trials {num_trials} --func " + func_name + str(dim) 
                     + " --data-dir " + ssp_dest_dir 
                     + " --len-scale -1 --ssp-dim " + str(ssp_dim)
             )
