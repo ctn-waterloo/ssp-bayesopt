@@ -1,0 +1,55 @@
+import numpy as np
+
+class DiscretizedFunction:
+    def __init__(self, bounds, len_scale):
+        self.bins = []
+        for b, l in zip(bounds, len_scale):
+            num_bins = np.maximum(1 + 2*int((b[1]-b[0]) / l), 10)
+#             print('num bins', num_bins, l)
+            assert num_bins > 0, f'Error = {b}, {l}'
+            self.bins.append(np.linspace(b[0],b[1],num_bins))
+
+        self.sum_f = np.zeros(tuple([b.size-1 for b in self.bins]))
+        self.sum_f2 = np.ones(self.sum_f.shape)
+        self.counts = np.ones(self.sum_f.shape)
+
+    def update(self, x, f):
+        assert x.shape[0] == 1
+        idx = self._get_idx(x[0,:])
+        self.counts.flat[idx] += 1
+        self.sum_f.flat[idx] += f
+        self.sum_f2.flat[idx] += f**2
+
+    def predict(self, x):
+        assert x.shape[0] == 1
+        idx = self._get_idx(x[0,:])
+        n = self.counts.flat[idx]
+        mu = self.sum_f.flat[idx] / n
+        var = (self.sum_f2.flat[idx] / n) - (mu * mu)
+        return mu, np.sqrt(var)
+
+    def _get_idx(self, x):
+        v = np.squeeze(
+                [np.maximum(0, np.digitize(x[b_idx], b, right=True)-1) for b_idx, b in enumerate(self.bins)]
+                )
+        return np.ravel_multi_index(v,self.sum_f.shape)
+
+    def sample(self, acq_func):
+
+        mean_arr = np.divide(self.sum_f, self.counts)
+        var_arr = np.divide(self.sum_f2, self.counts) - np.multiply(mean_arr, mean_arr)
+        acq_vals = acq_func(mean_arr, var_arr)
+
+        try:
+            max_val = np.max(acq_vals)
+        except ValueError as ve:
+            print(ve)
+            print(acq_vals)
+            print(mean_arr)
+            print(self.bins)
+            exit()
+        idxs = np.where(acq_vals == max_val)
+        choice_idx = np.random.choice(np.arange(len(idxs[0])))
+        xs = np.squeeze([np.mean(self.bins[dim_idx][l[choice_idx]:l[choice_idx]+2]) for dim_idx, l in enumerate(idxs)])
+#         print('sample', xs, max_val)
+        return xs, max_val
