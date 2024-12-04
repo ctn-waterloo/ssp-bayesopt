@@ -445,7 +445,7 @@ class RandomSSPSpace(SSPSpace):
     '''
     Creates an SSP space using randomly generated frequency components.
     '''
-    def __init__(self, domain_dim: int, ssp_dim: int,  domain_bounds=None, length_scale=1, rng=np.random.default_rng()):
+    def __init__(self, domain_dim: int, ssp_dim: int,  domain_bounds=None, length_scale=1, rng=np.random.default_rng(), **_):
 #         partial_phases = rng.random.rand(ssp_dim//2,domain_dim)*2*np.pi - np.pi
         
         
