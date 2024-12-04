@@ -140,7 +140,7 @@ class SSPAgent(Agent):
 
         return min_func, gradient
 
-    def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float):
+    def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float, step_num=0):
         '''
         Updates the state of the Bayesian Linear Regression.
         '''
