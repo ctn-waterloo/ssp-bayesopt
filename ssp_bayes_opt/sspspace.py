@@ -2,8 +2,185 @@ import numpy as np
 from scipy.stats import qmc
 from scipy.stats import special_ortho_group
 from scipy.optimize import minimize
+from nengo.dists import Distribution, UniformHypersphere, ScatteredHypersphere
 
 import warnings
+
+
+class SPSpace:
+    r"""  Class for Semantic Pointer (SP) representation mapping
+
+    This is similar to nengo_spa vocabs but structured differently.
+
+    Parameters
+    ----------
+        domain_size : int
+            The number of discrete symbols that will be encoded in this space.
+
+        dim : int
+            The dimensionality of the SPs, should be >= domain_size.
+
+        seed : int
+            The seed for generating the SPs. Default is None.
+
+    Attributes
+    ----------
+        domain_size, dim : int
+
+        vectors : np.ndarray
+           A (domain_size x dim) array of all SPs
+
+        inverse_vectors : Node
+            Inverse (under binding) SPs
+
+    Examples
+    --------
+       from sspslam import SPSpace
+       sp_space = SPSpace(5, 100)
+
+    """
+
+    def __init__(self, domain_size: int, dim: int, seed=None, vectors=None, **kwargs):
+        self.domain_size = int(domain_size)
+        self.dim = int(dim)
+        if np.issubdtype(type(seed), np.integer):
+            rng = np.random.RandomState(seed)
+        else:
+            rng = np.random.RandomState()
+        self.rng = rng
+        if self.domain_size == 1:  # only one is special case, vectors only contains identity
+            self.vectors = np.zeros((self.domain_size, self.dim))
+            self.vectors[:, 0] = 1
+        elif vectors is not None:
+            self.vectors = vectors
+        else:
+            self.vectors = self.make_unitary(
+                UniformHypersphere(surface=True).sample(self.domain_size, self.dim, rng=rng))
+
+            for j in range(self.domain_size):
+                q = self.vectors[j, :] / np.linalg.norm(self.vectors[j, :])
+                for k in range(j + 1, self.domain_size):
+                    self.vectors[k, :] = self.vectors[k, :] - (q.T @ self.vectors[k, :]) * q
+        self.inverse_vectors = self.invert(self.vectors)
+        # self.make_unitary(self.rng.randn(self.domain_size,self.dim))
+
+    def encode(self, i):
+        """
+        Maps index to SP
+
+        Parameters
+        ----------
+        i : np.array
+            An array of ints, each in [0, domain_size)
+
+        Returns
+        -------
+        np.array
+            Semantic Pointers.
+
+        """
+        return self.vectors[i.reshape(-1).astype(int)]
+
+    def decode(self, v, **kwargs):
+        """
+        Maps dim-D vector to index
+
+        Parameters
+        ----------
+        v : np.array
+            A (n_samples x ssp_dim) vector
+
+        Returns
+        -------
+        np.array
+            A n_samples length vector of indexes
+
+        """
+        sims = self.vectors @ v.T
+        return np.argmax(sims, axis=0)
+
+    def clean_up(self, v, **kwargs):
+        """
+        Maps dim-D vector to SP
+
+        Parameters
+        ----------
+        v : np.array
+            A (n_samples x ssp_dim) vector
+
+        Returns
+        -------
+        np.array
+            A (n_samples x ssp_dim) vector, each row a Semantic Pointer.
+
+        """
+        sims = self.vectors @ v.T
+        return self.vectors[np.argmax(sims, axis=0)]
+
+    def normalize(self, v):
+        """
+        Normalizes input
+        """
+        return v / np.sqrt(np.sum(v ** 2))
+
+    def make_unitary(self, v):
+        """
+        Makes input unitary (Fourier components have magnitude of 1)
+        """
+        fv = np.fft.fft(v, axis=1)
+        fv = fv / np.sqrt(fv.real ** 2 + fv.imag ** 2)
+        return np.fft.ifft(fv, axis=1).real
+
+    def identity(self):
+        """
+        Returns
+        -------
+        np.array
+            dim-D identity vector under binding
+
+        """
+        s = np.zeros(self.dim)
+        s[0] = 1
+        return s
+
+    def bind(self, a, b):
+        """
+        Binds together input
+
+        Parameters
+        ----------
+        a : np.array
+            A vector with shape (n_samples x ssp_dim)
+
+        b : np.array
+            A vector with shape (n_samples x ssp_dim)
+
+        Returns
+        -------
+        np.array
+            A vector with shape (n_samples x ssp_dim). Row i is a[i,:] binded with b[i,:]
+
+        """
+        a = np.atleast_2d(a)
+        b = np.atleast_2d(b)
+        return np.fft.ifft(np.fft.fft(a, axis=1) * np.fft.fft(b, axis=1), axis=1).real
+
+    def invert(self, a):
+        """
+        Inverts input under binding
+        """
+        a = np.atleast_2d(a)
+        return a[:, -np.arange(self.dim)]
+
+    def get_binding_matrix(self, v):
+        """
+        Maps input vector to a matrix that, when multiplied with another vecotr, will bind vectors
+        """
+        C = np.zeros((self.dim, self.dim))
+        for i in range(self.dim):
+            for j in range(self.dim):
+                C[i, j] = v[:, (i - j) % self.dim]
+        return C
 
 class SSPSpace:
     def __init__(self, domain_dim: int, ssp_dim: int, axis_matrix=None, phase_matrix=None,

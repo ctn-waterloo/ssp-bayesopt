@@ -138,6 +138,9 @@ class BayesianOptimization:
                                                      kwargs['x_dim'],
                                                      self.bounds,
                                                      kwargs.pop('goals',None))
+        elif 'nas' in agent_type:
+            logger.info('Creating NAS Graph Domain')
+            domain = agents.domains.NASGraphDomain(self.target)
         else:
             logger.info('Creating Rectangular Domain')
             domain = agents.domains.BoundedDomain(self.bounds)
@@ -202,6 +205,10 @@ class BayesianOptimization:
             agt = agents.SSPMultiAgent(init_xs, init_ys, **kwargs) 
             init_xs = agt.init_xs
             init_ys = agt.init_ys
+        elif agent_type=='ssp-nas-graph':
+            agt = agents.SSPNASGraphAgent(init_xs, init_ys, **kwargs)
+            init_xs = agt.init_xs
+            init_ys = agt.init_ys
         else:
             raise NotImplementedError(f'{agent_type} agent not implemented')
         logger.info(f'{type(agt).__name__} Agent created')
@@ -263,17 +270,14 @@ class BayesianOptimization:
         self.xs = np.zeros((n_iter + init_xs.shape[0], init_xs.shape[1]))
         self.ys = np.zeros((n_iter + init_xs.shape[0],))
 
-<<<<<<< HEAD
+
         for row_idx, (x,y) in enumerate(zip(init_xs, init_ys)):
             self.xs[row_idx] = x
             self.ys[row_idx] = y
-=======
-        for x,y in zip(init_xs, init_ys):
-            self.xs.append(np.atleast_2d(x))
-            self.ys.append(np.atleast_2d(y))
->>>>>>> 1fec28b123e6d1f4d60f1af34590116e061a55bd
 
 
+
+        # Extract the upper and lower bounds of domain for sampling.
         # Extract the upper and lower bounds of domain for sampling.
         lbounds = self.bounds[:,0]
         ubounds = self.bounds[:,1]
@@ -323,7 +327,7 @@ class BayesianOptimization:
 #                     phi_init = np.copy(best_phi[restart_idx,:])
                     phi_init = agt.initial_guess()
                     start = time.thread_time_ns()
-                    soln = minimize(optim_func, phi_init,
+                    soln = minimize(optim_func, phi_init.flatten(),
                                     jac=jac_func, 
                                     method='L-BFGS-B')
                     if hasattr(time, 'thread_time_ns'):
@@ -361,11 +365,8 @@ class BayesianOptimization:
             self.xs[t_now] = np.copy(x_t)
             self.ys[t_now] = np.copy(y_t)
             if self.log_and_plot_f is not None:
-<<<<<<< HEAD
                 self.log_and_plot_f(np.vstack(self.xs[:t_now+1]), np.vstack(self.ys[:t_now+1]),times=self.times, trial=t_now, memory=self.memory)
-=======
-                self.log_and_plot_f(np.vstack(self.xs), np.vstack(self.ys), self.times, t + init_xs.shape[0])
->>>>>>> 1fec28b123e6d1f4d60f1af34590116e061a55bd
+
             self.agt = agt
             
         self.total_time = time.thread_time_ns() - full_start

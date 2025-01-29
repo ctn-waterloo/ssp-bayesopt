@@ -62,8 +62,8 @@ class SamplingTrial(pytry.Trial):
                            n_scales = p.n_scales,
                            n_rotates = p.n_rotates,
                            length_scale=p.len_scale,
-#                            decoder_method='direct-optim',
-                           decoder_method='network-optim',
+                           decoder_method='direct-optim',
+                           # decoder_method='network-optim',
                            beta_ucb=p.beta_ucb,
                            )
         elapsed_time = time.thread_time_ns() - start
@@ -112,7 +112,7 @@ if __name__=='__main__':
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=100)
     parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=1.0)
     parser.add_argument('--num-trials', dest='num_trials', type=int, default=1)
-    parser.add_argument('--data-dir', dest='data_dir', type=str, default='/home/ns2dumon/Documents/ssp-bayesopt/experiments/data/')
+    parser.add_argument('--data-dir', dest='data_dir', type=str, default='data')
 
 
 
@@ -122,7 +122,7 @@ if __name__=='__main__':
     # random.seed(1)
     seeds = [random.randint(1,100000) for _ in range(args.num_trials)]
 
-    data_path = os.path.join(args.data_dir,args.function_name,args.agent_type)
+    data_path = os.path.join(os.getcwd(),args.data_dir,args.function_name,args.agent_type)
     if not os.path.exists(data_path):
         os.makedirs(data_path)
     for seed in seeds:
