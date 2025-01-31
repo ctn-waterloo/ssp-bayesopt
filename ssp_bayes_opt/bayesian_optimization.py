@@ -138,9 +138,9 @@ class BayesianOptimization:
                                                      kwargs['x_dim'],
                                                      self.bounds,
                                                      kwargs.pop('goals',None))
-        elif 'nas' in agent_type:
-            logger.info('Creating NAS Graph Domain')
-            domain = agents.domains.NASGraphDomain(self.target)
+        elif ('nas' in agent_type) or ('mcbo' in agent_type): # both just assume the target has a sample method
+            logger.info(f'Creating {agent_type} Domain')
+            domain = agents.domains.TargetDefinedDomain(self.target)
         else:
             logger.info('Creating Rectangular Domain')
             domain = agents.domains.BoundedDomain(self.bounds)
@@ -207,6 +207,10 @@ class BayesianOptimization:
             init_ys = agt.init_ys
         elif agent_type=='ssp-nas-graph':
             agt = agents.SSPNASGraphAgent(init_xs, init_ys, **kwargs)
+            init_xs = agt.init_xs
+            init_ys = agt.init_ys
+        elif agent_type=='ssp-mcbo':
+            agt = agents.SSPMCBOAgent(init_xs, init_ys, self.target.search_space, **kwargs)
             init_xs = agt.init_xs
             init_ys = agt.init_ys
         else:

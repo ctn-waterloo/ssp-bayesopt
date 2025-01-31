@@ -79,7 +79,8 @@ class SPSpace:
             Semantic Pointers.
 
         """
-        return self.vectors[i.reshape(-1).astype(int)]
+        i = np.atleast_1d(i)
+        return self.vectors[i.flatten().astype(int)]
 
     def decode(self, v, **kwargs):
         """

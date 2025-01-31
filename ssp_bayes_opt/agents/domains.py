@@ -128,7 +128,7 @@ class TrajectoryDomain(Domain):
     ### end sample 
 
 
-class NASGraphDomain(Domain):
+class TargetDefinedDomain(Domain):
     def __init__(self, target):
         self.target = target
 

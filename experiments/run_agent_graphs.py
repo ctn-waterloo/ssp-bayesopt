@@ -15,12 +15,12 @@ import ssp_bayes_opt
 import numpy as np
 
 
-# Requries installing https://github.com/google-research/nasbench
+# Requires installing NAS-bench: https://github.com/google-research/nasbench
 # and downloading nasbench_only108.tfrecord
 # See https://github.com/google-research/nasbench
-# Recommend using seperate env
+# Recommend using separate env
 
-# git clone https://github.com/google-research/nasbench
+# git clone git@github.com:google-research/nasbench.git
 # cd nasbench
 # pip install -e .
 # python nasbench/scripts/generate_graphs.py
@@ -32,7 +32,7 @@ import numpy as np
 class NASBench:
     def __init__(self, data_dir='nasbench', results=None, graphs=None):
         """
-        Initialize the NASBench
+        Initialize the NASBench objective function
         """
         if results is None:
             self.results = api.NASBench(os.path.join(data_dir, 'nasbench_only108.tfrecord'))

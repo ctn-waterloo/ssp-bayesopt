@@ -14,7 +14,7 @@ from .agent import Agent
 # https://github.com/google-research/nasbench
 class SSPNASGraphAgent(Agent):
     def __init__(self, init_xs, init_ys,
-                 max_nodes=9, max_edges=7, num_ops = 3,
+                 max_nodes=9, max_edges=7, num_ops=3,
                  ssp_dim=151,
                  gamma_c=1.0,
                  beta_ucb=np.log(2/1e-6),
@@ -25,7 +25,7 @@ class SSPNASGraphAgent(Agent):
         self.max_edges = max_edges
         self.num_ops = num_ops + 1 #for input
         self.x_dim = int(0.5*(self.max_edges-1)*self.max_edges) # assuming max size
-        self.threshold = (1/self.max_nodes + 1/self.max_edges)*0.3
+        self.threshold = 0.3#(1/self.max_nodes + 1/self.max_edges)*0.3
         # self.ops = ['conv1x1-bn-relu', 'conv3x3-bn-relu', 'maxpool3x3']
         # self.fixed_ops = ['input', 'output']
 
@@ -77,12 +77,6 @@ class SSPNASGraphAgent(Agent):
         phi = self.sqrt_alpha * (np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t)) 
         return mu, var, phi
 
-#     def sample_trajectories(self, num_points=10):
-#         sampler = qmc.Sobol(d=self.x_dim) 
-#         u_sample_points = sampler.random(num_points*self.traj_len)
-#         sample_points = qmc.scale(u_sample_points, self.ssp_x_space.domain_bounds[:,0], 
-#                                   self.ssp_x_space.domain_bounds[:,1])
-#         return sample_points.reshape(num_points, self.traj_len*self.x_dim)
 
     def _optimize_lengthscale(self, init_trajs, init_ys):
         ls_0 = np.array([[4.],[4.]]) 
