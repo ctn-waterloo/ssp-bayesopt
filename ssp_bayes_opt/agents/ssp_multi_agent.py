@@ -18,7 +18,7 @@ class SSPMultiAgent(Agent):
                  gamma_c=1.0,
                  beta_ucb=np.log(2/1e-6),
                  init_pos=None,
-                 decoder_method='network-optim'):
+                 decoder_method='network-optim', optim_ls=False):
         super().__init__()
         self.ssp_dim = ssp_dim
         self.num_restarts = 10
@@ -49,13 +49,7 @@ class SSPMultiAgent(Agent):
         self.ssp_t_space = ssp_t_space
         self.agent_sps = agent_sps
         self.ssp_dim = ssp_x_spaces[0].ssp_dim
-        # Encode timestamps
-        self.timestep_ssps = self.ssp_t_space.encode(
-                                                    np.linspace(0,
-                                                                self.traj_len,
-                                                                self.traj_len
-                                                                ).reshape(-1,1)
-                                                    )
+
         ###
         
         # Encode the initial sample points 
@@ -68,12 +62,19 @@ class SSPMultiAgent(Agent):
 
         self.init_xs = init_xs
         self.init_ys = init_ys
-
-        # optres = self._optimize_lengthscale(init_xs, init_ys)
-        # for i in range(n_agents):
-        #     self.ssp_x_spaces[i].update_lengthscale(optres[0])
-        #self.ssp_t_space.update_lengthscale(optres[1])
+        if optim_ls:
+            optres = self._optimize_lengthscale(init_xs, init_ys)
+            for i in range(n_agents):
+                self.ssp_x_spaces[i].update_lengthscale(optres[0])
+            self.ssp_t_space.update_lengthscale(optres[1])
         self.length_scales = length_scale
+        # Encode timestamps
+        self.timestep_ssps = self.ssp_t_space.encode(
+            np.linspace(0,
+                        self.traj_len,
+                        self.traj_len
+                        ).reshape(-1, 1)
+        )
 
         self.blr = blr.BayesianLinearRegression(self.ssp_dim)
         self.blr.update(init_phis, np.array(init_ys))
@@ -133,6 +134,13 @@ class SSPMultiAgent(Agent):
             kfold = KFold(n_splits=min(xs.shape[0], 50))
             ssp_x_space.update_lengthscale(length_scale[0])
             ssp_t_space.update_lengthscale(length_scale[1])
+            # Encode timestamps
+            self.timestep_ssps = self.ssp_t_space.encode(
+                np.linspace(0,
+                            self.traj_len,
+                            self.traj_len
+                            ).reshape(-1, 1)
+            )
             for train_idx, test_idx in kfold.split(xs):
                 train_x, test_x = xs[train_idx], xs[test_idx]
                 train_y, test_y = ys[train_idx], ys[test_idx]

@@ -18,8 +18,10 @@ class SSPNASGraphAgent(Agent):
                  ssp_dim=151,
                  gamma_c=1.0,
                  beta_ucb=np.log(2/1e-6),
+                 alpha_decay=1.0,
                  init_pos=None,
-                 seed=None, **kwargs):
+                 seed=None,
+                 **kwargs):
         super().__init__()
         self.max_nodes = max_nodes
         self.max_edges = max_edges
@@ -64,7 +66,8 @@ class SSPNASGraphAgent(Agent):
         # MI params
         self.gamma_t = 0
         self.gamma_c = gamma_c
-        self.sqrt_alpha = beta_ucb 
+        self.sqrt_alpha = beta_ucb
+        self.alpha_decay = alpha_decay
 
         # self.decoder_method = decoder_method
     
@@ -204,6 +207,8 @@ class SSPNASGraphAgent(Agent):
             self.phi_norm_bounds[1] = phi_norm
     
         self.blr.update(phi, y_val)
+
+        self.sqrt_alpha = self.sqrt_alpha * self.alpha_decay
         
         # Update gamma
         if isinstance(self.gamma_c, (int, float)):

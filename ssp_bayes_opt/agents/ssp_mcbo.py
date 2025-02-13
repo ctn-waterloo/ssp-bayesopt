@@ -23,7 +23,8 @@ class SSPMCBOAgent(Agent):
                  beta_ucb=np.log(2 / 1e-6),
                  init_pos=None,
                  seed=None,
-                 decoder_method='direct-optim',
+                 decoder_method='direct-optim',optim_ls=True,
+                 conjunctive_w=0.1,
                  **kwargs):
         super().__init__()
 
@@ -32,9 +33,10 @@ class SSPMCBOAgent(Agent):
         self.n_params = len(search_space.params)
         self.n_ordinal = len(search_space.ordinal_names)
         domain_bounds = np.zeros((self.n_params, 2))
-        domain_bounds[:, 0] = [search_space.params[p].lb for p in search_space.params]
-        domain_bounds[:, 1] = [search_space.params[p].ub for p in search_space.params]
+        domain_bounds[:, 0] = [search_space.params[p].transfo_lb for p in search_space.params]
+        domain_bounds[:, 1] = [search_space.params[p].transfo_ub for p in search_space.params]
         self.domain_bounds = domain_bounds
+        self.conjunctive_w = conjunctive_w
 
         if not isinstance(length_scale, (list, tuple, np.ndarray)):
             length_scale = [length_scale] * self.n_params
@@ -44,6 +46,11 @@ class SSPMCBOAgent(Agent):
         self.n_cont = len(search_space.cont_names)
         self.n_disc = len(search_space.disc_names)
         self.n_nomial = len(search_space.nominal_names)
+
+        self.cont_idxs = []
+        self.disc_idxs = []
+        self.nominal_idxs = []
+        self.ordinal_idxs = []
         self.spaces = defaultdict(None)
         if search_space.cont_names:  # continuous params
 
@@ -95,7 +102,19 @@ class SSPMCBOAgent(Agent):
         # domain_bounds = np.array([np.zeros(self.max_nodes*self.max_edges),
         #                      self.num_ops*np.ones(self.max_nodes*self.max_edges)]).T
 
-        # Encode the initial sample points 
+
+        if optim_ls:
+            ls = self._optimize_lengthscale(init_xs, init_ys)
+            if (self.n_cont>0) and (self.n_disc>0): # TODO have less if-else
+                self.spaces['cont'].update_lengthscale(ls[:self.n_cont])
+                self.spaces['disc'].update_lengthscale(ls[-self.n_disc:])
+            elif (self.n_cont>0):
+                self.spaces['cont'].update_lengthscale(ls)
+            elif (self.n_disc>0):
+                self.spaces['disc'].update_lengthscale(ls)
+
+
+        # Encode the initial sample points
         init_phis = self.encode(init_xs)
         norms = np.linalg.norm(init_phis, axis=1)
 
@@ -104,18 +123,6 @@ class SSPMCBOAgent(Agent):
 
         self.init_xs = init_xs
         self.init_ys = init_ys
-
-        ls = self._optimize_lengthscale(init_xs, init_ys)
-        if (self.n_cont>0) and (self.n_disc>0): # TODO have less if-else
-            self.spaces['cont'].update_lengthscale(ls[:self.n_cont])
-            self.spaces['disc'].update_lengthscale(ls[-self.n_disc:])
-        elif (self.n_cont>0):
-            self.spaces['cont'].update_lengthscale(ls)
-        elif (self.n_disc>0):
-            self.spaces['disc'].update_lengthscale(ls)
-
-        # for i in range(n_agents):
-        #     self.ssp_x_spaces[i].update_lengthscale(optres[0])
 
         self.blr = blr.BayesianLinearRegression(self.ssp_dim)
         self.blr.update(init_phis, np.array(init_ys))
@@ -135,7 +142,8 @@ class SSPMCBOAgent(Agent):
             if self.n_cont > 0:
                 self.init_samples['cont'] = self.spaces['cont'].get_sample_pts_and_ssps(2**10, method='length-scale')
             if self.n_disc > 0:
-                self.init_samples['disc'] = self.spaces['disc'].get_sample_pts_and_ssps(int(np.max(domain_bounds[self.disc_idxs, 1])), method='grid')
+                self.init_samples['disc'] = self.spaces['disc'].get_sample_pts_and_ssps(int(np.max(domain_bounds[self.disc_idxs, 1])),
+                                                                                        method='grid')
         self.decoder_method = decoder_method
 
     def length_scale(self):
@@ -150,6 +158,7 @@ class SSPMCBOAgent(Agent):
     def _optimize_lengthscale(self, init_xs, init_ys):
         ls_0 = np.ones(self.n_cont + self.n_disc)
         ls_0[:self.n_cont] = (self.domain_bounds[self.cont_idxs, 1] - self.domain_bounds[self.cont_idxs, 0]) / 10.
+        ls_0[self.n_cont:] = (self.domain_bounds[self.disc_idxs, 1] - self.domain_bounds[self.disc_idxs, 0]) / 10.
 
         if (self.n_cont > 0) and (self.n_disc > 0):
 
@@ -224,7 +233,7 @@ class SSPMCBOAgent(Agent):
 
         retval = minimize(min_func, x0=ls_0, method='L-BFGS-B',
                           bounds=[(1e-4, None)] * ls_0.shape[0],
-                          )
+                          options={'maxiter': 50})
         return np.abs(retval.x).reshape(-1,1)
 
     def initial_guess(self):
@@ -360,7 +369,7 @@ class SSPMCBOAgent(Agent):
         _phi = self.identity
         for p in phis:
             _phi = self.bind(p, _phi)
-        phi += 0.1*_phi
+        phi += self.conjunctive_w*_phi
         return phi
 
     def decode(self, ssp):
@@ -378,7 +387,6 @@ class SSPMCBOAgent(Agent):
                                                 method=self.decoder_method,
                                                 samples=self.init_samples['disc']
                                                 )
-            decoded_x[:, self.disc_idxs] = np.round(disc_x)  # should be integers
         if self.n_nomial > 0:
             query = self.bind(ssp, self.spaces['slots'].inverse_vectors[2])
             for i in range(self.n_nomial):

@@ -44,16 +44,16 @@ class NASBench:
         else:
             self.graphs = graphs
 
-        self.best_final_validation_accuracy = -1
+        self.best_final_accuracy = -1
         for ahash in self.results.computed_statistics.keys():
             nseeds = len(self.results.computed_statistics[ahash][108])
-            final_validation_accuracy = 0
+            final_accuracy = 0
             for seed in range(nseeds):
-                final_validation_accuracy += self.results.computed_statistics[ahash][108][seed][
-                    'final_validation_accuracy']
-            final_validation_accuracy /= nseeds
-            if final_validation_accuracy > self.best_final_validation_accuracy:
-                self.best_final_validation_accuracy = final_validation_accuracy
+                final_accuracy += self.results.computed_statistics[ahash][108][seed][
+                    'final_test_accuracy']
+            final_accuracy /= nseeds
+            if final_accuracy > self.best_final_accuracy:
+                self.best_final_accuracy = final_accuracy
 
         self.INPUT = 'input'
         self.OUTPUT = 'output'
@@ -89,7 +89,46 @@ class NASBench:
             samples[i, :] = np.concatenate([matrix[i, i + 1:] for i in range(matrix.shape[0] - 1)])
         return samples
 
-    def __call__(self, input_graphs, info=None):
+    def remove_disconnected(self, graph, operations):
+        operations = np.array(operations)
+        non_dead_nodes = [i for i in range(graph.shape[0]) if i == graph.shape[0] - 1 or np.any(graph[i, :])]
+        graph = graph[np.ix_(non_dead_nodes, non_dead_nodes)]
+        operations = operations[non_dead_nodes]
+
+        # # Step 1: Remove disconnected subgraphs that don't contain the input node (index 0)
+        # def find_reachable_nodes(start_node, adj_matrix):
+        #     visited = set()
+        #     stack = [start_node]
+        #     while stack:
+        #         node = stack.pop()
+        #         if node not in visited:
+        #             visited.add(node)
+        #             stack.extend(np.where(adj_matrix[node] > 0)[0])
+        #     return visited
+        #
+        # # Keep only the reachable nodes
+        # reachable_from_input = find_reachable_nodes(0, graph)
+        # valid_nodes = sorted(reachable_from_input)
+        # # if len(valid_nodes) == 1: # nothing is reachable, just return smallest valid graph
+        # #     graph = np.array([[0,1],[0,0]])
+        # #     operations = [self.INPUT, self.OUTPUT]
+        # #     return graph, operations.tolist()
+        #
+        # if (graph.shape[0] - 1) not in reachable_from_input:
+        #     # raise ValueError("The graph is entirely disconnected from the output node.")
+        #     graph[valid_nodes[-1],-1] = 1
+        #     valid_nodes.append(graph.shape[0] - 1)
+        #
+        # graph = graph[np.ix_(valid_nodes, valid_nodes)]
+        # operations = operations[valid_nodes]
+        #
+        # # Step 2: Remove dead-end nodes (rows with all zeros except last row)
+        # non_dead_nodes = [i for i in range(graph.shape[0]) if i == graph.shape[0] - 1 or np.any(graph[i, :])]
+        # graph = graph[np.ix_(non_dead_nodes, non_dead_nodes)]
+        # operations = operations[non_dead_nodes]
+        return graph, operations.tolist()
+
+    def __call__(self, input_graphs, info=None, score="validation_accuracy"):
         input_graphs = np.atleast_2d(input_graphs)
         outputs = np.zeros(input_graphs.shape[0])
         for n, input_graph in enumerate(input_graphs):
@@ -108,11 +147,12 @@ class NASBench:
             operations[0] = self.INPUT
             operations[-1] = self.OUTPUT
 
+            matrix, operations = self.remove_disconnected(matrix,operations)
             model_spec = api.ModelSpec(matrix=matrix.copy(), ops=operations)
-            print(model_spec)
-            print(self.results.is_valid(model_spec))
+            # print(model_spec)
+            # print(self.results.is_valid(model_spec))
             if self.results.is_valid(model_spec):
-                outputs[n] = self.results.query(model_spec)['validation_accuracy']
+                outputs[n] = self.results.query(model_spec)[score]
             else:
                 outputs[n] = 0
         return outputs
@@ -121,18 +161,20 @@ class NASBench:
 if __name__ == '__main__':
     parser = ArgumentParser()
 
-    parser.add_argument('--nas-data-dir', dest='nas_data_dir', type=str, default='./experiments/nas_data')
-    parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=100)
-    parser.add_argument('--num-samples', dest='num_samples', type=int, default=1000)
+    parser.add_argument('--nas-data-dir', dest='nas_data_dir', type=str, default='./nas_data')
+    parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=801)
+    parser.add_argument('--num-samples', dest='num_samples', type=int, default=200)
     parser.add_argument('--num-init-samples', dest='num_init_samples', type=int, default=10)
-    parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=1.0)
-    parser.add_argument('--data-dir', dest='data_dir', type=str, default='data')
+    parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=1.)#14.5)
+    parser.add_argument('--data-dir', dest='data_dir', type=str, default='./data/nasbench')
     parser.add_argument('--verbose', action='store_true')
     parser.add_argument('--seed', type=int, default=0)
     args = parser.parse_args()
 
     if args.nas_data_dir[:2] == './':
         args.nas_data_dir = os.path.join(os.getcwd(), args.nas_data_dir[2:])
+    if args.data_dir[:2] == './':
+        args.data_dir = os.path.join(os.getcwd(), args.data_dir[2:])
 
     nasbench = api.NASBench(os.path.join(args.nas_data_dir, 'nasbench_only108.tfrecord'))
     with open(os.path.join(args.nas_data_dir, 'generated_graphs.json')) as f:
@@ -155,20 +197,35 @@ if __name__ == '__main__':
                        agent_type='ssp-nas-graph',
                        ssp_dim=args.ssp_dim,
                        beta_ucb=args.beta_ucb,
+                       gamma_c=0.,
                        )
     elapsed_time = time.thread_time_ns() - start
 
-    vals = np.zeros((num_init_samples + budget,))
+    train_vals = np.zeros((num_init_samples + budget,))
     sample_locs = []
 
     for i, res in enumerate(optimizer.res):
-        vals[i] = res['target']
+        train_vals[i] = res['target']
         sample_locs.append(res['params'])
+    test_vals = target(np.array(sample_locs), score="test_accuracy")
 
-    regrets = target.best_final_validation_accuracy - vals
+    regrets = target.best_final_accuracy - test_vals
     cum_regrets = np.divide(np.cumsum(regrets), np.arange(1,regrets.shape[0]+1))
+
+
+    best_vals = np.maximum.accumulate(test_vals)
     print(optimizer.max)
-    print(target.best_final_validation_accuracy)
+    print(best_vals[-1])
+    # for test_vals. want >94, ideal is 94.32; getting 93.78
+    # for train_vals. want >94.6, ideal is 94.9; getting 94.1
+    # fig=plt.figure();plt.plot(-best_vals);fig.savefig(f"{args.task_id}_sspbo.png");plt.show()
+
+
+    np.savez(os.path.join(args.data_dir, f"nasbench_seed{args.seed}.npz"),
+             test_vals=test_vals, train_vals=train_vals,
+             sample_locs=sample_locs, best_vals=best_vals, regrets=regrets, cum_regrets=cum_regrets,
+             times=optimizer.times, elapsed_time=elapsed_time,
+             args=args)
 
     # cum_regrets = np.divide(np.cumsum(regrets), matlib.repmat(range(1, regrets.shape[0] + 1), 1, 1))
     # plt.figure()
