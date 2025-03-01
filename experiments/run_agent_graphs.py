@@ -60,33 +60,42 @@ class NASBench:
         self.CONV1X1 = 'conv1x1-bn-relu'
         self.CONV3X3 = 'conv3x3-bn-relu'
         self.MAXPOOL3X3 = 'maxpool3x3'
-        self.operations = [self.CONV1X1, self.CONV3X3, self.MAXPOOL3X3]
+        self.operations = [self.INPUT, self.CONV1X1, self.CONV3X3, self.MAXPOOL3X3, self.OUTPUT]
 
-        self.max_nodes = 9
-        self.max_edges = 7
+        self.max_conns = 9
+        self.max_layers = 7
         self.num_ops = len(self.operations)
         self.n_graphs = len(self.graphs)
         self.graph_hashs = list(self.graphs.keys())
-        self.rolled_len = int(0.5 * (self.max_edges - 1) * self.max_edges)
+        self.rolled_len = int(0.5 * (self.max_layers - 1) * self.max_layers)
+        # self.invalid_calls = []
 
     def sample(self, num_points):
-        samples = np.zeros((num_points, self.rolled_len))
+        samples = np.zeros((num_points, self.rolled_len + self.max_layers))
         for i in range(num_points):
-            retry = True
-            while retry:
-                idx = np.random.randint(0, self.n_graphs)
-                _matrix = np.array(self.graphs[self.graph_hashs[idx]][0])
-                if (_matrix.shape[0] == self.max_edges):
-                    retry = False
+            # retry = True
+            # while retry:
+            #     idx = np.random.randint(0, self.n_graphs)
+            #     _matrix = np.array(self.graphs[self.graph_hashs[idx]][0])
+            #     if (_matrix.shape[0] == self.max_layers):
+            #         retry = False
+            idx = np.random.randint(0, self.n_graphs)
+            matrix = np.array(self.graphs[self.graph_hashs[idx]][0])
             ops = np.array(self.graphs[self.graph_hashs[idx]][1])
-            ops[ops > 0] = ops[ops > 0] + 1
-            ops[ops == -1] = 1
-            ops[ops == -2] = 0
-            ops = ops.reshape(-1, 1)
-            # matrix = np.zeros((self.max_edges, self.max_edges))
+            ops[ops >= 0] = ops[ops >= 0] + 1
+            ops[ops == -1] = 0
+            ops[ops == -2] = self.num_ops - 1
+
+            n_layers = matrix.shape[0]
+            if (n_layers < self.max_layers):
+                matrix = np.pad(matrix, (0, self.max_layers - n_layers), )
+                ops = np.pad(ops, (0, self.max_layers - n_layers))
+
+            # ops = ops.reshape(-1, 1)
+            # matrix = np.zeros((self.max_layers, self.max_layers))
             # matrix[:_matrix.shape[0], :_matrix.shape[0]] = _matrix * ops
-            matrix = _matrix * ops
-            samples[i, :] = np.concatenate([matrix[i, i + 1:] for i in range(matrix.shape[0] - 1)])
+            # matrix = matrix * ops
+            samples[i, :] = np.concatenate([matrix[i, i + 1:] for i in range(matrix.shape[0] - 1)] + [ops])
         return samples
 
     def remove_disconnected(self, graph, operations):
@@ -96,36 +105,36 @@ class NASBench:
         operations = operations[non_dead_nodes]
 
         # # Step 1: Remove disconnected subgraphs that don't contain the input node (index 0)
-        # def find_reachable_nodes(start_node, adj_matrix):
-        #     visited = set()
-        #     stack = [start_node]
-        #     while stack:
-        #         node = stack.pop()
-        #         if node not in visited:
-        #             visited.add(node)
-        #             stack.extend(np.where(adj_matrix[node] > 0)[0])
-        #     return visited
-        #
-        # # Keep only the reachable nodes
-        # reachable_from_input = find_reachable_nodes(0, graph)
-        # valid_nodes = sorted(reachable_from_input)
-        # # if len(valid_nodes) == 1: # nothing is reachable, just return smallest valid graph
-        # #     graph = np.array([[0,1],[0,0]])
-        # #     operations = [self.INPUT, self.OUTPUT]
-        # #     return graph, operations.tolist()
-        #
-        # if (graph.shape[0] - 1) not in reachable_from_input:
-        #     # raise ValueError("The graph is entirely disconnected from the output node.")
-        #     graph[valid_nodes[-1],-1] = 1
-        #     valid_nodes.append(graph.shape[0] - 1)
-        #
-        # graph = graph[np.ix_(valid_nodes, valid_nodes)]
-        # operations = operations[valid_nodes]
-        #
-        # # Step 2: Remove dead-end nodes (rows with all zeros except last row)
-        # non_dead_nodes = [i for i in range(graph.shape[0]) if i == graph.shape[0] - 1 or np.any(graph[i, :])]
-        # graph = graph[np.ix_(non_dead_nodes, non_dead_nodes)]
-        # operations = operations[non_dead_nodes]
+        def find_reachable_nodes(start_node, adj_matrix):
+            visited = set()
+            stack = [start_node]
+            while stack:
+                node = stack.pop()
+                if node not in visited:
+                    visited.add(node)
+                    stack.extend(np.where(adj_matrix[node] > 0)[0])
+            return visited
+
+        # Keep only the reachable nodes
+        reachable_from_input = find_reachable_nodes(0, graph)
+        valid_nodes = sorted(reachable_from_input)
+        # if len(valid_nodes) == 1: # nothing is reachable, just return smallest valid graph
+        #     graph = np.array([[0,1],[0,0]])
+        #     operations = [self.INPUT, self.OUTPUT]
+        #     return graph, operations.tolist()
+
+        if (graph.shape[0] - 1) not in reachable_from_input:
+            # raise ValueError("The graph is entirely disconnected from the output node.")
+            graph[valid_nodes[-1],-1] = 1
+            valid_nodes.append(graph.shape[0] - 1)
+
+        graph = graph[np.ix_(valid_nodes, valid_nodes)]
+        operations = operations[valid_nodes]
+
+        # Step 2: Remove dead-end nodes (rows with all zeros except last row)
+        non_dead_nodes = [i for i in range(graph.shape[0]) if i == graph.shape[0] - 1 or np.any(graph[i, :])]
+        graph = graph[np.ix_(non_dead_nodes, non_dead_nodes)]
+        operations = operations[non_dead_nodes]
         return graph, operations.tolist()
 
     def __call__(self, input_graphs, info=None, score="validation_accuracy"):
@@ -133,16 +142,14 @@ class NASBench:
         outputs = np.zeros(input_graphs.shape[0])
         for n, input_graph in enumerate(input_graphs):
 
-            matrix = np.zeros((self.max_edges, self.max_edges),dtype=int)
-            operations = [None] * target.max_edges
-            for i in range(self.max_edges - 1):
+            matrix = np.zeros((self.max_layers, self.max_layers),dtype=int)
+            operations = [None] * target.max_layers
+            for i in range(self.max_layers - 1):
                 layer_i = np.concatenate([np.zeros(i + 1),
-                                          input_graph[int((self.max_edges - 1 + 0.5 * (1 - i)) * i):int(
-                                              (self.max_edges - 1 - 0.5 * i) * (i + 1))]])
-                if np.any(layer_i > 1):
-                    operations[i] = self.operations[int(np.round(np.mean(layer_i[layer_i > 1]))) - 2]
-                else:
-                    operations[i] = self.operations[0]
+                                          input_graph[int((self.max_layers - 1 + 0.5 * (1 - i)) * i):int(
+                                              (self.max_layers - 1 - 0.5 * i) * (i + 1))]])
+                operations[i] = self.operations[int(input_graph[self.rolled_len+i])]
+
                 matrix[i, :] = layer_i > 0
             operations[0] = self.INPUT
             operations[-1] = self.OUTPUT
@@ -162,13 +169,13 @@ if __name__ == '__main__':
     parser = ArgumentParser()
 
     parser.add_argument('--nas-data-dir', dest='nas_data_dir', type=str, default='./nas_data')
-    parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=801)
+    parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=201)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=200)
-    parser.add_argument('--num-init-samples', dest='num_init_samples', type=int, default=10)
-    parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=1.)#14.5)
+    parser.add_argument('--num-init-samples', dest='num_init_samples', type=int, default=2)
+    parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=15.)#14.5)
     parser.add_argument('--data-dir', dest='data_dir', type=str, default='./data/nasbench')
     parser.add_argument('--verbose', action='store_true')
-    parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--seed', type=int, default=2)
     args = parser.parse_args()
 
     if args.nas_data_dir[:2] == './':
@@ -198,8 +205,13 @@ if __name__ == '__main__':
                        ssp_dim=args.ssp_dim,
                        beta_ucb=args.beta_ucb,
                        gamma_c=0.,
+                       length_scale=4.
                        )
     elapsed_time = time.thread_time_ns() - start
+
+    # ex_graph = target.sample(1)
+    # ex_ssp = optimizer.agt.encode(ex_graph)
+    # ex_ssp_hat = optimizer.agt.decode(ex_ssp)
 
     train_vals = np.zeros((num_init_samples + budget,))
     sample_locs = []
@@ -214,12 +226,21 @@ if __name__ == '__main__':
 
 
     best_vals = np.maximum.accumulate(test_vals)
-    print(optimizer.max)
-    print(best_vals[-1])
-    # for test_vals. want >94, ideal is 94.32; getting 93.78
-    # for train_vals. want >94.6, ideal is 94.9; getting 94.1
-    # fig=plt.figure();plt.plot(-best_vals);fig.savefig(f"{args.task_id}_sspbo.png");plt.show()
 
+    print(np.max(train_vals[args.num_init_samples:]))
+    print(np.max(test_vals[args.num_init_samples:]))
+
+    # import matplotlib.pyplot as plt0.9446113705635071
+    # 0.9382011294364929
+    # plt.figure(figsize=(8, 8))
+    # plt.plot(np.maximum.accumulate(test_vals))
+    # plt.show()
+    # for test_vals. want >94, ideal is 94.32;
+    # for train_vals. want >94.6, ideal is 94.9;
+    # fig=plt.figure();plt.plot(-best_vals);fig.savefig(f"{args.task_id}_sspbo.png");plt.show()
+    # 0.9378004670143127
+    # np.max(train_vals[args.num_init_samples:])
+    # Out[2]: 0.9455128312110901
 
     np.savez(os.path.join(args.data_dir, f"nasbench_seed{args.seed}.npz"),
              test_vals=test_vals, train_vals=train_vals,
@@ -228,6 +249,52 @@ if __name__ == '__main__':
              args=args)
 
     # cum_regrets = np.divide(np.cumsum(regrets), matlib.repmat(range(1, regrets.shape[0] + 1), 1, 1))
+    # import matplotlib.pyplot as plt
     # plt.figure()
-    # plt.plot(cum_regrets)
+    # plt.plot(test_vals)
     # plt.show()
+
+    # import json
+    # import pickle
+    #
+    #
+    # def save_graphs(self, optim_samples, n_samples=500):
+    #     samples = self.sample(n_samples)
+    #     samples = np.vstack([optim_samples,
+    #                         samples])
+    #     outs = []
+    #     outs2 = []
+    #     for n, input_graph in enumerate(samples):
+    #         ssp_graph = optimizer.agt.encode(input_graph)
+    #
+    #         matrix = np.zeros((self.max_layers, self.max_layers),dtype=int)
+    #         operations = np.zeros(self.max_layers)
+    #         for i in range(self.max_layers - 1):
+    #             layer_i = np.concatenate([np.zeros(i + 1),
+    #                                       input_graph[int((self.max_layers - 1 + 0.5 * (1 - i)) * i):int(
+    #                                           (self.max_layers - 1 - 0.5 * i) * (i + 1))]])
+    #             operations[i] = int(input_graph[self.rolled_len+i]) + 1
+    #
+    #             matrix[i, :] = layer_i > 0
+    #         operations[0] = 1
+    #         operations[-1] = 0
+    #         matrix, operations = self.remove_disconnected(matrix, operations)
+    #
+    #
+    #         mat_str = " ".join(list(matrix.flatten().astype('str')))
+    #         op_str = " ".join(np.array(operations).astype('int').astype('str'))
+    #         outs.append((mat_str,op_str))
+    #         outs2.append((matrix, operations, ssp_graph))
+    #     with open("nas_graph_plot_data.json", "w") as f:
+    #         json.dump(outs, f)
+    #
+    #     # with open("nas_full_plot_data.json", "w") as f:
+    #     #     json.dump(outs2, f)
+    #     with open("nas_full_plot_data.pkl", "wb") as f:
+    #         pickle.dump(outs2, f)
+    #     return outs
+    #
+    #
+    # # sample_locs = np.array(sample_locs)
+    # # outs = save_graphs(target, sample_locs[np.argsort(test_vals)[-50:]], n_samples=950)
+    # outs = save_graphs(target, sample_locs[np.argmax(test_vals)].reshape(1,-1), n_samples=500)

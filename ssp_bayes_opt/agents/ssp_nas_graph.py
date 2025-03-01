@@ -14,8 +14,9 @@ from .agent import Agent
 # https://github.com/google-research/nasbench
 class SSPNASGraphAgent(Agent):
     def __init__(self, init_xs, init_ys,
-                 max_nodes=9, max_edges=7, num_ops=3,
+                 max_conns=9, max_layers=7, num_ops=3,
                  ssp_dim=151,
+                 length_scale=1.,
                  gamma_c=1.0,
                  beta_ucb=np.log(2/1e-6),
                  alpha_decay=1.0,
@@ -23,10 +24,10 @@ class SSPNASGraphAgent(Agent):
                  seed=None,
                  **kwargs):
         super().__init__()
-        self.max_nodes = max_nodes
-        self.max_edges = max_edges
-        self.num_ops = num_ops + 1 #for input
-        self.x_dim = int(0.5*(self.max_edges-1)*self.max_edges) # assuming max size
+        self.max_conns = max_conns
+        self.max_layers = max_layers
+        self.num_ops = num_ops + 2 #for input and output
+        self.x_dim = int(0.5*(self.max_layers-1)*self.max_layers) # assuming max size
         self.threshold = 0.3#(1/self.max_nodes + 1/self.max_edges)*0.3
         # self.ops = ['conv1x1-bn-relu', 'conv3x3-bn-relu', 'maxpool3x3']
         # self.fixed_ops = ['input', 'output']
@@ -34,20 +35,40 @@ class SSPNASGraphAgent(Agent):
         self.ssp_dim = ssp_dim
         self.num_restarts = 10
         self.init_pos = None if init_pos is None else np.atleast_2d(init_pos)
-        # domain_bounds = np.array([np.zeros(self.max_nodes*self.max_edges),
-        #                      self.num_ops*np.ones(self.max_nodes*self.max_edges)]).T
-       
-        self.spspace = sspspace.SPSpace(self.max_edges + self.num_ops + 2,
+        # domain_bounds = np.array([np.zeros(self.max_nodes*self.max_layers),
+        #                      self.num_ops*np.ones(self.max_nodes*self.max_layers)]).T
+
+        # self.ssp_space = sspspace.HexagonalSSPSpace(1, ssp_dim, seed=seed, length_scale=length_scale)
+        # self.ssp_dim = self.ssp_space.ssp_dim
+        # self.sp_space = sspspace.SPSpace(self.num_ops + 2,
+        #                                 dim=self.ssp_dim, seed=seed)
+        #
+        # self.node_sps = self.ssp_space.encode(np.arange(1,self.max_layers+1)[:,None])
+        # self.inverse_node_sps = self.ssp_space.encode(-np.arange(1,self.max_layers+1)[:, None])
+        #
+        # self.ops_sps = self.sp_space.vectors[:self.num_ops ]
+        # self.inverse_ops_sps = self.sp_space.inverse_vectors[:self.num_ops]
+        # self.op_slot_sp = self.sp_space.vectors[self.num_ops].reshape(1,-1)
+        # self.inverse_op_slot_sp = self.sp_space.inverse_vectors[self.num_ops].reshape(1,-1)
+        # self.target_slot_sp = self.sp_space.vectors[self.num_ops+1].reshape(1,-1)
+        # self.inverse_target_slot_sp = self.sp_space.inverse_vectors[self.num_ops+1].reshape(1,-1)
+
+
+        self.sp_space = sspspace.SPSpace(self.max_layers + self.num_ops + 3,
                                         dim=ssp_dim, seed=seed)
-        self.node_sps = self.spspace.vectors[:self.max_edges]
-        self.inverse_node_sps = self.spspace.inverse_vectors[:self.max_edges]
-        self.ops_sps = self.spspace.vectors[self.max_edges:self.max_edges + self.num_ops ]
-        self.inverse_ops_sps = self.spspace.inverse_vectors[:self.max_edges:self.max_edges + self.num_ops]
-        self.op_slot_sp = self.spspace.vectors[self.num_ops].reshape(1,-1)
-        self.inverse_op_slot_sp = self.spspace.inverse_vectors[self.num_ops].reshape(1,-1)
-        self.target_slot_sp = self.spspace.vectors[self.num_ops+1].reshape(1,-1)
-        self.inverse_target_slot_sp = self.spspace.inverse_vectors[self.num_ops+1].reshape(1,-1)
-        self.ssp_dim = self.spspace.dim
+        self.layer_sps = self.sp_space.vectors[:self.max_layers]
+        self.inverse_layer_sps = self.sp_space.inverse_vectors[:self.max_layers]
+        self.ops_sps = self.sp_space.vectors[self.max_layers:self.max_layers + self.num_ops]
+        self.inverse_ops_sps = self.sp_space.inverse_vectors[:self.max_layers:self.max_layers + self.num_ops]
+        self.op_slot_sp = self.sp_space.vectors[self.max_layers + self.num_ops].reshape(1, -1)
+        self.inverse_op_slot_sp = self.sp_space.inverse_vectors[self.max_layers + self.num_ops].reshape(1, -1)
+        self.target_slot_sp = self.sp_space.vectors[self.max_layers + self.num_ops + 1].reshape(1, -1)
+        self.inverse_target_slot_sp = self.sp_space.inverse_vectors[self.max_layers + self.num_ops + 1].reshape(1, -1)
+        self.other_sp = self.sp_space.vectors[self.max_layers + self.num_ops + 2].reshape(1, -1)
+        self.ssp_dim = self.sp_space.dim
+
+        self.identity = self.sp_space.identity()[None, :]
+
         
         # Encode the initial sample points 
         init_phis = self.encode(init_xs)
@@ -80,38 +101,6 @@ class SSPNASGraphAgent(Agent):
         phi = self.sqrt_alpha * (np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t)) 
         return mu, var, phi
 
-
-    def _optimize_lengthscale(self, init_trajs, init_ys):
-        ls_0 = np.array([[4.],[4.]]) 
-
-        def min_func(length_scale, xs=init_trajs, ys=init_ys,
-                        ssp_x_space=self.ssp_x_space,ssp_t_space=self.ssp_t_space):
-            errors = []
-            kfold = KFold(n_splits=min(xs.shape[0], 50))
-            ssp_x_space.update_lengthscale(length_scale[0])
-            ssp_t_space.update_lengthscale(length_scale[1])
-            for train_idx, test_idx in kfold.split(xs):
-                train_x, test_x = xs[train_idx], xs[test_idx]
-                train_y, test_y = ys[train_idx], ys[test_idx]
-
-                train_phis = self.encode(train_x)
-                test_phis = self.encode(test_x)
-
-                b = blr.BayesianLinearRegression(ssp_x_space.ssp_dim)
-                b.update(train_phis, train_y)
-                mu, var = b.predict(test_phis)
-                diff = test_y.flatten() - mu.flatten()
-                loss = -0.5*np.log(var) - np.divide(np.power(diff,2),var)
-                errors.append(np.sum(-loss))
-            ### end for
-            return np.sum(errors)
-        ### end min_func
-
-        retval = minimize(min_func, x0=ls_0, method='L-BFGS-B',
-                          bounds=[(1/np.sqrt(init_trajs.shape[0]),None),(1/np.sqrt(init_trajs.shape[0]),None)],
-                          )
-        return np.abs(retval.x) 
-
     def initial_guess(self):
         '''
         The initial guess for optimizing the acquisition function.
@@ -120,29 +109,6 @@ class SSPNASGraphAgent(Agent):
         # From the approximate solution of dot(m,x) + x^T Sigma x
         return self.blr.sample()
 
-
-    def untrusted(self, x, badness=-1):
-        '''
-        Updates the domain constraints for the optimization.
-        TODO: modify to permit multiple updates at once
-
-        Parameters
-        ----------
-        x : np.ndarray
-            points to be excluded from the optimization.
-            For now assuming one data point per call of untrusted
-
-
-        badness : float
-            The scale to be applied to the x points.  For now
-            assuming that one scalar value is applied per point in
-            x
-        '''
-        phi = self.encode(x)
-        # TODO: modify to running average of ssps.  
-        # Could exceed the scale of the mean values 
-        # if not careful. 
-        self.constraint_ssp += badness * phi
 
     def acquisition_func(self):
         '''
@@ -221,55 +187,113 @@ class SSPNASGraphAgent(Agent):
             raise RuntimeError(msg)
 
 
-    def encode(self,G):
+    # def encode(self,G):
+    #     '''
+    #     Translates a graph x into an SSP representation.
+    #
+    #
+    #     Parameters:
+    #     -----------
+    #     x : np.ndarray
+    #         A (s, l, d) numpy array specifying a graph G with particular structure
+    #     '''
+    #     G = np.atleast_2d(G)
+    #     S = np.zeros((G.shape[0], self.ssp_dim))
+    #
+    #     for n in range(G.shape[0]): # not vectorized
+    #         S2 = self.identity
+    #         for i in range(self.max_layers-1):
+    #             layer_i = G[n,int((self.max_layers - 1 + 0.5 * (1 - i)) * i):int((self.max_layers - 1 - 0.5 * i) * (i + 1))]
+    #             if np.sum(layer_i) > 0:
+    #                 if i == 0:
+    #                     op_i = 1
+    #                 else:
+    #                     op_i = int(np.round(np.mean(layer_i[layer_i>0]))) # what operation is happening on this layer?
+    #                 _S = self.sp_space.bind(self.op_slot_sp, self.ops_sps[op_i-1][None,:]) # bind & bundle that in
+    #                 target_bundle = np.sum(self.layer_sps[np.where(layer_i>0)[0],:], axis=0, keepdims=True) # target layers bundle
+    #                 _S += self.sp_space.bind(self.target_slot_sp, target_bundle)
+    #                 S[n,:] += self.sp_space.bind(self.layer_sps[i][None,:], _S).flatten()
+    #                 S2 = self.sp_space.bind(S2, S[n,:])
+    #         S[n, :] += 0.1*S2.flatten()
+    #         S[n, :] /= np.linalg.norm(S[n, :])
+    #     return S
+
+    def encode(self, G):
         '''
         Translates a graph x into an SSP representation.
-        
+
 
         Parameters:
         -----------
         x : np.ndarray
             A (s, l, d) numpy array specifying a graph G with particular structure
         '''
-        G = np.atleast_2d(G)
+        G = np.atleast_2d(G.copy())
         S = np.zeros((G.shape[0], self.ssp_dim))
-        for n in range(G.shape[0]): # not vectorized
-            for i in range(self.max_edges-1):
-                layer_i = G[n,int((self.max_edges - 1 + 0.5 * (1 - i)) * i):int((self.max_edges - 1 - 0.5 * i) * (i + 1))]
+
+        for n in range(G.shape[0]):  # not vectorized
+            S2 = self.identity#np.zeros((1,self.ssp_dim))#self.other_sp#self.identity
+            for i in range(self.max_layers - 1):
+                # S2 = self.identity
+                layer_i = G[n,
+                          int((self.max_layers - 1 + 0.5 * (1 - i)) * i):int((self.max_layers - 1 - 0.5 * i) * (i + 1))]
+                if i == 0:
+                    op_i = 0
+                else:
+                    op_i = int(G[n, self.x_dim + i])  # what operation is happening on this layer?
+                _S = self.sp_space.bind(self.op_slot_sp, self.ops_sps[op_i][None, :])  # bind & bundle that in
                 if np.sum(layer_i) > 0:
-                    if i == 0:
-                        op_i = 1
-                    else:
-                        op_i = int(np.round(np.mean(layer_i[layer_i>0]))) # what operation is happening on this layer?
-                    _S = self.spspace.bind(self.op_slot_sp, self.ops_sps[op_i-1][None,:]) # bind & bundle that in
-                    target_bundle = np.sum(self.node_sps[np.where(layer_i>0)[0],:], axis=0, keepdims=True) # target layers bundle
-                    _S += self.spspace.bind(self.target_slot_sp, target_bundle)
-                    S[n,:] += self.spspace.bind(self.node_sps[i][None,:], _S).flatten()
+                    target_bundle = np.sum(self.layer_sps[1+i+np.where(layer_i > 0)[0], :], axis=0,
+                                           keepdims=True).reshape(1,-1)  # target layers bundle
+                    _S += self.sp_space.bind(self.target_slot_sp, target_bundle)
+                _S = self.sp_space.bind(self.layer_sps[i][None, :], _S).flatten()
+
+
+                S[n, :] += _S
+                S2 = self.sp_space.bind(S2, _S)
+
+            #     if np.sum(layer_i) > 0:
+            #         S2 += self.sp_space.bind(self.sp_space.bind(self.layer_sps[i][None, :],
+            #                                                                   self.ops_sps[op_i][None, :]),
+            #                                                target_bundle)
+            # # S[n, :] += 0.1 * S2.flatten()
+            # S[n, :] += 0.1 * self.sp_space.bind(self.other_sp, S2).flatten()
+
+                # S2 = self.sp_space.bind(S2, S[n, :])
+                    # S2 = self.sp_space.bind(S2, S[n, :])
+            S[n, :] += 0.1 * S2.flatten()
+            # S[n, :] /= np.linalg.norm(S[n, :])
         return S
     
         
     def decode(self,ssp):
-        ssp = np.atleast_2d(ssp)
-        n_nodes = 0
-        decoded_graphs = np.zeros((ssp.shape[0], self.x_dim))
+        ssp = np.atleast_2d(ssp.copy())
+        n_conns = 0
+        decoded_graphs = np.zeros((ssp.shape[0], self.x_dim + self.max_layers))
         for n in range(ssp.shape[0]):
-            decoded_graph = np.zeros((self.max_edges, self.max_edges))
-            for i in range(self.max_edges - 1):
-                query_i = self.spspace.bind(self.inverse_node_sps[i][None, :], ssp[n,:].reshape(1,-1))
-                op_query = self.spspace.bind(self.inverse_op_slot_sp, query_i)
-                if i == 0: # input layer is special
-                    op_i = 1
-                else:
-                    op_i = 2 + np.argmax(np.sum(self.ops_sps[1:] * op_query, axis=-1))
+            decoded_graph = np.zeros((self.max_layers, self.max_layers))
+            decoded_ops = np.zeros(self.max_layers)
+            for i in range(self.max_layers - 1):
+                query_i = self.sp_space.bind(self.inverse_layer_sps[i][None, :], ssp[n,:].reshape(1,-1))
+                op_query = self.sp_space.bind(self.inverse_op_slot_sp, query_i)
+                op_i = 1 + np.argmax(np.sum(self.ops_sps[1:-1] * op_query, axis=-1))
+                decoded_ops[i] = op_i
                 # if op_i>4:
                 #     print(op_i)
-                target_query = self.spspace.bind(self.inverse_target_slot_sp, query_i)
-                sims = np.sum(self.node_sps[i:] * target_query, axis=-1)
+                target_query = self.sp_space.bind(self.inverse_target_slot_sp, query_i)
+                sims = np.sum(self.layer_sps[i+1:] * target_query, axis=-1)
+                target_bundle = [np.zeros(self.ssp_dim)]
                 for j,sim in enumerate(sims):
                     if sim >= self.threshold:
-                        n_nodes += 1
-                        decoded_graph[i,j+i] = op_i
-                    if n_nodes > self.max_nodes:
+                        n_conns += 1
+                        decoded_graph[i,1+i+j] = 1
+                        target_bundle.append(self.layer_sps[i+1+j])
+                    if n_conns > self.max_conns:
                         break
-            decoded_graphs[n,:] = np.concatenate([decoded_graph[i,i+1:] for i in range(decoded_graph.shape[0]-1)])
+                bound_term = self.sp_space.bind(self.op_slot_sp, self.ops_sps[op_i]) + self.sp_space.bind(self.target_slot_sp, np.sum(np.array(target_bundle), axis=0, keepdims=True))
+                ssp[n,:] = ssp[n,:] - self.sp_space.bind(self.layer_sps[i][None,:], bound_term).flatten()
+            decoded_ops[0] = 0
+            decoded_ops[-1] = self.num_ops-1
+            decoded_graphs[n,:] = np.concatenate([decoded_graph[i,i+1:] for i in range(decoded_graph.shape[0]-1)]
+                                                 + [decoded_ops])
         return decoded_graphs
