@@ -1,4 +1,4 @@
-!/bin/bash
+#!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --mem=2G
 #SBATCH --time=0-4:00
@@ -30,3 +30,6 @@ elif [ "$run_index" -eq 3 ]; then
 elif [ "$run_index" -eq 4 ]; then
     echo "Running ssp-hex-loihi"
     python run_agent.py --agent "ssp-hex" --num-trials 30 --func $func --data-dir $dest_dir --len-scale -1 --ssp-dim $sspdim --gamma 0.0 --beta-ucb 0.1 --nengo --backend "loihi-sim"
+else
+    echo "Unexpected run_index value: $run_index"
+fi
