@@ -30,6 +30,8 @@ setup(
             #'tensorflow==2.7.0',
             'pytest',
             'mypy',
-            'typing-extensions'
+            'typing-extensions',
+            'nengo',
+            'nengo_loihi'
             ]
 )

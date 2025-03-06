@@ -83,8 +83,8 @@ class NASBench:
             matrix = np.array(self.graphs[self.graph_hashs[idx]][0])
             ops = np.array(self.graphs[self.graph_hashs[idx]][1])
             ops[ops >= 0] = ops[ops >= 0] + 1
-            ops[ops == -1] = 0
-            ops[ops == -2] = self.num_ops - 1
+            ops[0] = 0
+            ops[-1] = self.num_ops - 1
 
             n_layers = matrix.shape[0]
             if (n_layers < self.max_layers):
@@ -175,7 +175,7 @@ if __name__ == '__main__':
     parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=15.)#14.5)
     parser.add_argument('--data-dir', dest='data_dir', type=str, default='./data/nasbench')
     parser.add_argument('--verbose', action='store_true')
-    parser.add_argument('--seed', type=int, default=2)
+    parser.add_argument('--seed', type=int, default=0)
     args = parser.parse_args()
 
     if args.nas_data_dir[:2] == './':
@@ -199,7 +199,7 @@ if __name__ == '__main__':
 
     start = time.thread_time_ns()
     optimizer.maximize(init_points=num_init_samples,
-                       n_iter=budget,
+                       n_iter=budget-num_init_samples,
                        num_restarts=1,
                        agent_type='ssp-nas-graph',
                        ssp_dim=args.ssp_dim,
@@ -211,7 +211,7 @@ if __name__ == '__main__':
 
     # ex_graph = target.sample(1)
     # ex_ssp = optimizer.agt.encode(ex_graph)
-    # ex_ssp_hat = optimizer.agt.decode(ex_ssp)
+    # ex_graph_hat = optimizer.agt.decode(ex_ssp)
 
     train_vals = np.zeros((num_init_samples + budget,))
     sample_locs = []
