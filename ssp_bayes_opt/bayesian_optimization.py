@@ -5,12 +5,6 @@ import logging
 import sys
 from scipy.stats import qmc
 
-logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
-
-handler = logging.StreamHandler(sys.stdout)
-handler.setLevel(logging.DEBUG)
-logger.addHandler(handler)
 
 from . import agents
 from . import sspspace
@@ -85,6 +79,13 @@ class BayesianOptimization:
         self.xs = None
         self.ys = None
 
+        self.logger = logging.getLogger()
+        # self.logger.setLevel(logging.DEBUG)
+
+        # handler = logging.StreamHandler(sys.stdout)
+        # # handler.setLevel(logging.DEBUG)
+        # self.logger.addHandler(handler)
+
     def initialize_agent(self,init_points: int =10,agent_type='ssp-hex',**kwargs):
         '''
         Creates the optimization agent from an initial sampling of the target
@@ -126,27 +127,27 @@ class BayesianOptimization:
    
 
         if 'traj' in agent_type:
-            logger.info('Creating Trajectory Domain')
+            self.logger.info('Creating Trajectory Domain')
             domain = agents.domains.TrajectoryDomain(kwargs['traj_len'], 
                                                      kwargs['x_dim'],
                                                      self.bounds)
             
         elif 'multi' in agent_type:
-            logger.info('Creating Multi-Agent Trajectory Domain')
+            self.logger.info('Creating Multi-Agent Trajectory Domain')
             domain = agents.domains.MultiTrajectoryDomain(kwargs['n_agents'], 
                                                      kwargs['traj_len'], 
                                                      kwargs['x_dim'],
                                                      self.bounds,
                                                      kwargs.pop('goals',None))
         elif ('nas' in agent_type) or ('mcbo' in agent_type): # both just assume the target has a sample method
-            logger.info(f'Creating {agent_type} Domain')
+            self.logger.info(f'Creating {agent_type} Domain')
             domain = agents.domains.TargetDefinedDomain(self.target)
         else:
-            logger.info('Creating Rectangular Domain')
+            self.logger.info('Creating Rectangular Domain')
             domain = agents.domains.BoundedDomain(self.bounds)
             
        
-        logger.info('Sampling from domain')
+        self.logger.info('Sampling from domain')
         if isinstance(init_points, int):
             init_xs = domain.sample(init_points)
             n_init_points = init_points
@@ -154,18 +155,18 @@ class BayesianOptimization:
             init_xs = np.copy(init_points[0])
             n_init_points = init_xs.shape[0]
 
-        logger.info('Evaluating Domain Samples')
+        self.logger.info('Evaluating Domain Samples')
         if isinstance(init_points, tuple) and init_points[1] is not None:
-            logger.info('Loading Pre-evaluated Samples')
+            self.logger.info('Loading Pre-evaluated Samples')
             init_ys = init_points[1]
         else:
-            logger.info('Executing Target Function')
+            self.logger.info('Executing Target Function')
             init_ys = np.array(
                     [self.target(np.atleast_2d(x), str(itr))
                      for itr, x in enumerate(init_xs)]).reshape((n_init_points,-1))
 
         # Initialize the agent
-        logger.info(f'Creating {agent_type} agent')
+        self.logger.info(f'Creating {agent_type} agent')
         if agent_type=='ssp-hex':
             ssp_space = sspspace.HexagonalSSPSpace(self.data_dim, **kwargs)
             agt = agents.SSPAgent(init_xs, init_ys,ssp_space, **kwargs) 
@@ -215,7 +216,7 @@ class BayesianOptimization:
             init_ys = agt.init_ys
         else:
             raise NotImplementedError(f'{agent_type} agent not implemented')
-        logger.info(f'{type(agt).__name__} Agent created')
+        self.logger.info(f'{type(agt).__name__} Agent created')
         return agt, init_xs, init_ys
 
 
@@ -259,17 +260,18 @@ class BayesianOptimization:
 
         # print(np.mean(np.linalg.norm(sample_xs - (sample_ssps @ self.ssp_to_domain_mat),axis=1)))
 
-        logger.info('Maximizing')
+        self.logger.info('Maximizing')
        
         agt, init_xs, init_ys = self.initialize_agent(init_points,
                                                       agent_type,
                                                       domain_bounds=self.bounds,
                                                       **kwargs
                                                       )
-        logging.info('Agent initialized')
+        self.logger.info('Agent initialized')
         #self.length_scale = agt.length_scale()
 
         self.times = np.zeros((n_iter,))
+        self.full_times = np.zeros((n_iter,))
         self.memory = np.zeros((n_iter,1)) 
         self.xs = np.zeros((n_iter + init_xs.shape[0], init_xs.shape[1]))
         self.ys = np.zeros((n_iter + init_xs.shape[0],))
@@ -306,9 +308,7 @@ class BayesianOptimization:
             if hasattr(time, 'thread_time_ns'):
                 start = time.thread_time_ns()
             # get the functions to optimize
-            ### TODO fix jacobian so it returns dx in x space
             optim_func, jac_func = agt.acquisition_func()
-
             # Use optimization to find a sample location
             for restart_idx in range(num_restarts):
 
@@ -338,6 +338,7 @@ class BayesianOptimization:
                         self.times[t] = time.thread_time_ns() - start
                     # TODO: move this outside the num_restarts loop
                     solnx = agt.decode(np.copy(np.atleast_2d(soln.x)))
+                self.full_times[t] = time.thread_time_ns() - start
                 vals[restart_idx] = -soln.fun
                 solns[restart_idx] = solnx
 #             if hasattr(time, 'thread_time_ns'):

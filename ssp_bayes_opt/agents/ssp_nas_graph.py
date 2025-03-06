@@ -59,7 +59,7 @@ class SSPNASGraphAgent(Agent):
         self.layer_sps = self.sp_space.vectors[:self.max_layers]
         self.inverse_layer_sps = self.sp_space.inverse_vectors[:self.max_layers]
         self.ops_sps = self.sp_space.vectors[self.max_layers:self.max_layers + self.num_ops]
-        self.inverse_ops_sps = self.sp_space.inverse_vectors[:self.max_layers:self.max_layers + self.num_ops]
+        self.inverse_ops_sps = self.sp_space.inverse_vectors[self.max_layers:self.max_layers + self.num_ops]
         self.op_slot_sp = self.sp_space.vectors[self.max_layers + self.num_ops].reshape(1, -1)
         self.inverse_op_slot_sp = self.sp_space.inverse_vectors[self.max_layers + self.num_ops].reshape(1, -1)
         self.target_slot_sp = self.sp_space.vectors[self.max_layers + self.num_ops + 1].reshape(1, -1)
@@ -232,7 +232,7 @@ class SSPNASGraphAgent(Agent):
         S = np.zeros((G.shape[0], self.ssp_dim))
 
         for n in range(G.shape[0]):  # not vectorized
-            S2 = self.identity#np.zeros((1,self.ssp_dim))#self.other_sp#self.identity
+            S2 = self.identity.copy()#np.zeros((1,self.ssp_dim))#self.other_sp#self.identity
             for i in range(self.max_layers - 1):
                 # S2 = self.identity
                 layer_i = G[n,
@@ -242,6 +242,7 @@ class SSPNASGraphAgent(Agent):
                 else:
                     op_i = int(G[n, self.x_dim + i])  # what operation is happening on this layer?
                 _S = self.sp_space.bind(self.op_slot_sp, self.ops_sps[op_i][None, :])  # bind & bundle that in
+                target_bundle = self.identity.copy()
                 if np.sum(layer_i) > 0:
                     target_bundle = np.sum(self.layer_sps[1+i+np.where(layer_i > 0)[0], :], axis=0,
                                            keepdims=True).reshape(1,-1)  # target layers bundle
@@ -250,7 +251,9 @@ class SSPNASGraphAgent(Agent):
 
 
                 S[n, :] += _S
-                S2 = self.sp_space.bind(S2, _S)
+                S2 = self.sp_space.bind(S2, self.layer_sps[i][None, :],
+                                        target_bundle, self.ops_sps[op_i][None, :])
+                # S2 = self.sp_space.bind(S2, _S)
 
             #     if np.sum(layer_i) > 0:
             #         S2 += self.sp_space.bind(self.sp_space.bind(self.layer_sps[i][None, :],
@@ -261,7 +264,7 @@ class SSPNASGraphAgent(Agent):
 
                 # S2 = self.sp_space.bind(S2, S[n, :])
                     # S2 = self.sp_space.bind(S2, S[n, :])
-            S[n, :] += 0.1 * S2.flatten()
+            S[n, :] += 0.5 * S2.flatten()
             # S[n, :] /= np.linalg.norm(S[n, :])
         return S
     

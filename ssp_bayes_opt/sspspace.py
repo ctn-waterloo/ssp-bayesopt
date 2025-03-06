@@ -61,6 +61,7 @@ class SPSpace:
                 q = self.vectors[j, :] / np.linalg.norm(self.vectors[j, :])
                 for k in range(j + 1, self.domain_size):
                     self.vectors[k, :] = self.vectors[k, :] - (q.T @ self.vectors[k, :]) * q
+                    self.vectors[k, :] = self.make_unitary(self.vectors[k, :].reshape(1,-1))
         self.inverse_vectors = self.invert(self.vectors)
         # self.make_unitary(self.rng.randn(self.domain_size,self.dim))
 
@@ -144,27 +145,13 @@ class SPSpace:
         s[0] = 1
         return s
 
-    def bind(self, a, b):
-        """
-        Binds together input
-
-        Parameters
-        ----------
-        a : np.array
-            A vector with shape (n_samples x ssp_dim)
-
-        b : np.array
-            A vector with shape (n_samples x ssp_dim)
-
-        Returns
-        -------
-        np.array
-            A vector with shape (n_samples x ssp_dim). Row i is a[i,:] binded with b[i,:]
-
-        """
-        a = np.atleast_2d(a)
-        b = np.atleast_2d(b)
-        return np.fft.ifft(np.fft.fft(a, axis=1) * np.fft.fft(b, axis=1), axis=1).real
+    def bind(self, *arrays):
+        # Binds together input with circular convolution
+        arrays = [np.atleast_2d(arr) for arr in arrays]
+        fft_result = np.fft.fft(arrays[0], axis=-1)
+        for arr in arrays[1:]:
+            fft_result = fft_result * np.fft.fft(arr, axis=-1)
+        return np.fft.ifft(fft_result, axis=-1).real
 
     def invert(self, a):
         """
@@ -533,11 +520,14 @@ class SSPSpace:
         s = np.zeros(self.ssp_dim)
         s[0] = 1
         return s
-    
-    def bind(self,a,b):
-        a = np.atleast_2d(a)
-        b = np.atleast_2d(b)
-        return np.fft.ifft(np.fft.fft(a, axis=1) * np.fft.fft(b,axis=1), axis=1).real
+
+    def bind(self, *arrays):
+        # Binds together input with circular convolution
+        arrays = [np.atleast_2d(arr) for arr in arrays]
+        fft_result = np.fft.fft(arrays[0], axis=-1)
+        for arr in arrays[1:]:
+            fft_result = fft_result * np.fft.fft(arr, axis=-1)
+        return np.fft.ifft(fft_result, axis=-1).real
     
     def invert(self,a):
         a = np.atleast_2d(a)

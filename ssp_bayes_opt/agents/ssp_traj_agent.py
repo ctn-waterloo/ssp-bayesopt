@@ -15,7 +15,7 @@ class SSPTrajectoryAgent(Agent):
                  ssp_x_space=None, ssp_t_space=None, ssp_dim=151,
                  domain_bounds=None, length_scale=4, gamma_c=1.0,
                  beta_ucb=np.log(2/1e-6),
-                 init_pos=None, decoder_method='network-optim'):
+                 init_pos=None, decoder_method='network-optim', optim_ls=False):
         super().__init__()
         self.num_restarts = 10
         self.data_dim = x_dim*traj_len
@@ -35,6 +35,11 @@ class SSPTrajectoryAgent(Agent):
         self.ssp_dim = ssp_x_space.ssp_dim
         self.ssp_x_space = ssp_x_space
         self.ssp_t_space = ssp_t_space
+
+        if optim_ls:
+            optres = self._optimize_lengthscale(init_xs, init_ys)
+            self.ssp_x_space.update_lengthscale(optres[0])
+            self.ssp_t_space.update_lengthscale(optres[1])
         
         # Encode timestamps
         self.timestep_ssps = self.ssp_t_space.encode(
@@ -52,9 +57,7 @@ class SSPTrajectoryAgent(Agent):
         self.init_xs = init_xs
         self.init_ys = init_ys
 
-        optres = self._optimize_lengthscale(init_xs, init_ys)
-        self.ssp_x_space.update_lengthscale(optres[0])
-        self.ssp_t_space.update_lengthscale(optres[1])
+
 
         self.blr = blr.BayesianLinearRegression(self.ssp_x_space.ssp_dim)
         self.blr.update(init_phis, np.array(init_ys))
@@ -110,6 +113,12 @@ class SSPTrajectoryAgent(Agent):
             kfold = KFold(n_splits=min(xs.shape[0], 50))
             ssp_x_space.update_lengthscale(length_scale[0])
             ssp_t_space.update_lengthscale(length_scale[1])
+            self.timestep_ssps = self.ssp_t_space.encode(
+                np.linspace(0,
+                            self.traj_len,
+                            self.traj_len
+                            ).reshape(-1, 1)
+            )
             for train_idx, test_idx in kfold.split(xs):
                 train_x, test_x = xs[train_idx], xs[test_idx]
                 train_y, test_y = ys[train_idx], ys[test_idx]

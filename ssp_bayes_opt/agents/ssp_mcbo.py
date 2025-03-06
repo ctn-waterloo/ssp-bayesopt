@@ -66,6 +66,8 @@ class SSPMCBOAgent(Agent):
 
         if search_space.disc_names:  # discrete params (integers, not categories)
             self.disc_idxs = np.array([np.where(self.param_names == n)[0] for n in search_space.disc_names]).flatten()
+            domain_bounds[self.disc_idxs, 0] = [search_space.params[p].lb for p in search_space.disc_names]
+            domain_bounds[self.disc_idxs, 1] = [search_space.params[p].ub for p in search_space.disc_names]
             self.spaces['disc'] = sspspace.RandomSSPSpace(self.n_disc,
                                                           ssp_dim=ssp_dim,
                                                           domain_bounds=domain_bounds[self.disc_idxs, :],
@@ -134,16 +136,18 @@ class SSPMCBOAgent(Agent):
         self.sqrt_alpha = beta_ucb
 
         self.init_samples = defaultdict(None)
-        if (decoder_method == 'network') | (decoder_method == 'network-optim'):
-            if self.n_cont > 0:
-                self.spaces['cont'].train_decoder_net();
-                self.spaces['disc'].train_decoder_net();
-        else:
-            if self.n_cont > 0:
+        if self.n_cont > 0:
+            if (decoder_method == 'network') | (decoder_method == 'network-optim'):
+                    self.spaces['cont'].train_decoder_net();
+            else:
                 self.init_samples['cont'] = self.spaces['cont'].get_sample_pts_and_ssps(2**10, method='length-scale')
-            if self.n_disc > 0:
-                self.init_samples['disc'] = self.spaces['disc'].get_sample_pts_and_ssps(int(np.max(domain_bounds[self.disc_idxs, 1])),
-                                                                                        method='grid')
+        if self.n_disc > 0:
+            _int_list = []
+            for n in search_space.disc_names:
+                _int_list.append(np.arange(search_space.params[n].lb, search_space.params[n].ub+1))
+            int_pts = np.vstack(np.meshgrid(*_int_list)).T
+            int_ssps = self.spaces['disc'].encode(int_pts)
+            self.init_samples['disc'] = (int_ssps, int_pts)
         self.decoder_method = decoder_method
 
     def length_scale(self):
@@ -383,8 +387,8 @@ class SSPMCBOAgent(Agent):
                                                                       )
         if self.n_disc > 0:
             query = self.bind(ssp, self.spaces['slots'].inverse_vectors[1])
-            disc_x = self.spaces['disc'].decode(query,
-                                                method=self.decoder_method,
+            decoded_x[:, self.disc_idxs] = self.spaces['disc'].decode(query,
+                                                method='from-set',
                                                 samples=self.init_samples['disc']
                                                 )
         if self.n_nomial > 0:

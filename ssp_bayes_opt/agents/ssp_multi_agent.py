@@ -52,12 +52,7 @@ class SSPMultiAgent(Agent):
 
         ###
         
-        # Encode the initial sample points 
-        init_phis = self.encode(init_xs)
-        norms = np.linalg.norm(init_phis, axis=1)
 
-        self.phi_norm_bounds = [norms.min(), norms.max()]
-#         print('!!! norm_bounds', self.phi_norm_bounds)
 
 
         self.init_xs = init_xs
@@ -75,6 +70,13 @@ class SSPMultiAgent(Agent):
                         self.traj_len
                         ).reshape(-1, 1)
         )
+
+        # Encode the initial sample points
+        init_phis = self.encode(init_xs)
+        norms = np.linalg.norm(init_phis, axis=1)
+
+        self.phi_norm_bounds = [norms.min(), norms.max()]
+        #         print('!!! norm_bounds', self.phi_norm_bounds)
 
         self.blr = blr.BayesianLinearRegression(self.ssp_dim)
         self.blr.update(init_phis, np.array(init_ys))
@@ -135,7 +137,7 @@ class SSPMultiAgent(Agent):
             ssp_x_space.update_lengthscale(length_scale[0])
             ssp_t_space.update_lengthscale(length_scale[1])
             # Encode timestamps
-            self.timestep_ssps = self.ssp_t_space.encode(
+            timestep_ssps = ssp_t_space.encode(
                 np.linspace(0,
                             self.traj_len,
                             self.traj_len
@@ -145,8 +147,8 @@ class SSPMultiAgent(Agent):
                 train_x, test_x = xs[train_idx], xs[test_idx]
                 train_y, test_y = ys[train_idx], ys[test_idx]
 
-                train_phis = self.encode(train_x)
-                test_phis = self.encode(test_x)
+                train_phis = self.encode(train_x,timestep_ssps=timestep_ssps)
+                test_phis = self.encode(test_x,timestep_ssps=timestep_ssps)
 
                 b = blr.BayesianLinearRegression(ssp_x_space.ssp_dim)
                 b.update(train_phis, train_y)
@@ -270,7 +272,7 @@ class SSPMultiAgent(Agent):
             raise RuntimeError(msg)
 
 
-    def encode(self,x):
+    def encode(self,x,timestep_ssps=None):
         '''
         Translates a trajectory x into an SSP representation.
         
@@ -281,6 +283,8 @@ class SSPMultiAgent(Agent):
             A (s, l, d) numpy array specifying s trajectories
             of length l.
         '''
+        if timestep_ssps is None:
+            timestep_ssps=self.timestep_ssps
         enc_x = np.atleast_2d(x)
         S = np.zeros((x.shape[0], self.ssp_dim))
         
@@ -291,17 +295,19 @@ class SSPMultiAgent(Agent):
                 #print(enc_x.shape)
                 #print(enc_x[:,i,j,:].shape)
                 #print(self.ssp_x_spaces[i].encode(enc_x[:,i,j,:]).shape)
-                Si += self.ssp_x_spaces[i].bind(self.timestep_ssps[j,:], 
+                Si += self.ssp_x_spaces[i].bind(timestep_ssps[j,:],
                                        self.ssp_x_spaces[i].encode(enc_x[:,i,j,:]))
             S += self.ssp_x_spaces[i].bind(self.agent_sps[i,:], Si)
         return S
     
         
-    def decode(self,ssp):
+    def decode(self,ssp,timestep_ssps=None):
+        if timestep_ssps is None:
+            timestep_ssps=self.timestep_ssps
         decoded_traj = np.zeros((self.n_agents, self.traj_len,self.x_dim))
         for i in range(self.n_agents):
             sspi = self.ssp_x_spaces[i].bind(self.ssp_x_spaces[i].invert(self.agent_sps[i,:]), ssp)
-            queries = self.ssp_x_spaces[i].bind(self.ssp_t_space.invert(self.timestep_ssps) , sspi)
+            queries = self.ssp_x_spaces[i].bind(self.ssp_t_space.invert(timestep_ssps) , sspi)
             decoded_traj[i,:,:] = self.ssp_x_spaces[i].decode(queries, 
                                                               method=self.decoder_method,
                                                               samples=self.init_samples[i])

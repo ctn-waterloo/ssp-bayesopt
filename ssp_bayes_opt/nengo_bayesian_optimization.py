@@ -5,12 +5,7 @@ import logging
 import sys, os
 from scipy.stats import qmc
 
-logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
 
-handler = logging.StreamHandler(sys.stdout)
-handler.setLevel(logging.DEBUG)
-logger.addHandler(handler)
 
 from . import agents
 from . import sspspace
@@ -45,8 +40,9 @@ def load_checkpoint(filepath):
         return pickle.load(f)
 
 class NengoBayesianOptimization(BayesianOptimization):
-    def __init__(self, **kwargs):
-        super(NengoBayesianOptimization, self).__init__()
+    def __init__(self, random_state=0, **kwargs):
+        self.seed = random_state
+        super(NengoBayesianOptimization, self).__init__(**kwargs)
 
     def maximize(self, init_points: int =10, n_iter: int =100,
                  num_restarts: int = 5, agent_type='ssp-hex',
@@ -92,17 +88,17 @@ class NengoBayesianOptimization(BayesianOptimization):
 
         # print(np.mean(np.linalg.norm(sample_xs - (sample_ssps @ self.ssp_to_domain_mat),axis=1)))
 
-        logger.info('Maximizing')
+        self.logger.info('Maximizing')
        
 
-        logging.info('Agent initialized')
+        self.logger.info('Agent initialized')
         #self.length_scale = agt.length_scale()
 
 
         self.memory = np.zeros((n_iter,1))
 
         if (checkpoint_path is not None) and os.path.exists(checkpoint_path):
-            logger.info(f"Loading checkpoint from {checkpoint_path}")
+            self.logger.info(f"Loading checkpoint from {checkpoint_path}")
             loaded_state = load_checkpoint(checkpoint_path)
             t = loaded_state['iteration']
             init_points = loaded_state['init_points']
@@ -114,7 +110,7 @@ class NengoBayesianOptimization(BayesianOptimization):
             agt = loaded_state['agt']
 
         else:
-            logger.info("No checkpoint found. Starting from scratch.")
+            self.logger.info("No checkpoint found. Starting from scratch.")
             t = 0
             agt, init_xs, init_ys = self.initialize_agent(init_points,
                                                           agent_type,
@@ -184,7 +180,7 @@ class NengoBayesianOptimization(BayesianOptimization):
                     if hasattr(time, 'thread_time_ns'):
                         self.times[t] = time.thread_time_ns() - start
                     # TODO: move this outside the num_restarts loop
-
+                    # print(sim.model.utilization_summary()) #if loihi: generally 7 blocks
                     solnx = get_soln(sim.data[soln_probe])
                     optim_func, _ = agt.acquisition_func()
                     solnf = optim_func(solnx.flatten())
@@ -230,7 +226,7 @@ class NengoBayesianOptimization(BayesianOptimization):
                 save_state = {'iteration': t, 'xs': self.xs, 'ys': self.ys,
                               'agt': agt, 'times': self.times}
                 save_checkpoint(save_state, checkpoint_path)
-                logger.info(f"Checkpoint saved at iteration {t}")
+                self.logger.info(f"Checkpoint saved at iteration {t}")
 
             t += 1
             
