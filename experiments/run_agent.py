@@ -187,7 +187,12 @@ if __name__=='__main__':
     # random.seed(1)
     seeds = [random.randint(1,100000) for _ in range(args.num_trials)]
 
-    data_path = os.path.join(os.getcwd(),args.data_dir,args.function_name,args.agent_type)
+    if args.nengo:
+        data_path = os.path.join(os.getcwd(),
+                                 args.data_dir, args.function_name, args.agent_type + '_nengo-' + args.backend)
+    else:
+        data_path = os.path.join(os.getcwd(),
+                             args.data_dir,args.function_name,args.agent_type)
     if not os.path.exists(data_path):
         os.makedirs(data_path)
     for seed in seeds:
