@@ -76,14 +76,13 @@ class SamplingTrial(pytry.Trial):
         #target, pbounds = functions.rescale(target,pbounds)
 
         if p.nengo:
-            sim_time = args.sim_time
+            sim_time = p.sim_time
             neuron_type = neuron_types['loihilif'] if 'loihi' in p.backend else neuron_types['lif']
             sim_type, sim_args = sim_types[p.backend]
 
             optimizer = ssp_bayes_opt.NengoBayesianOptimization(f=target,
                                                            bounds=pbounds,
                                                            verbose=p.verbose,
-
                                                            sampling_seed=p.seed)
             start = time.thread_time_ns()
             optimizer.maximize(init_points=p.num_init_samples,
@@ -101,7 +100,7 @@ class SamplingTrial(pytry.Trial):
                                neurons_per_dim=p.num_neurons,
                                neuron_type=neuron_type,
                                sim_type=sim_type, sim_args=sim_args,
-                               tau=0.05
+                               sim_time=sim_time, tau=0.05
                                )
             elapsed_time = time.thread_time_ns() - start
         else:
