@@ -117,7 +117,8 @@ class NengoBayesianOptimization(BayesianOptimization):
                                                           domain_bounds=self.bounds,
                                                           **kwargs
                                                           )
-            init_points = agt.init_xs.shape[0]
+
+            init_points = init_xs.shape[0]
             self.xs = np.zeros((n_iter + init_points, init_xs.shape[1]))
             self.ys = np.zeros((n_iter + init_points,))
             self.times = np.zeros((n_iter,))
