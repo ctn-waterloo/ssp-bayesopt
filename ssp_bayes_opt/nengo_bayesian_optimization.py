@@ -122,6 +122,7 @@ class NengoBayesianOptimization(BayesianOptimization):
             self.xs = np.zeros((n_iter + init_points, init_xs.shape[1]))
             self.ys = np.zeros((n_iter + init_points,))
             self.times = np.zeros((n_iter,))
+            self.full_times = np.zeros((n_iter,))
             for row_idx, (x,y) in enumerate(zip(init_xs, init_ys)):
                 self.xs[row_idx] = x
                 self.ys[row_idx] = y
@@ -155,41 +156,42 @@ class NengoBayesianOptimization(BayesianOptimization):
             optim_func, jac_func = agt.acquisition_func()
 
             # Use optimization to find a sample location
-            for restart_idx in range(num_restarts):
+            # for restart_idx in range(num_restarts):
 
-                if (agent_type in gp_agent_types) or (agent_type=='disc-domain'):
-                    print('Agent type not implemented in nengo', agent_type)
-                    exit(1)
-                else: ## ssp agent
-                    phi_init = agt.initial_guess()
-                    start = time.thread_time_ns()
-                    solver_net, soln_probe = bo_solver.make_network(
-                        bo_soln_init=phi_init.flatten(),
-                        m= agt.blr.m.flatten(),
-                        sigma=agt.blr.S,
-                        beta_inv=1 / agt.blr.beta,
-                        gamma_t=agt.gamma_c,
-                        neurons_per_dim=neurons_per_dim,
-                        tau=tau,
-                        seed=self.seed,
-                        neuron_type=neuron_type
-                    )
-                    sim = sim_type(solver_net, **sim_args)
-                    with sim:
-                        sim.run(sim_time)
+            if (agent_type in gp_agent_types) or (agent_type=='disc-domain'):
+                print('Agent type not implemented in nengo', agent_type)
+                exit(1)
+            else: ## ssp agent
+                phi_init = agt.initial_guess()
+                start = time.thread_time_ns()
+                solver_net, soln_probe = bo_solver.make_network(
+                    bo_soln_init=phi_init.flatten(),
+                    m= agt.blr.m.flatten(),
+                    sigma=agt.blr.S,
+                    beta_inv=1 / agt.blr.beta,
+                    gamma_t=agt.gamma_c,
+                    neurons_per_dim=neurons_per_dim,
+                    tau=tau,
+                    seed=self.seed,
+                    neuron_type=neuron_type
+                )
+                sim = sim_type(solver_net, **sim_args)
+                with sim:
+                    sim.run(sim_time)
 
-                    if hasattr(time, 'thread_time_ns'):
-                        self.times[t] = time.thread_time_ns() - start
-                    # TODO: move this outside the num_restarts loop
-                    # print(sim.model.utilization_summary()) #if loihi: generally 7 blocks
-                    solnx = get_soln(sim.data[soln_probe])
-                    optim_func, _ = agt.acquisition_func()
-                    solnf = optim_func(solnx.flatten())
-                    solnx = agt.decode(np.copy(np.atleast_2d(solnx)))
+                if hasattr(time, 'thread_time_ns'):
+                    self.times[t] = time.thread_time_ns() - start
+                # TODO: move this outside the num_restarts loop
+                # print(sim.model.utilization_summary()) #if loihi: generally 7 blocks
+                solnx = get_soln(sim.data[soln_probe])
+                optim_func, _ = agt.acquisition_func()
+                solnf = optim_func(solnx.flatten())
+                solnx = agt.decode(np.copy(np.atleast_2d(solnx)))
+                self.full_times[t] = time.thread_time_ns() - start
 
 
-                vals[restart_idx] = -solnf
-                solns[restart_idx] = solnx
+                vals = -solnf
+                solns = solnx
 #             if hasattr(time, 'thread_time_ns'):
 #                 self.times[t] = time.thread_time_ns() - start
             ## END timing section

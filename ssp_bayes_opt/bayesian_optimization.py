@@ -311,11 +311,10 @@ class BayesianOptimization:
             optim_func, jac_func = agt.acquisition_func()
             # Use optimization to find a sample location
             for restart_idx in range(num_restarts):
-
+                start = time.thread_time_ns()
                 if agent_type in gp_agent_types:
                     x_init = np.random.uniform(low=lbounds, high=ubounds, size=(len(ubounds),))
                     # Do bounded optimization to ensure x stays in bound
-                    start = time.thread_time_ns()
                     soln = minimize(optim_func, x_init,
                                     jac=jac_func, 
                                     method='L-BFGS-B',
@@ -323,7 +322,6 @@ class BayesianOptimization:
                     self.times[t] = time.thread_time_ns() - start
                     solnx = np.copy(soln.x)
                 elif agent_type=='disc-domain':
-                    start = time.thread_time_ns()
                     soln = agt.sample()
                     self.times[t] = time.thread_time_ns() - start
                     solnx = np.copy(soln.x)
@@ -338,7 +336,7 @@ class BayesianOptimization:
                         self.times[t] = time.thread_time_ns() - start
                     # TODO: move this outside the num_restarts loop
                     solnx = agt.decode(np.copy(np.atleast_2d(soln.x)))
-                self.full_times[t] = time.thread_time_ns() - start
+
                 vals[restart_idx] = -soln.fun
                 solns[restart_idx] = solnx
 #             if hasattr(time, 'thread_time_ns'):
@@ -362,6 +360,7 @@ class BayesianOptimization:
             update_start = time.thread_time_ns()
             agt.update(x_t, y_t, var_t, step_num=t + init_xs.shape[0])
             self.times[t] += time.thread_time_ns() - update_start
+            self.full_times[t] = time.thread_time_ns() - start
 
             self.memory[t,0] = get_memory_usage(heap)
 
