@@ -4,137 +4,87 @@ from scipy.optimize import minimize
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import KFold
 import warnings
+from .ssp_agent import SSPAgent
 
 from .. import sspspace
 from .. import blr
 
-from .agent import Agent
 
-class SSPMultiAgent(Agent):
-    def __init__(self, init_xs, init_ys, n_agents, x_dim=1, traj_len=1,
-                 ssp_x_spaces=None, ssp_t_space=None,
-                 ssp_dim=151,
-                 domain_bounds=None, length_scale=4,
-                 gamma_c=1.0,
-                 beta_ucb=np.log(2/1e-6),
-                 init_pos=None,
-                 decoder_method='network-optim', optim_ls=False):
-        super().__init__()
-        self.ssp_dim = ssp_dim
-        self.num_restarts = 10
+class SSPMultiAgent(SSPAgent):
+    def __init__(self, init_xs, init_ys, **kwargs):
+        super().__init__(init_xs, init_ys, None, **kwargs)
+
+
+    def _set_ssp_space(self, n_agents,
+                       x_dim, traj_len,
+                       domain_bounds,
+                       decoder_method,
+                       ssp_x_spaces=None, ssp_t_space=None,
+                       seed=0,
+                       init_pos=None, **kwargs):
+        assert n_agents > 0
+        self.data_dim = x_dim * traj_len * n_agents
         self.n_agents = n_agents
-        self.data_dim = x_dim*traj_len*n_agents
-        self.x_dim= x_dim
+        self.x_dim = x_dim
         self.init_pos = None if init_pos is None else np.atleast_2d(init_pos)
         self.traj_len = traj_len
-        if domain_bounds is not None:
-            domain_bounds = np.array([np.min(domain_bounds[:,0])*np.ones(x_dim*n_agents), 
-                             np.max(domain_bounds[:,1])*np.ones(x_dim*n_agents)]).T
-        if not isinstance(length_scale, (list, tuple, np.ndarray)):
-            length_scale = [length_scale]*n_agents
-       
-       
+
         if ssp_x_spaces is None:
             ssp_x_spaces=[]
             for i in range(n_agents):
-                ssp_x_spaces.append( sspspace.HexagonalSSPSpace(x_dim,ssp_dim=ssp_dim,
+                ssp_x_spaces.append( sspspace.HexagonalSSPSpace(x_dim,ssp_dim=kwargs.get('ssp_dim', 100),
                                                                 scale_min=0.1, scale_max=3,
-                                                                domain_bounds=domain_bounds[i*x_dim:(i+1)*x_dim,:], 
-                                                                length_scale=length_scale[i]) )
+                                                                domain_bounds=domain_bounds[i*x_dim:(i+1)*x_dim,:],
+                                                                length_scale=1))
+
         if ssp_t_space is None:
-            ssp_t_space =  sspspace.RandomSSPSpace(1,ssp_dim=ssp_x_spaces[0].ssp_dim,
-                                domain_bounds=np.array([[0,self.traj_len]]), length_scale=1) 
-        agent_sps = sspspace.RandomSSPSpace(n_agents, ssp_dim=ssp_x_spaces[0].ssp_dim, length_scale=1).axis_matrix.T
+            ssp_t_space = sspspace.RandomSSPSpace(1, ssp_dim=ssp_x_spaces[0].ssp_dim,
+                                                  domain_bounds=np.array([[0, self.traj_len]]), length_scale=1)
+        self.ssp_dim = ssp_x_spaces[0].ssp_dim
         self.ssp_x_spaces = ssp_x_spaces
         self.ssp_t_space = ssp_t_space
-        self.agent_sps = agent_sps
-        self.ssp_dim = ssp_x_spaces[0].ssp_dim
 
-        ###
-        
-
-
-
-        self.init_xs = init_xs
-        self.init_ys = init_ys
-        if optim_ls:
-            optres = self._optimize_lengthscale(init_xs, init_ys)
+        if not 'length_scale' in kwargs or np.any(np.array(kwargs.get('length_scale')) < 0):
+            optres = self._optimize_lengthscale(self.init_xs, self.init_ys)
             for i in range(n_agents):
-                self.ssp_x_spaces[i].update_lengthscale(optres[0])
-            self.ssp_t_space.update_lengthscale(optres[1])
-        self.length_scales = length_scale
-        # Encode timestamps
+                self.ssp_x_spaces[i].update_lengthscale(optres[i])
+            self.ssp_t_space.update_lengthscale(optres[-1])
+        else:
+            for i in range(n_agents):
+                self.ssp_x_spaces[i].update_lengthscale(kwargs.get('length_scale', 4))
+            self.ssp_t_space.update_lengthscale(kwargs.get('time_length_scale', 10))
         self.timestep_ssps = self.ssp_t_space.encode(
             np.linspace(0,
                         self.traj_len,
                         self.traj_len
                         ).reshape(-1, 1)
         )
+        self.agent_sps = sspspace.SPSpace(n_agents,ssp_x_spaces[0].ssp_dim, seed).vectors # changed on mar 14 2025
 
-        # Encode the initial sample points
-        init_phis = self.encode(init_xs)
-        norms = np.linalg.norm(init_phis, axis=1)
-
-        self.phi_norm_bounds = [norms.min(), norms.max()]
-        #         print('!!! norm_bounds', self.phi_norm_bounds)
-
-        self.blr = blr.BayesianLinearRegression(self.ssp_dim)
-        self.blr.update(init_phis, np.array(init_ys))
-
-
-        self.constraint_ssp = np.zeros_like(self.blr.m)
-
-        #if not self.init_pos is None:
-            # constraint_val = self.ssp_x_space.bind(
-            #                             self.timestep_ssps[0,:],
-            #                             self.ssp_x_space.encode(self.init_pos)
-            #                         )
-            # # Transpose on constraint_val because the ssp_space expects
-            # # data to be organized with samples in rows 
-            # # but BLR expects samples in columns.
-            # self.constraint_ssp += constraint_val.T
-        ### end if
-
-        # MI params
-        self.gamma_t = 0
-        self.gamma_c = gamma_c
-        self.sqrt_alpha = beta_ucb 
-
-        if (decoder_method=='network') | (decoder_method=='network-optim'):
+        if (decoder_method == 'network') | (decoder_method == 'network-optim'):
             for i in range(n_agents):
                 self.ssp_x_spaces[i].train_decoder_net();
-            self.init_samples=[None]*n_agents
+            self.init_samples = None
         else:
             init_samples = []
             for i in range(n_agents):
-                init_samples.append( self.ssp_x_spaces[i].get_sample_pts_and_ssps(2**17, method='length-scale') )
+                init_samples.append(self.ssp_x_spaces[i].get_sample_pts_and_ssps(2 ** 17, method='length-scale'))
             self.init_samples = init_samples
         self.decoder_method = decoder_method
-    
+
     def length_scale(self):
-        return self.length_scales
+        return np.array([space.length_scale for space in self.ssp_x_spaces] + [self.ssp_t_space.length_scale])
 
-    def eval(self, xs):
-        phis = self.encode(xs)
-        mu, var = self.blr.predict(phis)
-        phi = self.sqrt_alpha * (np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t)) 
-        return mu, var, phi
-
-#     def sample_trajectories(self, num_points=10):
-#         sampler = qmc.Sobol(d=self.x_dim) 
-#         u_sample_points = sampler.random(num_points*self.traj_len)
-#         sample_points = qmc.scale(u_sample_points, self.ssp_x_space.domain_bounds[:,0], 
-#                                   self.ssp_x_space.domain_bounds[:,1])
-#         return sample_points.reshape(num_points, self.traj_len*self.x_dim)
 
     def _optimize_lengthscale(self, init_trajs, init_ys):
-        ls_0 = np.array([[4.],[4.]]) 
+        ls_0 = 4 * np.ones((self.n_agents+1,1))
 
         def min_func(length_scale, xs=init_trajs, ys=init_ys,
-                        ssp_x_space=self.ssp_x_space,ssp_t_space=self.ssp_t_space):
+                        ssp_x_spaces=self.ssp_x_spaces,ssp_t_space=self.ssp_t_space):
             errors = []
             kfold = KFold(n_splits=min(xs.shape[0], 50))
-            ssp_x_space.update_lengthscale(length_scale[0])
+            for i in range(self.n_agents):
+                ssp_x_spaces[i].update_lengthscale(length_scale[0])
             ssp_t_space.update_lengthscale(length_scale[1])
             # Encode timestamps
             timestep_ssps = ssp_t_space.encode(
@@ -150,7 +100,7 @@ class SSPMultiAgent(Agent):
                 train_phis = self.encode(train_x,timestep_ssps=timestep_ssps)
                 test_phis = self.encode(test_x,timestep_ssps=timestep_ssps)
 
-                b = blr.BayesianLinearRegression(ssp_x_space.ssp_dim)
+                b = blr.BayesianLinearRegression(ssp_x_spaces[0].ssp_dim)
                 b.update(train_phis, train_y)
                 mu, var = b.predict(test_phis)
                 diff = test_y.flatten() - mu.flatten()
@@ -163,113 +113,7 @@ class SSPMultiAgent(Agent):
         retval = minimize(min_func, x0=ls_0, method='L-BFGS-B',
                           bounds=[(1/np.sqrt(init_trajs.shape[0]),None),(1/np.sqrt(init_trajs.shape[0]),None)],
                           )
-        return np.abs(retval.x) 
-
-    def initial_guess(self):
-        '''
-        The initial guess for optimizing the acquisition function.
-        '''
-        # Return an initial guess from either the distribution or
-        # From the approximate solution of dot(m,x) + x^T Sigma x
-        return self.blr.sample()
-
-
-    def untrusted(self, x, badness=-1):
-        '''
-        Updates the domain constraints for the optimization.
-        TODO: modify to permit multiple updates at once
-
-        Parameters
-        ----------
-        x : np.ndarray
-            points to be excluded from the optimization.
-            For now assuming one data point per call of untrusted
-
-
-        badness : float
-            The scale to be applied to the x points.  For now
-            assuming that one scalar value is applied per point in
-            x
-        '''
-        phi = self.encode(x)
-        # TODO: modify to running average of ssps.  
-        # Could exceed the scale of the mean values 
-        # if not careful. 
-        self.constraint_ssp += badness * phi
-
-    def acquisition_func(self):
-        '''
-        return objective_func, jacobian_func
-        '''
-        # TODO: Currently returning (objective_func, None) to be fixed when 
-        # I finish the derivation
-
-        def min_func(phi, m=self.blr.m,# + self.constraint_ssp,
-                        sigma=self.blr.S,
-                        gamma=self.gamma_t,
-                        sqrt_alpha=self.sqrt_alpha,
-                        beta_inv=1/self.blr.beta,
-                        norm_margin=self.phi_norm_bounds):
-
-            phi_norm = np.linalg.norm(phi)
-            phi_norm_scale = np.mean(norm_margin) / phi_norm
-            phi = phi_norm_scale * phi 
-
-            val = phi.T @ m
-            mi = sqrt_alpha * (np.sqrt(gamma + beta_inv + phi.T @ sigma @ phi) - np.sqrt(gamma))
-            return -(val + mi).flatten()
-
-
-        def gradient(phi, m=self.blr.m,# + self.constraint_ssp,
-                      sigma=self.blr.S,
-                      gamma=self.gamma_t,
-                      sqrt_alpha=self.sqrt_alpha,
-                      beta_inv=1/self.blr.beta,
-                      norm_margin=self.phi_norm_bounds):
-
-            phi_norm = np.linalg.norm(phi)
-            phi_norm_scale = np.mean(norm_margin) / phi_norm
-            phi = phi_norm_scale * phi 
-
-            sqr = (phi.T @ sigma @ phi) 
-            scale = np.sqrt(sqr + gamma + beta_inv)
-            retval = -(m.flatten() + sqrt_alpha * sigma @ phi / scale)
-            return retval
-
-        return min_func, gradient
-    
-    def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float, step_num=0):
-        '''
-        Updates the state of the Bayesian Linear Regression.
-        '''
-    
-        x_val = x_t
-        y_val = y_t
-        if len(x_t.shape) < 2:
-            x_val = x_t.reshape(1, x_t.shape[0])
-            y_val = y_t.reshape(1, y_t.shape[0])
-        y_val = y_val
-    
-        # Update BLR
-        phi = np.atleast_2d(self.encode(x_val).squeeze())
-
-        phi_norm = np.linalg.norm(phi)
-        if phi_norm < self.phi_norm_bounds[0]:
-            self.phi_norm_bounds[0] = phi_norm
-        if phi_norm > self.phi_norm_bounds[1]:
-            self.phi_norm_bounds[1] = phi_norm
-    
-        self.blr.update(phi, y_val)
-        
-        # Update gamma
-        if isinstance(self.gamma_c, (int, float)):
-            self.gamma_t = self.gamma_t + self.gamma_c*sigma_t
-        elif callable(self.gamma_c):
-            self.gamma_t = self.gamma_t + self.gamma_c(step_num) * sigma_t
-        else:
-            msg = f'unable to use {self.gamma_c}, expected number of callable'
-            print(msg)
-            raise RuntimeError(msg)
+        return np.abs(retval.x)
 
 
     def encode(self,x,timestep_ssps=None):

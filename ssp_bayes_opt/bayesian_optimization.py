@@ -167,50 +167,50 @@ class BayesianOptimization:
 
         # Initialize the agent
         self.logger.info(f'Creating {agent_type} agent')
-        if agent_type=='ssp-hex':
+        if agent_type == 'ssp-hex':
             ssp_space = sspspace.HexagonalSSPSpace(self.data_dim, **kwargs)
             agt = agents.SSPAgent(init_xs, init_ys,ssp_space, **kwargs) 
-        elif agent_type=='ssp-rand':
+        elif agent_type == 'ssp-rand':
             ssp_space = sspspace.RandomSSPSpace(self.data_dim, **kwargs)
             agt = agents.SSPAgent(init_xs, init_ys,ssp_space, **kwargs) 
-        elif agent_type=='ssp-custom':
+        elif agent_type == 'ssp-custom':
             assert 'ssp_space' in kwargs
-            agt = agents.SSPAgent(init_xs, init_ys,kwargs.get('ssp_space') )
-        elif agent_type=='gp':
+            agt = agents.SSPAgent(init_xs, init_ys,kwargs.get('ssp_space'))
+        elif agent_type == 'gp':
             agt = agents.GPAgent(init_xs, init_ys,**kwargs) 
-        elif agent_type=='static-gp':
+        elif agent_type == 'static-gp':
             agt = agents.GPAgent(init_xs, init_ys, updating=False, **kwargs) 
-        elif agent_type=='gp-matern':
+        elif agent_type == 'gp-matern':
             agt = agents.GPAgent(init_xs, init_ys, 
                                 kernel_type='matern', 
                                 updating=False, **kwargs) 
-        elif agent_type=='gp-sinc':
+        elif agent_type == 'gp-sinc':
             agt = agents.GPAgent(init_xs, init_ys, 
                                 kernel_type='sinc', 
                                 updating=False, **kwargs) 
-        elif agent_type=='gp-ucb-matern':
+        elif agent_type == 'gp-ucb-matern':
             agt = agents.GPUCBAgent(init_xs, init_ys, 
                                 kernel_type='matern', 
                                 updating=False, **kwargs) 
-        elif agent_type=='gp-ucb-sinc':
+        elif agent_type == 'gp-ucb-sinc':
             agt = agents.GPUCBAgent(init_xs, init_ys, 
                                 kernel_type='sinc', 
                                 updating=False, **kwargs) 
-        elif agent_type=='disc-domain':
+        elif agent_type == 'disc-domain':
             agt = agents.DiscretizedDomainAgent(init_xs, init_ys, bounds=self.bounds, **kwargs)
-        elif agent_type=='ssp-traj':
+        elif agent_type == 'ssp-traj':
             agt = agents.SSPTrajectoryAgent(init_xs, init_ys, **kwargs) 
             init_xs = agt.init_xs
             init_ys = agt.init_ys
-        elif agent_type=='ssp-multi':
+        elif agent_type == 'ssp-multi':
             agt = agents.SSPMultiAgent(init_xs, init_ys, **kwargs) 
             init_xs = agt.init_xs
             init_ys = agt.init_ys
-        elif agent_type=='ssp-nas-graph':
+        elif agent_type == 'ssp-nas-graph':
             agt = agents.SSPNASGraphAgent(init_xs, init_ys, **kwargs)
             init_xs = agt.init_xs
             init_ys = agt.init_ys
-        elif agent_type=='ssp-mcbo':
+        elif agent_type == 'ssp-mcbo':
             agt = agents.SSPMCBOAgent(init_xs, init_ys, self.target.search_space, **kwargs)
             init_xs = agt.init_xs
             init_ys = agt.init_ys

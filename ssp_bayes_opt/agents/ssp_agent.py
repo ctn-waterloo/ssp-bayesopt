@@ -17,49 +17,58 @@ from .agent import Agent
 class SSPAgent(Agent):
     def __init__(self, init_xs, init_ys, ssp_space,
                  decoder_method='network-optim',
-                gamma_c=1.0,
-                beta_ucb=np.log(2/1e-6),
+                 gamma_c=1.0,
+                 beta_ucb=np.log(2/1e-6),
                  **kwargs):
         super().__init__()
   
         (num_pts, data_dim) = init_xs.shape
         self.data_dim = data_dim
+        self.init_xs = init_xs
+        self.init_ys = init_ys
 
-        ### end if
-        self.ssp_space = ssp_space
-        self.ssp_dim= ssp_space.ssp_dim
-
-        # Optimize the length scales
-        if not 'length_scale' in kwargs or kwargs.get('length_scale') < 0:
-            self.ssp_space.update_lengthscale(self._optimize_lengthscale(init_xs, init_ys))
-        else:
-            self.ssp_space.update_lengthscale(kwargs.get('length_scale', 4))
-        ### end if
-        print('Selected Lengthscale: ', ssp_space.length_scale)
-        
-        
-
-        # Encode the initial sample points 
+        self._set_ssp_space(ssp_space=ssp_space, decoder_method=decoder_method,**kwargs)
+        # Encode the initial sample points
         init_phis = self.encode(init_xs)
 
-        self.blr = blr.BayesianLinearRegression(self.ssp_space.ssp_dim)
-
+        self.blr = blr.BayesianLinearRegression(self.ssp_dim)
         self.blr.update(init_phis, np.array(init_ys))
+        self.constraint_ssp = np.zeros_like(self.blr.m)
 
         # MI params
         self.gamma_t = 0
         self.gamma_c = gamma_c
         self.sqrt_alpha = beta_ucb
-        
-        if (decoder_method=='network') | (decoder_method=='network-optim'):
+    ### end __init__
+
+
+    def _set_ssp_space(self, ssp_space, decoder_method, **kwargs):
+        if ssp_space is None:
+            ssp_space = sspspace.HexagonalSSPSpace(self.data_dim, ssp_dim=kwargs.get('ssp_dim', 100),
+                 scale_min=0.1, scale_max=3,
+                 domain_bounds=kwargs.get('domain_bounds', None),
+                length_scale=kwargs.get('length_scale', 4))
+
+        self.ssp_space = ssp_space
+        self.ssp_dim = ssp_space.ssp_dim
+
+        # Optimize the length scales
+        if not 'length_scale' in kwargs or kwargs.get('length_scale') < 0:
+            self.ssp_space.update_lengthscale(self._optimize_lengthscale(self.init_xs, self.init_ys))
+        else:
+            self.ssp_space.update_lengthscale(kwargs.get('length_scale', 4))
+        ### end if
+        print('Selected Lengthscale: ', ssp_space.length_scale)
+
+        if (decoder_method == 'network') | (decoder_method == 'network-optim'):
             self.ssp_space.train_decoder_net();
-            self.init_samples=None
+            self.init_samples = None
         else:
             self.init_samples = self.ssp_space.get_sample_pts_and_ssps(2**17,'length-scale')
         self.decoder_method = decoder_method
 
-    ### end __init__
-
+    def length_scale(self):
+        return self.ssp_space.length_scale
 
     def _optimize_lengthscale(self, init_xs, init_ys):
 
@@ -94,6 +103,28 @@ class SSPAgent(Agent):
         # From the approximate solution of dot(m,x) + x^T Sigma x
         return self.blr.sample()
 
+    def untrusted(self, x, badness=-1):
+        '''
+        Updates the domain constraints for the optimization.
+        TODO: modify to permit multiple updates at once
+
+        Parameters
+        ----------
+        x : np.ndarray
+            points to be excluded from the optimization.
+            For now assuming one data point per call of untrusted
+
+
+        badness : float
+            The scale to be applied to the x points.  For now
+            assuming that one scalar value is applied per point in
+            x
+        '''
+        phi = self.encode(x)
+        # TODO: modify to running average of ssps.
+        # Could exceed the scale of the mean values
+        # if not careful.
+        self.constraint_ssp += badness * phi
 
     def acquisition_func(self):
         '''
@@ -133,7 +164,10 @@ class SSPAgent(Agent):
             retval = -(m.flatten() + sig_phi / scale)
             return retval
 
+
         return min_func, gradient
+
+
 
     def update(self, x_t:np.ndarray, y_t:np.ndarray, sigma_t:float, step_num=0):
         '''
