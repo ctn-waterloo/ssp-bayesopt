@@ -17,8 +17,8 @@ from typing import Callable
 
 from guppy import hpy
 import nengo
-import nengo_loihi
-import nengo_ocl
+# import nengo_loihi
+# import nengo_ocl
 import pickle
 
 def get_memory_usage(h):

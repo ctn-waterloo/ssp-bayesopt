@@ -46,7 +46,7 @@ if __name__ == '__main__':
     # init_guess = np.ones((ssp_dim,))
     # init_guess = np.random.random(size=(ssp_dim,))
 
-    model, solution_probe = make_solver_network(
+    model, solution_probe = make_network(
             bo_soln_init=init_guess, 
             m=mu, 
             sigma=sigma, 
