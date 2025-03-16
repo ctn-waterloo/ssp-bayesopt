@@ -1,11 +1,6 @@
 from nasbench import api
 import json
-import numpy as np
-import matplotlib.pyplot as plt
 import time
-from scipy.stats import qmc
-import numpy.matlib as matlib
-
 from argparse import ArgumentParser
 import os
 import os.path
@@ -15,6 +10,7 @@ import ssp_bayes_opt
 import numpy as np
 import pytry
 from run_agent import neuron_types, sim_types
+
 # Requires installing NAS-bench: https://github.com/google-research/nasbench
 # and downloading nasbench_only108.tfrecord
 # See https://github.com/google-research/nasbench

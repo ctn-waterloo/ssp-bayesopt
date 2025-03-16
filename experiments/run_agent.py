@@ -1,15 +1,11 @@
 import numpy as np
 import pytry
-import matplotlib.pyplot as plt
 import time
 import functions
-from scipy.stats import qmc
 
 from argparse import ArgumentParser
-import os
 import os.path
 import random
-import pickle
 import nengo
 import nengo_loihi
 
@@ -144,7 +140,7 @@ class SamplingTrial(pytry.Trial):
             true_max_val = function_maximum_value[p.function_name] 
         regrets = true_max_val - vals
         # print(optimizer.max)
-        print(regrets[-1])
+        # print(regrets[-1])
         
         return dict(
             regret=regrets,

@@ -7,18 +7,11 @@ from scipy.stats import qmc
 
 
 
-from . import agents
-from . import sspspace
 from . import bo_solver
 from .bayesian_optimization import BayesianOptimization
-# from scipy.stats import qmc
-from scipy.optimize import minimize, Bounds
-from typing import Callable
 
 from guppy import hpy
 import nengo
-# import nengo_loihi
-# import nengo_ocl
 import pickle
 
 def get_memory_usage(h):
