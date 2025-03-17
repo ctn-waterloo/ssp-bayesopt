@@ -58,8 +58,8 @@ class SamplingTrial(pytry.Trial):
         self.param('UCB Beta', beta_ucb=1.0)
         self.param('MI gamma_c', gamma=0.0)
         self.param('ssp dim', ssp_dim=151)
-        self.param('n_scales', n_scales=5)
-        self.param('n_rotates', n_rotates=5)
+        self.param('n_scales', n_scales=4)
+        self.param('n_rotates', n_rotates=4)
         self.param('trial number', trial_num=None)
 
         self.param('use nengo', nengo=False)
@@ -140,7 +140,7 @@ class SamplingTrial(pytry.Trial):
             true_max_val = function_maximum_value[p.function_name] 
         regrets = true_max_val - vals
         # print(optimizer.max)
-        # print(regrets[-1])
+        print(regrets[-1])
         
         return dict(
             regret=regrets,
@@ -154,7 +154,8 @@ class SamplingTrial(pytry.Trial):
             mus=None,
             variances=None,
             acquisition=None,
-            total_time = optimizer.total_time
+            total_time=optimizer.total_time,
+            params=p
         )
 
 
@@ -164,10 +165,12 @@ if __name__=='__main__':
 
     parser.add_argument('--func', dest='function_name', type=str, default='himmelblau')
     parser.add_argument('--agent', dest='agent_type', type=str, default='ssp-hex')
-    parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=151)
+    parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=97)
+    parser.add_argument('--n-scales', dest='n_scales', type=int, default=3)
+    parser.add_argument('--n-rotates', dest='n_rotates', type=int, default=3)
     parser.add_argument('--len-scale', dest='len_scale', type=float, default=4)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=100)
-    parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=1.0)
+    parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=0.1)
     parser.add_argument('--gamma', dest='gamma', type=float, default=0.0)
     parser.add_argument('--num-trials', dest='num_trials', type=int, default=1)
     parser.add_argument('--data-dir', dest='data_dir', type=str, default='data')
@@ -204,5 +207,7 @@ if __name__=='__main__':
                   'gamma':args.gamma,
                   'nengo':args.nengo,
                   'backend':args.backend,
+                  'n_scales':args.n_scales,
+                  'n_rotates':args.n_rotates,
                   }
         r = SamplingTrial().run(**params)

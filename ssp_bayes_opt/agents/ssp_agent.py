@@ -144,7 +144,7 @@ class SSPAgent(Agent):
                 phi = norm_margin * phi / phi_norm
             ### end if
             val = phi.T @ m
-            mi = np.sqrt(gamma + beta_inv + phi.T @ sigma @ phi) - np.sqrt(gamma)
+            mi = self.sqrt_alpha * np.sqrt(gamma + beta_inv + phi.T @ sigma @ phi) - np.sqrt(gamma)
             return -(val + mi).flatten()
 
 
@@ -161,7 +161,7 @@ class SSPAgent(Agent):
             sig_phi = sigma @ phi
             sqr = (phi.T @ sig_phi ) 
             scale = np.sqrt(sqr + gamma + beta_inv)
-            retval = -(m.flatten() + sig_phi / scale)
+            retval = -(m.flatten() + self.sqrt_alpha * sig_phi / scale)
             return retval
 
 

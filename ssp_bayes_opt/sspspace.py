@@ -661,10 +661,10 @@ class HexagonalSSPSpace(SSPSpace):
     Creates an SSP space using the Hexagonal Tiling developed by NS Dumont 
     (2020)
     '''
-    def __init__(self,  domain_dim:int,ssp_dim: int=151, n_rotates:int=5, n_scales:int=5, 
+    def __init__(self,  domain_dim:int,ssp_dim: int=151, n_rotates:int=-1, n_scales:int=-1,
                  scale_min=0.1, scale_max=3,
                  domain_bounds=None, length_scale=1, **kwargs):
-        if (n_rotates==5) & (n_scales==5) & (ssp_dim!=151): # user wants to define ssp with total dim, not number of simplex rotates and scales
+        if (n_rotates<0) & (n_scales<0): # user wants to define ssp with total dim, not number of simplex rotates and scales
             n_rotates = int(np.sqrt((ssp_dim-1)/(2*(domain_dim+1))))
             n_scales = n_rotates
             ssp_dim = n_rotates*n_scales*(domain_dim+1)*2 + 1

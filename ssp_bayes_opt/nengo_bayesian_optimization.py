@@ -1,10 +1,8 @@
 import numpy as np
 import time
 
-import logging 
+import logging
 import sys, os
-from scipy.stats import qmc
-
 
 
 from . import bo_solver
