@@ -201,7 +201,7 @@ if __name__ == '__main__':
     parser.add_argument('--beta-ucb', dest='beta_ucb', type=float,
                         default=30.0)  # np.log(2/1e-6))#np.log(2/1e-6))#np.log(2/1e-6))
     parser.add_argument('--gamma', dest='gamma', type=float, default=0.0)
-    parser.add_argument('--len_scale', dest='len_scale', type=float, default=-1.0) # negative means optimize
+    parser.add_argument('--len-scale', dest='len_scale', type=float, default=-1.0) # negative means optimize
     parser.add_argument('--data-dir', dest='data_dir', type=str, default='data')
     parser.add_argument('--num-trials', dest='num_trials', type=int, default=1)
     parser.add_argument('--nengo', action='store_true')
