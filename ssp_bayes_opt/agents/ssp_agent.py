@@ -19,6 +19,7 @@ class SSPAgent(Agent):
                  decoder_method='network-optim',
                  gamma_c=1.0,
                  beta_ucb=np.log(2/1e-6),
+                 var_decay=0.,
                  **kwargs):
         super().__init__()
   
@@ -35,10 +36,11 @@ class SSPAgent(Agent):
         self.blr.update(init_phis, np.array(init_ys))
         self.constraint_ssp = np.zeros_like(self.blr.m)
 
-        # MI params
+        # Acq. fun params
         self.gamma_t = 0
         self.gamma_c = gamma_c
-        self.sqrt_alpha = beta_ucb
+        self.var_weight = beta_ucb
+        self.var_decay = var_decay
     ### end __init__
 
 
@@ -92,7 +94,7 @@ class SSPAgent(Agent):
     def eval(self, xs):
         phis = self.encode(xs)
         mu, var = self.blr.predict(phis)
-        phi = self.sqrt_alpha * (np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t)) 
+        phi = self.var_weight * (np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t))
         return mu, var, phi
 
     def initial_guess(self):
@@ -144,7 +146,7 @@ class SSPAgent(Agent):
                 phi = norm_margin * phi / phi_norm
             ### end if
             val = phi.T @ m
-            mi = self.sqrt_alpha * np.sqrt(gamma + beta_inv + phi.T @ sigma @ phi) - np.sqrt(gamma)
+            mi = self.var_weight * np.sqrt(gamma + beta_inv + phi.T @ sigma @ phi) - np.sqrt(gamma)
             return -(val + mi).flatten()
 
 
@@ -161,7 +163,7 @@ class SSPAgent(Agent):
             sig_phi = sigma @ phi
             sqr = (phi.T @ sig_phi ) 
             scale = np.sqrt(sqr + gamma + beta_inv)
-            retval = -(m.flatten() + self.sqrt_alpha * sig_phi / scale)
+            retval = -(m.flatten() + self.var_weight * sig_phi / scale)
             return retval
 
 
@@ -185,6 +187,16 @@ class SSPAgent(Agent):
         # Update BLR
         phi = np.atleast_2d(self.encode(x_val).squeeze())
         self.blr.update(phi, y_val)
+
+        # Update var_weight
+        if isinstance(self.var_decay, (int, float)):
+            self.var_weight = self.var_weight + self.var_decay
+        elif callable(self.var_decay):
+            self.var_weight = self.var_weight + self.var_decay(step_num)
+        else:
+            msg = f'unable to use {self.var_weight}, expected number or callable'
+            print(msg)
+            raise RuntimeError(msg)
         
         # Update gamma
         if isinstance(self.gamma_c, (int, float)):
@@ -192,7 +204,7 @@ class SSPAgent(Agent):
         elif callable(self.gamma_c):
             self.gamma_t = self.gamma_t + self.gamma_c(step_num) * sigma_t
         else:
-            msg = f'unable to use {self.gamma_c}, expected number of callable'
+            msg = f'unable to use {self.gamma_c}, expected number or callable'
             print(msg)
             raise RuntimeError(msg)
 

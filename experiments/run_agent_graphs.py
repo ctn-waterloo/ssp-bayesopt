@@ -211,6 +211,7 @@ class SamplingTrial(pytry.Trial):
         pbounds = np.tile(np.array([0, self.target.num_ops + 2]), self.target.rolled_len).reshape(-1, 2)
         # samples = target.sample(10) #test
         # model_spec=target(samples) #test
+        var_decay = -p.beta_ucb / budget
         if p.nengo:
             sim_time = p.sim_time
             neuron_type = neuron_types['loihilif'] if 'loihi' in p.backend else neuron_types['lif']
@@ -230,6 +231,7 @@ class SamplingTrial(pytry.Trial):
                                decoder_method='direct-optim',
                                gamma_c=p.gamma,
                                beta_ucb=p.beta_ucb,
+                               var_decay=var_decay,
                                neurons_per_dim=p.num_neurons,
                                neuron_type=neuron_type,
                                sim_type=sim_type, sim_args=sim_args,
@@ -249,6 +251,7 @@ class SamplingTrial(pytry.Trial):
                                agent_type='ssp-nas-graph',
                                ssp_dim=p.ssp_dim,
                                beta_ucb=p.beta_ucb,
+                               var_decay=var_decay,
                                gamma_c=p.gamma,
                                length_scale=1.0,
                                decoder_method='direct-optim',
@@ -350,7 +353,7 @@ if __name__ == '__main__':
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=200)
     parser.add_argument('--num-init-samples', dest='num_init_samples', type=int, default=20)
     parser.add_argument('--beta-ucb', dest='beta_ucb', type=float,
-                        default=30.0)  # np.log(2/1e-6))#np.log(2/1e-6))#np.log(2/1e-6))
+                        default=10.0)  # np.log(2/1e-6))#np.log(2/1e-6))#np.log(2/1e-6))
     parser.add_argument('--gamma', dest='gamma', type=float, default=0.0)
     parser.add_argument('--data-dir', dest='data_dir', type=str, default='data')
     parser.add_argument('--num-trials', dest='num_trials', type=int, default=1)

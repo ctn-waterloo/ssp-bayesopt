@@ -71,6 +71,8 @@ class SamplingTrial(pytry.Trial):
         target, pbounds, budget = functions.factory(p.function_name)
         #target, pbounds = functions.rescale(target,pbounds)
 
+        var_decay = -p.beta_ucb / budget # was 0 before
+
         if p.nengo:
             sim_time = p.sim_time
             neuron_type = neuron_types['loihilif'] if 'loihi' in p.backend else neuron_types['lif']
@@ -93,6 +95,7 @@ class SamplingTrial(pytry.Trial):
                                gamma_c=p.gamma,
                                # decoder_method='network-optim',
                                beta_ucb=p.beta_ucb,
+                               var_decay=var_decay,
                                neurons_per_dim=p.num_neurons,
                                neuron_type=neuron_type,
                                sim_type=sim_type, sim_args=sim_args,
@@ -118,6 +121,7 @@ class SamplingTrial(pytry.Trial):
                                gamma_c=0.,
                                # decoder_method='network-optim',
                                beta_ucb=p.beta_ucb,
+                               var_decay=var_decay
                                )
             elapsed_time = time.thread_time_ns() - start
         
@@ -139,7 +143,7 @@ class SamplingTrial(pytry.Trial):
         else:
             true_max_val = function_maximum_value[p.function_name] 
         regrets = true_max_val - vals
-        # print(optimizer.max)
+        print(optimizer.max)
         print(regrets[-1])
         
         return dict(
@@ -168,9 +172,9 @@ if __name__=='__main__':
     parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=97)
     parser.add_argument('--n-scales', dest='n_scales', type=int, default=3)
     parser.add_argument('--n-rotates', dest='n_rotates', type=int, default=3)
-    parser.add_argument('--len-scale', dest='len_scale', type=float, default=4)
+    parser.add_argument('--len-scale', dest='len_scale', type=float, default=-1)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=100)
-    parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=0.1)
+    parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=1.)
     parser.add_argument('--gamma', dest='gamma', type=float, default=0.0)
     parser.add_argument('--num-trials', dest='num_trials', type=int, default=1)
     parser.add_argument('--data-dir', dest='data_dir', type=str, default='data')

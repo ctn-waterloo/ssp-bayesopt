@@ -112,6 +112,8 @@ class SamplingTrial(pytry.Trial):
         # samples = target.sample(10) #test
         # model_spec=target(samples) #test
 
+        var_decay = -p.beta_ucb / budget  # was 0 before
+
         if p.nengo:
             sim_time = p.sim_time
             neuron_type = neuron_types['loihilif'] if 'loihi' in p.backend else neuron_types['lif']
@@ -131,6 +133,7 @@ class SamplingTrial(pytry.Trial):
                                decoder_method='direct-optim',
                                gamma_c=p.gamma,
                                beta_ucb=p.beta_ucb,
+                               var_decay=var_decay,
                                conjunctive_w=0.1,
                                neurons_per_dim=p.num_neurons,
                                neuron_type=neuron_type,
@@ -153,6 +156,7 @@ class SamplingTrial(pytry.Trial):
                                agent_type='ssp-mcbo',
                                ssp_dim=p.ssp_dim,
                                beta_ucb=p.beta_ucb,
+                               var_decay=var_decay,
                                gamma_c=p.gamma,
                                length_scale=p.len_scale,
                                conjunctive_w=0.1,
@@ -194,12 +198,12 @@ if __name__ == '__main__':
     parser = ArgumentParser()
 
 
-    parser.add_argument('--task-id', dest='task_id', type=str, default='xgboost_opt')
-    parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=97)
+    parser.add_argument('--task-id', dest='task_id', type=str, default='pest')
+    parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=201)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=200)
     parser.add_argument('--num-init-samples', dest='num_init_samples', type=int, default=20)
     parser.add_argument('--beta-ucb', dest='beta_ucb', type=float,
-                        default=30.0)  # np.log(2/1e-6))#np.log(2/1e-6))#np.log(2/1e-6))
+                        default=10.0)  # np.log(2/1e-6))#np.log(2/1e-6))#np.log(2/1e-6))
     parser.add_argument('--gamma', dest='gamma', type=float, default=0.0)
     parser.add_argument('--len-scale', dest='len_scale', type=float, default=-1.0) # negative means optimize
     parser.add_argument('--data-dir', dest='data_dir', type=str, default='data')
@@ -209,8 +213,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    args.nengo=True
-
+    # args.nengo=True #
 
     # random.seed(1)
     seeds = [random.randint(1, 100000) for _ in range(args.num_trials)]

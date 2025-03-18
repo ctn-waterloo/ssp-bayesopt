@@ -5,7 +5,7 @@ import logging
 import sys, os
 
 
-from . import bo_solver
+from . import network_solver
 from .bayesian_optimization import BayesianOptimization
 
 from guppy import hpy
@@ -155,7 +155,7 @@ class NengoBayesianOptimization(BayesianOptimization):
             else: ## ssp agent
                 phi_init = agt.initial_guess()
                 start = time.thread_time_ns()
-                solver_net, soln_probe = bo_solver.make_network(
+                solver_net, soln_probe = network_solver.make_network(
                     bo_soln_init=phi_init.flatten(),
                     m= agt.blr.m.flatten(),
                     sigma=agt.blr.S,
