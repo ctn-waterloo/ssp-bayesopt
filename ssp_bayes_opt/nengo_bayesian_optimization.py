@@ -161,6 +161,7 @@ class NengoBayesianOptimization(BayesianOptimization):
                     sigma=agt.blr.S,
                     beta_inv=1 / agt.blr.beta,
                     gamma_t=agt.gamma_c,
+                    var_weight=agt.var_weight,
                     neurons_per_dim=neurons_per_dim,
                     tau=tau,
                     seed=self.seed,

@@ -1,12 +1,14 @@
 # Project specific
 
 /data
+/experiments/data
 
 tests/data/
 util/plots/
 *.npy
+*.npz
 *.swp
-
+*.DS_Store
 
 
 # Byte-compiled / optimized / DLL files
