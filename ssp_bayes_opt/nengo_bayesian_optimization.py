@@ -8,14 +8,9 @@ import sys, os
 from . import network_solver
 from .bayesian_optimization import BayesianOptimization
 
-from guppy import hpy
 import nengo
 import pickle
 
-def get_memory_usage(h):
-    return h.heap().size / 1024 ** 2
-#     mem_info = psutil.Process().memory_info()
-#     return (mem_info.rss / 1024.**2, mem_info.vms / 1024 ** 2)
 
 def get_soln(data, time_steps=500):
     return np.mean(data[-time_steps:,:], axis=0)
@@ -137,8 +132,8 @@ class NengoBayesianOptimization(BayesianOptimization):
         vals = np.zeros((num_restarts,))
 
         gp_agent_types = ['gp-matern','gp-ucb-matern','gp-sinc','gp-ucb-sinc']
-        heap = hpy()
-        heap.setref()
+        # heap = hpy()
+        # heap.setref()
         while t < n_iter:
             if hasattr(time, 'thread_time_ns'):
                 start = time.thread_time_ns()

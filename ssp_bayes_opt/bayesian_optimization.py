@@ -224,6 +224,7 @@ class BayesianOptimization:
 
     def maximize(self, init_points: int =10, n_iter: int =100,
                  num_restarts: int = 5, agent_type='ssp-hex',
+                 save_memory=True,
                  **kwargs):
 
         '''
@@ -302,8 +303,9 @@ class BayesianOptimization:
         vals = np.zeros((num_restarts,))
 
         gp_agent_types = ['gp-matern','gp-ucb-matern','gp-sinc','gp-ucb-sinc']
-        heap = hpy()
-        heap.setref()
+        if save_memory:
+            heap = hpy()
+            heap.setref()
         for t in range(n_iter):
 #             heap.setref()
             ## Begin timing section
@@ -364,7 +366,8 @@ class BayesianOptimization:
             self.times[t] += time.thread_time_ns() - update_start
             self.full_times[t] = time.thread_time_ns() - start
 
-            self.memory[t,0] = get_memory_usage(heap)
+            if save_memory:
+                self.memory[t,0] = get_memory_usage(heap)
 
             # Log actions
             t_now = t + init_xs.shape[0]
