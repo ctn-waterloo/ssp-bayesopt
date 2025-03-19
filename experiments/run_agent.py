@@ -66,12 +66,18 @@ class SamplingTrial(pytry.Trial):
         self.param('nengo backend', backend='cpu')
         self.param('num neurons', num_neurons=8)
         self.param('sim time', sim_time=2.5)
+
+        self.param('use beta decay', decay=False)
     
     def evaluate(self, p):        
         target, pbounds, budget = functions.factory(p.function_name)
         #target, pbounds = functions.rescale(target,pbounds)
 
-        var_decay = -p.beta_ucb / budget # was 0 before
+        if p.decay:
+            var_decay = -p.beta_ucb / budget
+        else:
+            var_decay = 0
+        # was 0 before
 
         if p.nengo:
             sim_time = p.sim_time
@@ -181,6 +187,7 @@ if __name__=='__main__':
 
     parser.add_argument('--nengo', action='store_true')
     parser.add_argument('--backend', dest='backend', type=str, default="cpu") # loihi-sim, loihi
+    parser.add_argument('--decay', action='store_true')
 
 
     
@@ -213,5 +220,6 @@ if __name__=='__main__':
                   'backend':args.backend,
                   'n_scales':args.n_scales,
                   'n_rotates':args.n_rotates,
+                  'decay': args.decay
                   }
         r = SamplingTrial().run(**params)

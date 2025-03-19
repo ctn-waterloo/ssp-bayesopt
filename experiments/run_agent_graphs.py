@@ -203,6 +203,8 @@ class SamplingTrial(pytry.Trial):
         self.param('nengo backend', backend='cpu')
         self.param('num neurons', num_neurons=8)
         self.param('sim time', sim_time=2.5)
+        self.param('use beta decay', decay=False)
+
 
     def evaluate(self, p):
 
@@ -211,7 +213,10 @@ class SamplingTrial(pytry.Trial):
         pbounds = np.tile(np.array([0, self.target.num_ops + 2]), self.target.rolled_len).reshape(-1, 2)
         # samples = target.sample(10) #test
         # model_spec=target(samples) #test
-        var_decay = -p.beta_ucb / budget
+        if p.decay:
+            var_decay = -p.beta_ucb / budget
+        else:
+            var_decay = 0
         if p.nengo:
             sim_time = p.sim_time
             neuron_type = neuron_types['loihilif'] if 'loihi' in p.backend else neuron_types['lif']
@@ -272,6 +277,9 @@ class SamplingTrial(pytry.Trial):
 
             regrets = self.target.best_final_accuracy - test_vals
 
+            print(np.max(train_vals[args.num_init_samples:]))
+            print(np.max(test_vals[args.num_init_samples:]))
+
             return dict(
                 regret=regrets,
                 sample_locs=sample_locs,
@@ -291,8 +299,7 @@ class SamplingTrial(pytry.Trial):
 
             # best_vals = np.maximum.accumulate(test_vals)
             #
-            # print(np.max(train_vals[args.num_init_samples:]))
-            # print(np.max(test_vals[args.num_init_samples:]))
+            #
 
             # import json
             # import pickle
@@ -359,6 +366,7 @@ if __name__ == '__main__':
     parser.add_argument('--num-trials', dest='num_trials', type=int, default=1)
     parser.add_argument('--nengo', action='store_true')
     parser.add_argument('--backend', dest='backend', type=str, default="cpu")  # loihi-sim, loihi
+    parser.add_argument('--decay', action='store_true')
 
     args = parser.parse_args()
 

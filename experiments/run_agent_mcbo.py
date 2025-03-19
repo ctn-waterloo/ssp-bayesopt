@@ -98,6 +98,8 @@ class SamplingTrial(pytry.Trial):
         self.param('ssp dim', ssp_dim=151)
         self.param('trial number', trial_num=None)
 
+        self.param('use beta decay', decay=False)
+
         self.param('use nengo', nengo=False)
         self.param('nengo backend', backend='cpu')
         self.param('num neurons', num_neurons=8)
@@ -112,7 +114,10 @@ class SamplingTrial(pytry.Trial):
         # samples = target.sample(10) #test
         # model_spec=target(samples) #test
 
-        var_decay = -p.beta_ucb / budget  # was 0 before
+        if p.decay:
+            var_decay = -p.beta_ucb / budget
+        else:
+            var_decay = 0
 
         if p.nengo:
             sim_time = p.sim_time
@@ -177,7 +182,7 @@ class SamplingTrial(pytry.Trial):
         else:
             regrets = None
 
-        print(-np.max(vals))
+        print(-np.max(vals[num_init_samples:]))
 
         return dict(
             regret=regrets,
@@ -198,23 +203,30 @@ class SamplingTrial(pytry.Trial):
 if __name__ == '__main__':
     parser = ArgumentParser()
 
+#pest, no decay, beta 1
+    # pest,  decay, beta 10
+    #rna_inverse_fold, no decay, beta 30
+    # rna_inverse_fold, no decay, beta 1.
+    # rna_inverse_fold, decay, beta 100
 
     parser.add_argument('--task-id', dest='task_id', type=str, default='rna_inverse_fold')
     parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=201)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=200)
     parser.add_argument('--num-init-samples', dest='num_init_samples', type=int, default=20)
     parser.add_argument('--beta-ucb', dest='beta_ucb', type=float,
-                        default=10.0)  #10 # np.log(2/1e-6))#np.log(2/1e-6))#np.log(2/1e-6))
+                        default=1.)  #10 # np.log(2/1e-6))#np.log(2/1e-6))#np.log(2/1e-6))
     parser.add_argument('--gamma', dest='gamma', type=float, default=0.0)
     parser.add_argument('--len-scale', dest='len_scale', type=float, default=-1.0) # negative means optimize
     parser.add_argument('--data-dir', dest='data_dir', type=str, default='data')
     parser.add_argument('--num-trials', dest='num_trials', type=int, default=1)
     parser.add_argument('--nengo', action='store_true')
-    parser.add_argument('--backend', dest='backend', type=str, default="loihi-sim")  # loihi-sim, loihi, cpu
+    parser.add_argument('--decay', action='store_true')
+    parser.add_argument('--backend', dest='backend', type=str, default="cpu")  # loihi-sim, loihi, cpu
 
     args = parser.parse_args()
 
     # args.nengo=True #
+    # args.decay=True
 
     # random.seed(1)
     seeds = [random.randint(1, 100000) for _ in range(args.num_trials)]
@@ -240,5 +252,6 @@ if __name__ == '__main__':
                   'gamma': args.gamma,
                   'nengo': args.nengo,
                   'backend': args.backend,
+                  'decay': args.decay,
                   }
         r = SamplingTrial().run(**params)
