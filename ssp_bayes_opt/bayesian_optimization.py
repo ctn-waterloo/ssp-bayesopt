@@ -195,7 +195,9 @@ class BayesianOptimization:
         elif agent_type == 'gp-ucb-sinc':
             agt = agents.GPUCBAgent(init_xs, init_ys, 
                                 kernel_type='sinc', 
-                                updating=False, **kwargs) 
+                                updating=False, **kwargs)
+        elif agent_type == 'rff':
+            agt = agents.RFFAgent(init_xs, init_ys, **kwargs)
         elif agent_type == 'disc-domain':
             agt = agents.DiscretizedDomainAgent(init_xs, init_ys, bounds=self.bounds, **kwargs)
         elif agent_type == 'ssp-traj':
@@ -312,7 +314,7 @@ class BayesianOptimization:
             # Use optimization to find a sample location
             for restart_idx in range(num_restarts):
                 start = time.thread_time_ns()
-                if agent_type in gp_agent_types:
+                if (agent_type in gp_agent_types) or ('rff' in agent_type):
                     x_init = np.random.uniform(low=lbounds, high=ubounds, size=(len(ubounds),))
                     # Do bounded optimization to ensure x stays in bound
                     soln = minimize(optim_func, x_init,

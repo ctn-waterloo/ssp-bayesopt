@@ -1,10 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from scipy.optimize import minimize
-from sklearn.model_selection import KFold
-import warnings
-
-from sklearn.gaussian_process.kernels import Matern
 from sklearn.gaussian_process import GaussianProcessRegressor 
 
 from .. import sspspace 

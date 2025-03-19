@@ -5,7 +5,7 @@ from .gp_agent import GPAgent, GPUCBAgent
 from .disc_domain_agent import DiscretizedDomainAgent
 from .ssp_nas_graph import SSPNASGraphAgent
 from .ssp_mcbo import SSPMCBOAgent
-
+from .rff_agent import RFFAgent
 from .. import sspspace
 
 from . import domains
