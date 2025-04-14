@@ -17,7 +17,7 @@ import os.path
 
 
 from argparse import ArgumentParser
-import best
+# import best
 
 def get_data(data_frame):
     regret = np.vstack(data_frame['regret'].values)
@@ -86,6 +86,7 @@ if __name__ == '__main__':
         head, func = os.path.split(head)
 
         alg_data = pytry.read(func_dir)
+        print(alg_name, alg_data)
         alg_regret, avg_alg_regret, alg_time = zip(*[get_dict_data(f) for f in alg_data])
 
         alg_regret = np.array(alg_regret).squeeze()
@@ -117,7 +118,7 @@ if __name__ == '__main__':
         plt.fill_between(regret_steps, 
                          avg_regret_mu - avg_regret_ste,
                          avg_regret_mu + avg_regret_ste, alpha=0.3)
-        plt.plot(regret_steps, avg_regret_mu, label=k[1], ls=line_styles[idx])
+        plt.plot(regret_steps, avg_regret_mu, label=k[1], ls=line_styles[idx%4])
         func_name = k[0]
 
     # Get rid of spines
