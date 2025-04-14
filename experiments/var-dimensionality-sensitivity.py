@@ -14,7 +14,7 @@ ssp_dims = (2*(dims+1)*(ns*n_scales) + 1).astype(int)
 ssp_dim = 300
 
 for i,dim in enumerate(dims):
-    dest_dir="/home/ns2dumon/Documents/ssp-bayesopt/data/var-dim-sensitivity/" + str(dim) + "/"
+    dest_dir="~/Public/data/ssp-bayesopt/var-dim-sensitivity/" + str(dim) + "/"
     for agt in ["ssp-rand" ,"gp-matern"]: #"ssp-hex", "gp-sinc" 
         os.system("python run_agent.py --agent " + agt
                 + " --num-trials 10 --func " + func_name + str(dim) + " --data-dir " + dest_dir 
