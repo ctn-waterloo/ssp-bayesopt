@@ -127,3 +127,10 @@ class TrajectoryDomain(Domain):
                                      self.traj_len * self.spatial_dim)
     ### end sample 
 
+
+class TargetDefinedDomain(Domain):
+    def __init__(self, target):
+        self.target = target
+
+    def sample(self, num_points: int = 10, **kwargs) -> np.ndarray:
+        return self.target.sample(num_points, **kwargs)

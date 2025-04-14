@@ -44,7 +44,8 @@ ytick.major.width: 0.566
 
 figure.titlesize: 9.0
 figure.titleweight: bold
-figure.dpi: 200
+figure.dpi: 400
+# figure.figsize: (7.20472, 3)
 
 lines.linewidth: 1.132
 

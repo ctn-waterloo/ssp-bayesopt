@@ -58,6 +58,7 @@ if __name__ == '__main__':
     parser = ArgumentParser(description='Plot results in folders')
     parser.add_argument('--alg', action='append', metavar=('name', 'dir'), nargs=2)
     parser.add_argument('--save', action='store_true')
+    parser.add_argument('--no_legend', action='store_true')
 
     args = parser.parse_args()
     names, folders = zip(*args.alg)
@@ -128,14 +129,15 @@ if __name__ == '__main__':
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False) 
 
-    plt.legend(fontsize=24)
+    if not args.no_legend:
+        plt.legend(fontsize=24)
     plt.ylabel('Average Regret (a.u.)', fontsize=24)
-    plt.xlabel('Sample Number', fontsize=24)
+    plt.xlabel(r'Sample Number ($n$)', fontsize=24)
     plt.title(f'Average Regret: {func_name.title()}', fontsize=24)
     plt.tight_layout()
 
     if args.save:
-        plt.savefig(f'{func_name}-regret.{plot_filetype}')
+        plt.savefig(f'{func_name}-regret-legend-{not args.no_legend}.{plot_filetype}')
     else:
         plt.show()
 

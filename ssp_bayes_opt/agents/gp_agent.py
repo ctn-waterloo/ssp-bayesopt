@@ -106,3 +106,28 @@ class GPAgent(Agent):
                 return -(mu + phi).flatten()
 
         return min_func, None
+
+class GPUCBAgent(GPAgent):
+    def __init__(self, init_xs, init_ys,  kernel_type='sinc', 
+                 updating=True, 
+                 gamma_c=1.0,
+                  beta_ucb=np.log(2/1e-6), **kwargs):
+        super().__init__(init_xs, init_ys, 
+                         kernel_type=kernel_type, 
+                         updating=updating,
+                         gamma_c=gamma_c,
+                         beta_ucb=beta_ucb,
+                         **kwargs)
+        self.beta_ucb = beta_ucb
+
+    def acquisition_func(self):
+        def min_func(x,
+                     gp=self.gp,
+                     beta_ucb=self.beta_ucb):
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                mu, std = gp.predict(x.reshape([1,-1]), return_std=True)
+                phi = np.sqrt(beta_ucb) * std
+                return -(mu + phi).flatten()
+
+        return min_func, None

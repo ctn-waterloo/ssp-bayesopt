@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import KFold
@@ -41,7 +40,7 @@ class Agent:
     def eval(self, xs):
         pass
 
-    def update(self, x_t, y_t, sigma_t):
+    def update(self, x_t, y_t, sigma_t, step_num=0):
         pass
 
     def untrusted(self, x, badness=None):

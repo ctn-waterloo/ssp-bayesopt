@@ -5,7 +5,10 @@ set -e
 # num_bins=10
 # dest_dir="/home/ns2dumon/Documents/ssp-bayesopt/data/test-funcs"
 # dest_dir="${HOME}/Public/data/ssp-bayesopt/test-funcs-variable-ls"
-dest_dir="${HOME}/Public/data/ssp-bayesopt/test-funcs-variable-2ls"
+# dest_dir="${HOME}/Public/data/ssp-bayesopt/test-funcs-variable-2ls"
+dest_dir="/run/media/furlong/Data/ssp-bayesopt/memory-test"
+
+
 echo $dest_dir
 for func in "branin-hoo" "himmelblau" "goldstein-price"
 do

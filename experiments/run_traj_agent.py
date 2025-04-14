@@ -1,21 +1,13 @@
 import numpy as np
 import pytry
-import matplotlib.pyplot as plt
 import time
-import functions
-from scipy.stats import qmc
 
 from argparse import ArgumentParser
-import os
 import os.path
 import random
 
 
 import ssp_bayes_opt
-
-import importlib
-
-importlib.reload(ssp_bayes_opt)
 
 budget=200
 xstar = np.array([[2.5,-3],[5,2],[8,6]])
@@ -43,6 +35,7 @@ class SamplingTrial(pytry.Trial):
         start = time.thread_time_ns()
         optimizer.maximize(init_points=p.num_init_samples, n_iter=budget,
                            agent_type='ssp-traj',ssp_dim=p.ssp_dim, x_dim=pt_dim, traj_len=traj_len,
+                           decoder_method='direct-optim',
                            length_scale=3.9)
         elapsed_time = time.thread_time_ns() - start
 
@@ -76,7 +69,7 @@ if __name__=='__main__':
     parser.add_argument('--ssp-dim', dest='ssp_dim', type=str, default=151)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=100)
     parser.add_argument('--num-trials', dest='num_trials', type=int, default=1)
-    parser.add_argument('--data-dir', dest='data_dir', type=str, default='/home/ns2dumon/Documents/ssp-bayesopt/experiments/data/')
+    parser.add_argument('--data-dir', dest='data_dir', type=str, default='data')
 
 
 
@@ -86,7 +79,9 @@ if __name__=='__main__':
     random.seed(1)
     seeds = [random.randint(1,100000) for _ in range(args.num_trials)]
 
-    data_path = os.path.join(args.data_dir,'trajectory-agent')
+    data_path = os.path.join(os.getcwd(),
+                             args.data_dir, 'test-trajectory-agent')
+
     if not os.path.exists(data_path):
         os.makedirs(data_path)
     for seed in seeds:
