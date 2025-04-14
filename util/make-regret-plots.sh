@@ -3,6 +3,7 @@
 ssp_dir=/run/media/furlong/Data/ssp-bayesopt/test-funcs
 sinc_gp_dir=/run/media/furlong/Data/ssp-bayesopt/test-funcs
 matern_gp_dir=/run/media/furlong/Data/ssp-bayesopt/test-funcs
+disc_domain_dir=/run/media/furlong/Data/ssp-bayesopt/test-funcs
 
 for func in himmelblau branin-hoo goldstein-price
 do
