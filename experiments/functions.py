@@ -194,7 +194,7 @@ def mccormick(xs):
     return -fval
 
 def styblinski_tang(xs):
-    return -np.sum(xs**4 - 16*xs**2 + 5*xs, axis=1)/2
+    return -np.sum(xs**4 - 16*xs**2 + 5*xs, axis=1)/2 # negative version bc we maximize instead of minimize
 
 
 if __name__=='__main__':

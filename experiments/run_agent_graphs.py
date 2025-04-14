@@ -102,6 +102,7 @@ class NASBench:
         operations = operations[non_dead_nodes]
 
         # # Step 1: Remove disconnected subgraphs that don't contain the input node (index 0)
+        # This is a way of dealing with the fact that graph size varies -- we decode the max # of layers, but
         def find_reachable_nodes(start_node, adj_matrix):
             visited = set()
             stack = [start_node]

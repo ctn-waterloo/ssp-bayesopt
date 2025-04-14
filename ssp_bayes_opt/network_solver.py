@@ -1,16 +1,25 @@
 import numpy as np
 import nengo
-import nengo_loihi
 from .vens import VirtualEnsemble
+
+# Notes regarding the parition:
+# One chip has 128 cores, each core has
+# MAX_NEURONS = 1024
+# MAX_IN_AXONS = 4096
+# MAX_OUT_AXONS = 4096
+# Nengo will try to put one ensemble on one core and split if the number of neurons is too high
+# but nengo will not split if the neuron of neurons is
 
 def make_network(bo_soln_init, m, sigma, beta_inv, gamma_t,
                  neurons_per_dim=50, seed=0, tau=0.05,
-                 var_weight= 1.,
+                 var_weight=1.,
                  partition=None,
                  dt=0.001,
                  tau_probe=0.1,
+                 rate=1.,
                  neuron_type=nengo.LIF()):
-    
+
+    init_val = bo_soln_init.flatten()/np.linalg.norm(bo_soln_init)
     ssp_dim = bo_soln_init.size
     model = nengo.Network(seed=seed)
     model.config[nengo.Ensemble].neuron_type = neuron_type
@@ -18,9 +27,9 @@ def make_network(bo_soln_init, m, sigma, beta_inv, gamma_t,
     n_neurons = neurons_per_dim * ssp_dim
 
     with model:
-        def stim_func(t,val=bo_soln_init.flatten()):
+        def stim_func(t):
             if t < 0.1:
-                return val
+                return init_val
             else:
                 return np.zeros((ssp_dim,))
 
@@ -28,14 +37,14 @@ def make_network(bo_soln_init, m, sigma, beta_inv, gamma_t,
             sqr = np.dot(x, np.dot(sigma, x))
             scale = np.sqrt(sqr + gamma_t + beta_inv)
             a_out = (mu + var_weight * sigma @ x / scale)
-            return tau*a_out + x
+            return tau * rate * a_out + x
 
         stim = nengo.Node(stim_func, label='stim')
 
 
-
         if partition is None:
-            solution_neurons = nengo.Ensemble(n_neurons, ssp_dim, label='solution_neurons')
+            solution_neurons = nengo.Ensemble(n_neurons, ssp_dim, intercepts=nengo.dists.CosineSimilarity(ssp_dim+2),
+                                              label='solution_neurons')
             nengo.Connection(stim, solution_neurons, synapse=None)
             nengo.Connection(solution_neurons, solution_neurons, function=transform_func,
                              synapse=tau)  # , solver=nengo.solvers.LstsqDrop(weights=False,drop=0.25))
@@ -61,10 +70,10 @@ def make_network(bo_soln_init, m, sigma, beta_inv, gamma_t,
 
 if __name__ == '__main__':
 
-    ssp_dim = 151
+    ssp_dim = 15
 
     sigma = np.eye(ssp_dim)
-    mu = np.zeros((ssp_dim,))
+    mu = np.random.random(size=(ssp_dim,))
     step_size = 0.1
     beta_inv = 2
     gamma_t = 0
@@ -83,6 +92,8 @@ if __name__ == '__main__':
             neurons_per_dim=4,
             partition=None,
         )
+    import nengo_loihi
+
     sim = nengo_loihi.Simulator(model)
     with sim:
         sim.run(2.5)
@@ -96,7 +107,7 @@ if __name__ == '__main__':
         beta_inv=beta_inv,
         gamma_t=gamma_t,
         neurons_per_dim=8,
-        partition=2,
+        partition=1,
     )
     sim = nengo_loihi.Simulator(model)
     with sim:
@@ -104,8 +115,20 @@ if __name__ == '__main__':
     raw_data_v2 = sim.data[solution_probe]
     print("Done with partition")
 
+    def get_fun(data):
+
+        return data @ mu + np.sqrt(beta_inv + np.sum((raw_data @ sigma) * raw_data, axis=-1))
+
     import matplotlib.pyplot as plt
-    plt.figure()
-    plt.plot(raw_data, alpha=0.8, color='blue')
-    plt.plot(raw_data_v2, '--', color='red')
+    fig, axs= plt.subplots(1,2,figsize=(7,3))
+    # axs[0].plot(raw_data, alpha=0.8, color='blue')
+    # axs[0].plot(raw_data_v2, '--', color='red')
+    axs[0].plot(raw_data/np.linalg.norm(raw_data,axis=-1,keepdims=True), alpha=0.8, color='blue')
+    axs[0].plot(raw_data_v2/np.linalg.norm(raw_data_v2,axis=-1,keepdims=True), '--', color='red')
+
+    # axs[1].plot(get_fun(raw_data), alpha=0.8, color='blue')
+    # axs[1].plot(get_fun(raw_data_v2), '--', color='red')
+    axs[1].plot(get_fun(raw_data/np.linalg.norm(raw_data,axis=-1,keepdims=True)), alpha=0.8, color='blue')
+    axs[1].plot(get_fun(raw_data_v2/np.linalg.norm(raw_data_v2,axis=-1,keepdims=True)), '--', color='red')
     plt.show()
+    raw_data

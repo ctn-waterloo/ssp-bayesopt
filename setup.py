@@ -24,14 +24,14 @@ setup(
             'Topic :: Scientific/Engineering :: Artificial Intelligence'
             ],
         install_requires=[
-            'numpy>=1.24.4',
-            'scipy==1.10.1',
+            'numpy',#'numpy>=1.24.4',
+            'scipy',#'scipy==1.10.1',
             'scikit-learn',
             #'tensorflow==2.7.0',
             'pytest',
             'mypy',
             'typing-extensions',
             'nengo',
-            'nengo_loihi'
+            #'nengo_loihi'
             ]
 )

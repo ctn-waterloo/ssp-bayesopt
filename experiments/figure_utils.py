@@ -4,21 +4,34 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+from matplotlib import font_manager
+
 
 # Load the correct matplotlibrc
 mpl.rc_file(os.path.join(os.path.dirname(__file__), 'matplotlibrc'))
 mpl.rcParams["text.usetex"] = True
+# mpl.rcParams["pgf.texsystem"] = "lualatex"
 mpl.rcParams["text.latex.preamble"] = r"""
     \usepackage{siunitx}
-    %\usepackage{libertine}
-    %\usepackage{libertinust1math}
     \usepackage{mathrsfs}
     \usepackage{amssymb}
-    %\renewcommand*\familydefault{\sfdefault}
     \renewcommand{\vec}[1]{\mathbf{#1}}
     \newcommand{\mat}[1]{\mathbf{#1}}
+    \usepackage{libertine}
+    \usepackage{libertinust1math}    
 """
+# \usepackage{helvet}
+ #   \renewcommand{\familydefault}{\sfdefault}
+#From nature:
+#89 mm (single column)
+#183 mm (double column)
+singlecolwidth = 3.5039
+doublecolwidth = 7.20472
 
+
+
+
+# from https://mk.bcgsc.ca/colorblind/palettes.mhtml#projecthome
 blues = ["#729fcfff", "#3465a4ff", "#204a87ff"][::-1]
 reds = ["#ef2929ff", "#cc0000ff", "#a40000ff"][::-1]
 greens = ["#8ae234ff", "#73d216ff", "#4e9a06ff"][::-1]
@@ -29,6 +42,11 @@ grays = [
     "#eeeeecff", "#d3d7cfff", "#babdb6ff", "#888a85ff", "#555753ff",
     "#2e3436ff"
 ][::-1]
+
+cols = ["#009ADE", "#00CD6C","#AF58BA","#FFC61E", "#C40F5B","#FD8D3C", "#089099"]
+
+linestyles = ['-','--',':','-.', (0, (5, 1)), (0, (1, 5)), (0, (3, 1, 1, 1, 1, 1)),
+           (0, (5, 10)), (0, (1, 10)), (0, (3, 10, 1, 10, 1, 10))]
 
 def save(fig, filename, suffix=""):
     # Special treatment for PDFs. We need to run the resulting PDF

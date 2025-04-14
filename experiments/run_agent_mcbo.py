@@ -95,14 +95,14 @@ class SamplingTrial(pytry.Trial):
         self.param('ssp length scale', len_scale=4)
         self.param('UCB Beta', beta_ucb=1.0)
         self.param('MI gamma_c', gamma=0.0)
-        self.param('ssp dim', ssp_dim=151)
+        self.param('ssp dim', ssp_dim=201)
         self.param('trial number', trial_num=None)
 
         self.param('use beta decay', decay=False)
 
         self.param('use nengo', nengo=False)
         self.param('nengo backend', backend='cpu')
-        self.param('num neurons', num_neurons=8)
+        self.param('num neurons', num_neurons=10)
         self.param('sim time', sim_time=2.5)
 
     def evaluate(self, p):
@@ -111,9 +111,8 @@ class SamplingTrial(pytry.Trial):
         target = MCBO_task(task_id=p.task_id)
         print(args)
         pbounds = target.bounds
-        # samples = target.sample(10) #test
-        # model_spec=target(samples) #test
 
+        conjunctive_w=0.1
         if p.decay:
             var_decay = -p.beta_ucb / budget
         else:
@@ -139,11 +138,11 @@ class SamplingTrial(pytry.Trial):
                                gamma_c=p.gamma,
                                beta_ucb=p.beta_ucb,
                                var_decay=var_decay,
-                               conjunctive_w=0.1,
+                               conjunctive_w=conjunctive_w,
                                neurons_per_dim=p.num_neurons,
                                neuron_type=neuron_type,
                                sim_type=sim_type, sim_args=sim_args,
-                               sim_time=sim_time, tau=0.05
+                               sim_time=sim_time, tau=0.05, rate=1.,
                                )
             elapsed_time = time.thread_time_ns() - start
         else:
@@ -164,7 +163,7 @@ class SamplingTrial(pytry.Trial):
                                var_decay=var_decay,
                                gamma_c=p.gamma,
                                length_scale=p.len_scale,
-                               conjunctive_w=0.1,
+                               conjunctive_w=conjunctive_w,
                                decoder_method='direct-optim',
                                save_memory=False,
                                )
@@ -182,6 +181,10 @@ class SamplingTrial(pytry.Trial):
         else:
             regrets = None
 
+        # samples = target.sample(10) #test
+        # model_spec=target(samples) #test
+        # ssp_samples = optimizer.agt.encode(samples)
+        # samples_hat = optimizer.agt.decode(ssp_samples)
         print(-np.max(vals[num_init_samples:]))
 
         return dict(
@@ -208,13 +211,13 @@ if __name__ == '__main__':
     #rna_inverse_fold, no decay, beta 30
     # rna_inverse_fold, no decay, beta 1.
     # rna_inverse_fold, decay, beta 100
-
-    parser.add_argument('--task-id', dest='task_id', type=str, default='rna_inverse_fold')
-    parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=201)
+    # ackley 501 dim, beta ~1
+    parser.add_argument('--task-id', dest='task_id', type=str, default='pest')
+    parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=101)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=200)
     parser.add_argument('--num-init-samples', dest='num_init_samples', type=int, default=20)
     parser.add_argument('--beta-ucb', dest='beta_ucb', type=float,
-                        default=1.)  #10 # np.log(2/1e-6))#np.log(2/1e-6))#np.log(2/1e-6))
+                        default=10.)  #10 # np.log(2/1e-6))#np.log(2/1e-6))#np.log(2/1e-6))
     parser.add_argument('--gamma', dest='gamma', type=float, default=0.0)
     parser.add_argument('--len-scale', dest='len_scale', type=float, default=-1.0) # negative means optimize
     parser.add_argument('--data-dir', dest='data_dir', type=str, default='data')

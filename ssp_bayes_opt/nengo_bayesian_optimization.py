@@ -160,7 +160,8 @@ class NengoBayesianOptimization(BayesianOptimization):
                     neurons_per_dim=neurons_per_dim,
                     tau=tau,
                     seed=self.seed,
-                    neuron_type=neuron_type
+                    neuron_type=neuron_type,
+                    rate=kwargs.get('rate',1.)
                 )
                 sim = sim_type(solver_net, **sim_args)
                 with sim:

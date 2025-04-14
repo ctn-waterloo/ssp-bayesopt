@@ -60,7 +60,9 @@ class SSPAgent(Agent):
             self.ssp_space.train_decoder_net();
             self.init_samples = None
         else:
-            self.init_samples = self.ssp_space.get_sample_pts_and_ssps(2**17,'length-scale')
+            self.init_samples = self.ssp_space.get_sample_pts_and_ssps(
+                np.min([100,int(np.ceil((1e7/self.ssp_dim)**(1/self.data_dim)))]),
+            'grid')
         self.decoder_method = decoder_method
 
     def length_scale(self):
@@ -71,6 +73,7 @@ class SSPAgent(Agent):
         ## fit to the initial values
         fit_gp = GaussianProcessRegressor(
                     kernel=SincKernel(
+                        length_scale=1.,#np.ones(init_xs.shape[1]),
                         length_scale_bounds=(
                             1/np.sqrt(init_xs.shape[0]+1), 
                             1e5)

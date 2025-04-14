@@ -13,7 +13,10 @@ from . import sspspace
 from scipy.optimize import minimize, Bounds
 from typing import Callable
 
-from guppy import hpy
+try:
+    from guppy import hpy
+except ImportError:
+    print('Failed to load guppy for memory profiling')
 
 def get_memory_usage(h):
     return h.heap().size / 1024 ** 2
@@ -168,7 +171,7 @@ class BayesianOptimization:
         # Initialize the agent
         self.logger.info(f'Creating {agent_type} agent')
         if agent_type == 'ssp-hex':
-            ssp_space = sspspace.HexagonalSSPSpace(self.data_dim, **kwargs)
+            ssp_space = sspspace.HexagonalSSPSpace(self.data_dim,  **kwargs) # dtype=np.float16,
             agt = agents.SSPAgent(init_xs, init_ys,ssp_space, **kwargs) 
         elif agent_type == 'ssp-rand':
             ssp_space = sspspace.RandomSSPSpace(self.data_dim, **kwargs)

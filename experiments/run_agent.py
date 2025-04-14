@@ -7,7 +7,23 @@ from argparse import ArgumentParser
 import os.path
 import random
 import nengo
-import nengo_loihi
+
+try:
+    import nengo_loihi
+    loihi_lif = nengo_loihi.LoihiLIF()
+    loihi_sim = nengo_loihi.Simulator
+    loihi_allocator = nengo_loihi.hardware.allocators.Greedy()
+except ImportError:
+    print('Failed to import nengo_loihi')
+    loihi_lif = None
+    loihi_sim = None
+    loihi_allocator = None
+try:
+    import nengo_spinnaker
+    spinnaker_sim = nengo_spinnaker.Simulator
+except ImportError:
+    print('Failed to import nengo_spinnaker')
+    spinnaker_sim = None
 
 function_maximum_value = {
     'himmelblau':0.07076226300682818, # Determined from offline minimization of modified himmelblau.
@@ -25,22 +41,23 @@ function_maximum_value = {
 neuron_types = {
     'lif': nengo.LIF(),
     'lifrate': nengo.LIFRate(),
-    'loihilif': nengo_loihi.LoihiLIF(),
+    'loihilif': loihi_lif,
     'direct': nengo.Direct()
 }
 
+#'progress_bar':False
 sim_types = {
-    'cpu': (nengo.Simulator, {'progress_bar':False}),#'gpu': (nengo_ocl.Simulator, {'progress_bar':False}),
-    'loihi-sim': (nengo_loihi.Simulator, {'progress_bar':False,'target':'sim'}),
-    'loihi': (nengo_loihi.Simulator,
-               {'progress_bar':False,
-                'target':'loihi','precompute':True,
+    'cpu': (nengo.Simulator, {}),#'gpu': (nengo_ocl.Simulator, {'progress_bar':False}),
+    'loihi-sim': (loihi_sim, {'target':'sim'}),
+    'loihi': (loihi_sim,
+               {'target':'loihi','precompute':True,
                  'hardware_options':{
                             "snip_max_spikes_per_step": 300,
-                            "allocator": nengo_loihi.hardware.allocators.Greedy(),
+                            "allocator": loihi_allocator,
                             "n_chips": 15
                         }}
-               )
+               ),
+    'spinnaker': (spinnaker_sim, {}),
 }
 
 import ssp_bayes_opt
@@ -105,7 +122,8 @@ class SamplingTrial(pytry.Trial):
                                neurons_per_dim=p.num_neurons,
                                neuron_type=neuron_type,
                                sim_type=sim_type, sim_args=sim_args,
-                               sim_time=sim_time, tau=0.05
+                               sim_time=sim_time, tau=0.05,
+                               save_memory=False
                                )
             elapsed_time = time.thread_time_ns() - start
         else:
@@ -180,7 +198,7 @@ if __name__=='__main__':
     parser.add_argument('--n-rotates', dest='n_rotates', type=int, default=3)
     parser.add_argument('--len-scale', dest='len_scale', type=float, default=-1)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=100)
-    parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=1.)
+    parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=0.1)
     parser.add_argument('--gamma', dest='gamma', type=float, default=0.0)
     parser.add_argument('--num-trials', dest='num_trials', type=int, default=1)
     parser.add_argument('--data-dir', dest='data_dir', type=str, default='data')
@@ -188,10 +206,9 @@ if __name__=='__main__':
     parser.add_argument('--nengo', action='store_true')
     parser.add_argument('--backend', dest='backend', type=str, default="cpu") # loihi-sim, loihi
     parser.add_argument('--decay', action='store_true')
-
-
     
     args = parser.parse_args()
+    args.nengo = True
 
     # random.seed(1)
     seeds = [random.randint(1,100000) for _ in range(args.num_trials)]

@@ -32,19 +32,33 @@ class SSPNASGraphAgent(SSPAgent):
         # self.ops = ['conv1x1-bn-relu', 'conv3x3-bn-relu', 'maxpool3x3']
         # self.fixed_ops = ['input', 'output']
 
-        self.ssp_dim = ssp_dim
 
-        self.sp_space = sspspace.SPSpace(self.max_layers + self.num_ops + 3,
+        # self.sp_space = sspspace.SPSpace(self.max_layers + self.num_ops + 3,
+        #                                  dim=ssp_dim, seed=seed)
+        # self.layer_sps = self.sp_space.vectors[:self.max_layers]
+        # self.inverse_layer_sps = self.sp_space.inverse_vectors[:self.max_layers]
+        # self.ops_sps = self.sp_space.vectors[self.max_layers:self.max_layers + self.num_ops]
+        # self.inverse_ops_sps = self.sp_space.inverse_vectors[self.max_layers:self.max_layers + self.num_ops]
+        # self.op_slot_sp = self.sp_space.vectors[self.max_layers + self.num_ops].reshape(1, -1)
+        # self.inverse_op_slot_sp = self.sp_space.inverse_vectors[self.max_layers + self.num_ops].reshape(1, -1)
+        # self.target_slot_sp = self.sp_space.vectors[self.max_layers + self.num_ops + 1].reshape(1, -1)
+        # self.inverse_target_slot_sp = self.sp_space.inverse_vectors[self.max_layers + self.num_ops + 1].reshape(1, -1)
+        # self.other_sp = self.sp_space.vectors[self.max_layers + self.num_ops + 2].reshape(1, -1)
+        # self.ssp_dim = self.sp_space.dim
+
+        self.sp_space = sspspace.SPSpace(self.max_layers*2 + self.num_ops + 3,
                                          dim=ssp_dim, seed=seed)
-        self.layer_sps = self.sp_space.vectors[:self.max_layers]
-        self.inverse_layer_sps = self.sp_space.inverse_vectors[:self.max_layers]
-        self.ops_sps = self.sp_space.vectors[self.max_layers:self.max_layers + self.num_ops]
-        self.inverse_ops_sps = self.sp_space.inverse_vectors[self.max_layers:self.max_layers + self.num_ops]
-        self.op_slot_sp = self.sp_space.vectors[self.max_layers + self.num_ops].reshape(1, -1)
-        self.inverse_op_slot_sp = self.sp_space.inverse_vectors[self.max_layers + self.num_ops].reshape(1, -1)
-        self.target_slot_sp = self.sp_space.vectors[self.max_layers + self.num_ops + 1].reshape(1, -1)
-        self.inverse_target_slot_sp = self.sp_space.inverse_vectors[self.max_layers + self.num_ops + 1].reshape(1, -1)
-        self.other_sp = self.sp_space.vectors[self.max_layers + self.num_ops + 2].reshape(1, -1)
+        self.head_layer_sps = self.sp_space.vectors[:self.max_layers]
+        self.tail_layer_sps = self.sp_space.vectors[self.max_layers:2*self.max_layers]
+        self.inverse_head_layer_sps = self.sp_space.inverse_vectors[:self.max_layers]
+        self.inverse_tail_layer_sps = self.sp_space.inverse_vectors[self.max_layers:2*self.max_layers]
+        self.ops_sps = self.sp_space.vectors[2*self.max_layers:2*self.max_layers + self.num_ops]
+        self.inverse_ops_sps = self.sp_space.inverse_vectors[2*self.max_layers:2*self.max_layers + self.num_ops]
+        self.op_slot_sp = self.sp_space.vectors[2*self.max_layers + self.num_ops].reshape(1, -1)
+        self.inverse_op_slot_sp = self.sp_space.inverse_vectors[2*self.max_layers + self.num_ops].reshape(1, -1)
+        self.target_slot_sp = self.sp_space.vectors[2*self.max_layers + self.num_ops + 1].reshape(1, -1)
+        self.inverse_target_slot_sp = self.sp_space.inverse_vectors[2*self.max_layers + self.num_ops + 1].reshape(1, -1)
+        self.other_sp = self.sp_space.vectors[2*self.max_layers + self.num_ops + 2].reshape(1, -1)
         self.ssp_dim = self.sp_space.dim
 
         self.identity = self.sp_space.identity()[None, :]
@@ -88,8 +102,8 @@ class SSPNASGraphAgent(SSPAgent):
 
 
                 S[n, :] += _S
-                S2 = self.sp_space.bind(S2, self.layer_sps[i][None, :],
-                                        target_bundle, self.ops_sps[op_i][None, :])
+                # S2 = self.sp_space.bind(S2, self.layer_sps[i][None, :],
+                #                         target_bundle)#, self.ops_sps[op_i][None, :])
                 # S2 = self.sp_space.bind(S2, _S)
 
             #     if np.sum(layer_i) > 0:
@@ -101,10 +115,45 @@ class SSPNASGraphAgent(SSPAgent):
 
                 # S2 = self.sp_space.bind(S2, S[n, :])
                     # S2 = self.sp_space.bind(S2, S[n, :])
-            S[n, :] += 0.5 * S2.flatten()
-
+            # S[n, :] += 0.1 * S2.flatten()
             S[n, :] /= np.linalg.norm(S[n, :])
+        # S = self.sp_space.make_unitary(S)
+
         return S
+
+    # def encode(self, G):
+    #     '''
+    #     Translates a graph x into an SSP representation.
+    #
+    #
+    #     Parameters:
+    #     -----------
+    #     x : np.ndarray
+    #         A (s, l, d) numpy array specifying a graph G with particular structure
+    #     '''
+    #     G = np.atleast_2d(G.copy())
+    #     S = np.zeros((G.shape[0], self.ssp_dim))
+    #
+    #     for n in range(G.shape[0]):  # not vectorized
+    #         for i in range(self.max_layers - 1):
+    #             layer_i = G[n,
+    #                       int((self.max_layers - 1 + 0.5 * (1 - i)) * i):int((self.max_layers - 1 - 0.5 * i) * (i + 1))]
+    #             if i == 0:
+    #                 op_i = 0
+    #             else:
+    #                 op_i = int(G[n, self.x_dim + i])  # what operation is happening on this layer?
+    #             _S = self.sp_space.bind(self.op_slot_sp, self.ops_sps[op_i][None, :])  # bind & bundle that in
+    #             # target_bundle = self.identity.copy()
+    #             if np.sum(layer_i) > 0:
+    #                 target_bundle = np.sum(self.tail_layer_sps[1+i+np.where(layer_i > 0)[0], :], axis=0,
+    #                                        keepdims=True).reshape(1,-1)  # target layers bundle
+    #                 # target_bundle = target_bundle/np.linalg.norm(target_bundle)
+    #                 _S += self.sp_space.bind(self.target_slot_sp, target_bundle)
+    #             _S = self.sp_space.bind(self.head_layer_sps[i][None, :], _S).flatten()
+    #             S[n, :] += _S
+    #         S[n, :] /= np.linalg.norm(S[n, :])
+    #
+    #     return S
     
         
     def decode(self,ssp):
@@ -134,7 +183,7 @@ class SSPNASGraphAgent(SSPAgent):
                         target_bundle.append(self.layer_sps[i+1+j])
                     if n_conns > self.max_conns:
                         continue
-                bound_term = self.sp_space.bind(self.op_slot_sp, self.ops_sps[op_i]) +\
+                bound_term = self.sp_space.bind(self.op_slot_sp, self.ops_sps[op_i]) + \
                              self.sp_space.bind(self.target_slot_sp, np.sum(np.array(target_bundle), axis=0, keepdims=True))
                 ssp[n,:] = ssp[n,:] - self.sp_space.bind(self.layer_sps[i][None,:], bound_term).flatten()
             decoded_ops[0] = 0
@@ -142,3 +191,31 @@ class SSPNASGraphAgent(SSPAgent):
             decoded_graphs[n,:] = np.concatenate([decoded_graph[i,i+1:] for i in range(decoded_graph.shape[0]-1)]
                                                  + [decoded_ops])
         return decoded_graphs
+
+    # def decode(self,ssp):
+    #     ssp = np.atleast_2d(ssp.copy())
+    #     n_conns = 0
+    #     decoded_graphs = np.zeros((ssp.shape[0], self.x_dim + self.max_layers))
+    #     for n in range(ssp.shape[0]):
+    #         decoded_graph = np.zeros((self.max_layers, self.max_layers))
+    #         decoded_ops = np.zeros(self.max_layers)
+    #         for i in range(self.max_layers - 1):
+    #             query_i = self.sp_space.bind(self.inverse_head_layer_sps[i][None, :], ssp[n,:].reshape(1,-1))
+    #             op_query = self.sp_space.bind(self.inverse_op_slot_sp, query_i)
+    #             op_sims = np.sum(self.ops_sps[1:-1] * op_query, axis=-1)
+    #             op_i = 1 + np.argmax(op_sims)
+    #             decoded_ops[i] = op_i
+    #             target_query = self.sp_space.bind(self.inverse_target_slot_sp, query_i)
+    #             sims = np.sum(self.tail_layer_sps[i+1:] * target_query, axis=-1)
+    #             for j,sim in enumerate(sims):
+    #                 if sim >= self.threshold:
+    #                     n_conns += 1
+    #                     decoded_graph[i,1+i+j] = 1
+    #                 if n_conns > self.max_conns:
+    #                     continue
+    #
+    #         decoded_ops[0] = 0
+    #         decoded_ops[-1] = self.num_ops-1
+    #         decoded_graphs[n,:] = np.concatenate([decoded_graph[i,i+1:] for i in range(decoded_graph.shape[0]-1)]
+    #                                              + [decoded_ops])
+    #     return decoded_graphs
