@@ -191,6 +191,13 @@ class BayesianOptimization:
             agt = agents.GPAgent(init_xs, init_ys, 
                                 kernel_type='sinc', 
                                 updating=False, **kwargs) 
+        elif agent_type=='disc-domain':
+            agt = agents.DiscretizedDomainAgent(
+                    init_xs, 
+                    init_ys, 
+                    bounds=self.bounds, 
+                    **kwargs,
+                    )
         elif agent_type == 'gp-ucb-matern':
             agt = agents.GPUCBAgent(init_xs, init_ys, 
                                 kernel_type='matern', 

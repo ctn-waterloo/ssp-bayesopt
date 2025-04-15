@@ -151,12 +151,11 @@ class SamplingTrial(pytry.Trial):
             elapsed_time = time.thread_time_ns() - start
         
 
-
         vals = np.zeros((p.num_init_samples + budget,))
         sample_locs = []
         
         for i, res in enumerate(optimizer.res):
-            vals[i] = res['target']
+            vals[i] = res['target'][0][0]
             sample_locs.append(res['params'])
             
         if "styblinski-tang" in p.function_name:
@@ -169,8 +168,12 @@ class SamplingTrial(pytry.Trial):
             true_max_val = function_maximum_value[p.function_name] 
         regrets = true_max_val - vals
         print(optimizer.max)
+<<<<<<< HEAD
+
+=======
         print(regrets[-1])
         
+>>>>>>> cd3244208c9bac7bf02ce1b0116b25e182c4aca5
         return dict(
             regret=regrets,
             sample_locs=sample_locs,
@@ -183,8 +186,12 @@ class SamplingTrial(pytry.Trial):
             mus=None,
             variances=None,
             acquisition=None,
+<<<<<<< HEAD
+            total_time = optimizer.total_time,
+=======
             total_time=optimizer.total_time,
             params=p
+>>>>>>> cd3244208c9bac7bf02ce1b0116b25e182c4aca5
         )
 
 
@@ -232,6 +239,8 @@ if __name__=='__main__':
                   'verbose':False,
                   'ssp_dim':args.ssp_dim,
                   'len_scale':args.len_scale,
+<<<<<<< HEAD
+=======
                   'beta_ucb':args.beta_ucb,
                   'gamma':args.gamma,
                   'nengo':args.nengo,
@@ -239,5 +248,6 @@ if __name__=='__main__':
                   'n_scales':args.n_scales,
                   'n_rotates':args.n_rotates,
                   'decay': args.decay
+>>>>>>> cd3244208c9bac7bf02ce1b0116b25e182c4aca5
                   }
         r = SamplingTrial().run(**params)

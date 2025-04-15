@@ -11,11 +11,12 @@ from ..util import DiscretizedFunction
 
 
 class MIAcquisitionFunc:
-    def __init__(self):
+    def __init__(self, sqrt_alpha):
         self.gamma_t = 0
+        self.sqrt_alpha = sqrt_alpha
 
     def __call__(self, mean, var):
-        return mean + np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t)
+        return mean + self.sqrt_alpha * (np.sqrt(var + self.gamma_t) - np.sqrt(self.gamma_t))
 
 class DiscretizedDomainAgent(Agent):
     def __init__(self, init_xs, init_ys,
@@ -33,9 +34,14 @@ class DiscretizedDomainAgent(Agent):
         ## Create the GP to use during optimization.
         ## fit to the initial values
 #         fit_kern = Matern(nu=2.5) 
+#         self.bins_per_dim = kwargs.get('bins_per_dim', None)
         self.lenscale = kwargs['length_scale']
-        if self.lenscale  < 0:
-            fit_kern = RBF(length_scale_bounds=(1e-5,1e5)) 
+        if self.lenscale is None or self.lenscale < 0:
+            fit_kern = Matern(
+                    nu=2.5,
+                    length_scale=np.ones((self.xs.shape[1],)),
+                    length_scale_bounds=(1e-5,1e5),
+            ) 
             fit_gp = GaussianProcessRegressor(
                     kernel=fit_kern,
                     alpha=1e-6,
@@ -46,16 +52,21 @@ class DiscretizedDomainAgent(Agent):
             fit_gp.fit(self.xs, self.ys)
             self.lenscale = np.abs(fit_gp.kernel_.theta)
         ### end if
-        assert np.any(self.lenscale > 0), f'Error: Negative length scale, {self.lenscale}, {fit_gp.kernel_.theta}, {fit_kern.length_scale}.'
+#         assert np.any(self.lenscale > 0), f'Error: Negative length scale, {self.lenscale}, {fit_gp.kernel_.theta}, {fit_kern.length_scale}.'
+#         assert self.bins_per_dim >= 10, f'Error: Choosing improbably small number of bins per dimension: {self.bins_per_dim}.'
 
         self.gamma_t = 0
         self.gamma_c = gamma_c
         self.sqrt_alpha = beta_ucb
         self.disc_func = DiscretizedFunction(
                 bounds, 
-                self.lenscale * np.ones((self.xs.shape[1],)),
+                self.lenscale,
+#                 self.bins_per_dim,
+                init_sum_f = np.mean(self.ys),
+                init_sum_f2 = np.var(self.ys) + np.mean(self.ys)**2, #np.sum(self.ys**2),
+                pseudo_counts = 1, #len(self.ys),
                 )
-        self.acq_func = MIAcquisitionFunc()
+        self.acq_func = MIAcquisitionFunc(sqrt_alpha=self.sqrt_alpha)
     ### end __init__
 
     def eval(self, xs):
