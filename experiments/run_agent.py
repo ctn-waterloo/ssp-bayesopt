@@ -208,7 +208,7 @@ if __name__=='__main__':
     parser.add_argument('--decay', action='store_true')
     
     args = parser.parse_args()
-    args.nengo = True
+    #args.nengo = True
 
     # random.seed(1)
     seeds = [random.randint(1,100000) for _ in range(args.num_trials)]
