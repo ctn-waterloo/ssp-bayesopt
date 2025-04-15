@@ -2,9 +2,7 @@ import numpy as np
 
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import Matern, ConstantKernel, RBF
-from .kernels import SincKernel
 import scipy
-from .. import sspspace 
 from .. import blr
 
 from .agent import Agent

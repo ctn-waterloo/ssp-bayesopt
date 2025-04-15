@@ -3,7 +3,6 @@ import warnings
 # import GP modules
 from sklearn.gaussian_process.kernels import Matern
 from sklearn.gaussian_process import GaussianProcessRegressor 
-from sklearn.preprocessing import StandardScaler 
 
 from .agent import Agent
 from .kernels import SincKernel
