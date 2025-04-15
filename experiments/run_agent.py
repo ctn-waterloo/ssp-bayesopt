@@ -87,9 +87,9 @@ class SamplingTrial(pytry.Trial):
         self.param('use beta decay', decay=False)
     
     def evaluate(self, p):        
-        target, pbounds, budget = functions.factory(p.function_name)
+        target, pbounds, _ = functions.factory(p.function_name)
         #target, pbounds = functions.rescale(target,pbounds)
-
+        budget = p.num_samples
         if p.decay:
             var_decay = -p.beta_ucb / budget
         else:
@@ -123,7 +123,8 @@ class SamplingTrial(pytry.Trial):
                                neuron_type=neuron_type,
                                sim_type=sim_type, sim_args=sim_args,
                                sim_time=sim_time, tau=0.05,
-                               save_memory=False
+                               save_memory=False,
+                               partitions=None
                                )
             elapsed_time = time.thread_time_ns() - start
         else:
@@ -192,7 +193,7 @@ if __name__=='__main__':
     parser = ArgumentParser()
 
     parser.add_argument('--func', dest='function_name', type=str, default='himmelblau')
-    parser.add_argument('--agent', dest='agent_type', type=str, default='ssp-hex')
+    parser.add_argument('--agent', dest='agent_type', type=str, default='ssp-rand')
     parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=97)
     parser.add_argument('--n-scales', dest='n_scales', type=int, default=3)
     parser.add_argument('--n-rotates', dest='n_rotates', type=int, default=3)
