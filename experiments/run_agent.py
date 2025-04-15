@@ -155,7 +155,7 @@ class SamplingTrial(pytry.Trial):
         sample_locs = []
         
         for i, res in enumerate(optimizer.res):
-            vals[i] = res['target'][0][0]
+            vals[i] = res['target']
             sample_locs.append(res['params'])
             
         if "styblinski-tang" in p.function_name:
@@ -192,10 +192,10 @@ if __name__=='__main__':
     parser = ArgumentParser()
 
     parser.add_argument('--func', dest='function_name', type=str, default='himmelblau')
-    parser.add_argument('--agent', dest='agent_type', type=str, default='ssp-rand')
-    parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=97)
-    parser.add_argument('--n-scales', dest='n_scales', type=int, default=3)
-    parser.add_argument('--n-rotates', dest='n_rotates', type=int, default=3)
+    parser.add_argument('--agent', dest='agent_type', type=str, default='ssp-hex')
+    parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=55)
+    parser.add_argument('--n-scales', dest='n_scales', type=int, default=2)
+    parser.add_argument('--n-rotates', dest='n_rotates', type=int, default=2)
     parser.add_argument('--len-scale', dest='len_scale', type=float, default=-1)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=100)
     parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=0.1)
