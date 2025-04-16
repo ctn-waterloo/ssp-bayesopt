@@ -24,7 +24,7 @@ setup(
             'Topic :: Scientific/Engineering :: Artificial Intelligence'
             ],
         install_requires=[
-            'numpy',#'numpy>=1.24.4',
+            'numpy==1.26',#'numpy>=1.24.4',
             'scipy',#'scipy==1.10.1',
             'scikit-learn',
 #             'tensorflow==2.7.0',
