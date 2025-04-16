@@ -2,12 +2,181 @@ import numpy as np
 from scipy.stats import qmc
 from scipy.stats import special_ortho_group
 from scipy.optimize import minimize
+from nengo.dists import UniformHypersphere
 
 import warnings
 
+
+class SPSpace:
+    r"""  Class for Semantic Pointer (SP) representation mapping
+
+    This is similar to nengo_spa vocabs but structured differently.
+
+    Parameters
+    ----------
+        domain_size : int
+            The number of discrete symbols that will be encoded in this space.
+
+        dim : int
+            The dimensionality of the SPs, should be >= domain_size.
+
+        seed : int
+            The seed for generating the SPs. Default is None.
+
+    Attributes
+    ----------
+        domain_size, dim : int
+
+        vectors : np.ndarray
+           A (domain_size x dim) array of all SPs
+
+        inverse_vectors : Node
+            Inverse (under binding) SPs
+
+    Examples
+    --------
+       from sspslam import SPSpace
+       sp_space = SPSpace(5, 100)
+
+    """
+
+    def __init__(self, domain_size: int, dim: int, seed=None, vectors=None, make_quasi_ortho=False, **kwargs):
+        self.domain_size = int(domain_size)
+        self.dim = int(dim)
+        if np.issubdtype(type(seed), np.integer):
+            rng = np.random.RandomState(seed)
+        else:
+            rng = np.random.RandomState()
+        self.rng = rng
+        if self.domain_size == 1:  # only one is special case, vectors only contains identity
+            self.vectors = np.zeros((self.domain_size, self.dim))
+            self.vectors[:, 0] = 1
+        elif vectors is not None:
+            self.vectors = vectors
+        elif make_quasi_ortho:
+            self.vectors = self.make_unitary(
+                UniformHypersphere(surface=True).sample(self.domain_size, self.dim, rng=rng))
+
+            for j in range(self.domain_size):
+                q = self.vectors[j, :] / np.linalg.norm(self.vectors[j, :])
+                for k in range(j + 1, self.domain_size):
+                    self.vectors[k, :] = self.vectors[k, :] - (q.T @ self.vectors[k, :]) * q
+                    self.vectors[k, :] = self.make_unitary(self.vectors[k, :].reshape(1,-1))
+        else:
+            self.vectors = np.zeros((domain_size, dim))
+            for k in range(domain_size):
+                self.vectors[k, :] = _make_good_unitary(dim)
+        self.inverse_vectors = self.invert(self.vectors)
+        # self.make_unitary(self.rng.randn(self.domain_size,self.dim))
+
+    def encode(self, i):
+        """
+        Maps index to SP
+
+        Parameters
+        ----------
+        i : np.array
+            An array of ints, each in [0, domain_size)
+
+        Returns
+        -------
+        np.array
+            Semantic Pointers.
+
+        """
+        i = np.atleast_1d(i)
+        return self.vectors[i.flatten().astype(int)]
+
+    def decode(self, v, **kwargs):
+        """
+        Maps dim-D vector to index
+
+        Parameters
+        ----------
+        v : np.array
+            A (n_samples x ssp_dim) vector
+
+        Returns
+        -------
+        np.array
+            A n_samples length vector of indexes
+
+        """
+        sims = self.vectors @ v.T
+        return np.argmax(sims, axis=0)
+
+    def clean_up(self, v, **kwargs):
+        """
+        Maps dim-D vector to SP
+
+        Parameters
+        ----------
+        v : np.array
+            A (n_samples x ssp_dim) vector
+
+        Returns
+        -------
+        np.array
+            A (n_samples x ssp_dim) vector, each row a Semantic Pointer.
+
+        """
+        sims = self.vectors @ v.T
+        return self.vectors[np.argmax(sims, axis=0)]
+
+    def normalize(self, v):
+        """
+        Normalizes input
+        """
+        return v / np.sqrt(np.sum(v ** 2))
+
+    def make_unitary(self, v):
+        """
+        Makes input unitary (Fourier components have magnitude of 1)
+        """
+        fv = np.fft.fft(v, axis=1)
+        fv = fv / np.sqrt(fv.real ** 2 + fv.imag ** 2)
+        return np.fft.ifft(fv, axis=1).real
+
+    def identity(self):
+        """
+        Returns
+        -------
+        np.array
+            dim-D identity vector under binding
+
+        """
+        s = np.zeros(self.dim)
+        s[0] = 1
+        return s
+
+    def bind(self, *arrays):
+        # Binds together input with circular convolution
+        arrays = [np.atleast_2d(arr) for arr in arrays]
+        fft_result = np.fft.fft(arrays[0], axis=-1)
+        for arr in arrays[1:]:
+            fft_result = fft_result * np.fft.fft(arr, axis=-1)
+        return np.fft.ifft(fft_result, axis=-1).real
+
+    def invert(self, a):
+        """
+        Inverts input under binding
+        """
+        a = np.atleast_2d(a)
+        return a[:, -np.arange(self.dim)]
+
+    def get_binding_matrix(self, v):
+        """
+        Maps input vector to a matrix that, when multiplied with another vecotr, will bind vectors
+        """
+        C = np.zeros((self.dim, self.dim))
+        for i in range(self.dim):
+            for j in range(self.dim):
+                C[i, j] = v[:, (i - j) % self.dim]
+        return C
+
 class SSPSpace:
     def __init__(self, domain_dim: int, ssp_dim: int, axis_matrix=None, phase_matrix=None,
-                 domain_bounds=None, length_scale=1, **kwargs):
+                 domain_bounds=None, length_scale=1, dtype=np.float64, **kwargs):
         '''
         Represents a domain using spatial semantic pointers.
 
@@ -38,8 +207,9 @@ class SSPSpace:
         '''
         self.domain_dim = domain_dim
         self.ssp_dim = ssp_dim
-        self.length_scale = length_scale * np.ones((self.domain_dim,1))
-        
+        self.dtype = dtype
+        self.length_scale = length_scale * np.ones((self.domain_dim,1), dtype=self.dtype)
+
         if domain_bounds is not None:
             assert domain_bounds.shape[0] == domain_dim
         
@@ -50,12 +220,12 @@ class SSPSpace:
         elif (phase_matrix is None):
             assert axis_matrix.shape[0] == ssp_dim, f'Expected ssp_dim {axis_matrix.shape[0]}, got {ssp_dim}.'
             assert axis_matrix.shape[1] == domain_dim
-            self.axis_matrix = axis_matrix
+            self.axis_matrix = axis_matrix.astype(dtype=self.dtype)
             self.phase_matrix = (-1.j*np.log(np.fft.fft(axis_matrix,axis=0))).real
         elif (axis_matrix is None):
             assert phase_matrix.shape[0] == ssp_dim
             assert phase_matrix.shape[1] == domain_dim
-            self.phase_matrix = phase_matrix
+            self.phase_matrix = phase_matrix.astype(dtype=self.dtype)
             self.axis_matrix = np.fft.ifft(np.exp(1.j*phase_matrix), axis=0).real
             
     def update_lengthscale(self, scale):
@@ -112,6 +282,7 @@ class SSPSpace:
         ls_mat = np.atleast_2d(np.diag(1/self.length_scale.flatten()))
         assert ls_mat.shape == (self.domain_dim, self.domain_dim), f'Expected Len Scale mat with dimensions {(self.domain_dim, self.domain_dim)}, got {ls_mat.shape}'
         scaled_x = x @ ls_mat
+        scaled_x = scaled_x.astype(self.dtype)
         data = np.fft.ifft( np.exp( 1.j * self.phase_matrix @ scaled_x.T), axis=0 ).real
         return data.T
     
@@ -355,11 +526,14 @@ class SSPSpace:
         s = np.zeros(self.ssp_dim)
         s[0] = 1
         return s
-    
-    def bind(self,a,b):
-        a = np.atleast_2d(a)
-        b = np.atleast_2d(b)
-        return np.fft.ifft(np.fft.fft(a, axis=1) * np.fft.fft(b,axis=1), axis=1).real
+
+    def bind(self, *arrays):
+        # Binds together input with circular convolution
+        arrays = [np.atleast_2d(arr) for arr in arrays]
+        fft_result = np.fft.fft(arrays[0], axis=-1)
+        for arr in arrays[1:]:
+            fft_result = fft_result * np.fft.fft(arr, axis=-1)
+        return np.fft.ifft(fft_result, axis=-1).real
     
     def invert(self,a):
         a = np.atleast_2d(a)
@@ -452,31 +626,10 @@ class RandomSSPSpace(SSPSpace):
         
         #partial_phases = rng.random((ssp_dim // 2, domain_dim)) * 2 * np.pi - np.pi
         #axis_matrix = _constructaxisfromphases(partial_phases)
-        def make_good_unitary(dim, eps=1e-3, rng=np.random):
-            a = rng.rand((dim - 1) // 2)
-            sign = rng.choice((-1, +1), len(a))
-            phi = sign * np.pi * (eps + a * (1 - 2 * eps))
-            assert np.all(np.abs(phi) >= np.pi * eps)
-            assert np.all(np.abs(phi) <= np.pi * (1 - eps))
-        
-            fv = np.zeros(dim, dtype='complex64')
-            fv[0] = 1
-            fv[1:(dim + 1) // 2] = np.cos(phi) + 1j * np.sin(phi)
-            fv[-1:dim // 2:-1] = np.conj(fv[1:(dim + 1) // 2])
-            if dim % 2 == 0:
-                fv[dim // 2] = 1
-        
-            assert np.allclose(np.abs(fv), 1)
-            v = np.fft.ifft(fv)
-            
-            v = v.real
-            assert np.allclose(np.fft.fft(v), fv)
-            assert np.allclose(np.linalg.norm(v), 1)
-            return v
 
         axis_matrix = np.zeros((ssp_dim,domain_dim))
         for i in range(domain_dim):
-            axis_matrix[:,i] = make_good_unitary(ssp_dim)
+            axis_matrix[:,i] = _make_good_unitary(ssp_dim)
 
         super().__init__(domain_dim, 
                          axis_matrix.shape[0],
@@ -493,10 +646,10 @@ class HexagonalSSPSpace(SSPSpace):
     Creates an SSP space using the Hexagonal Tiling developed by NS Dumont 
     (2020)
     '''
-    def __init__(self,  domain_dim:int,ssp_dim: int=151, n_rotates:int=5, n_scales:int=5, 
+    def __init__(self,  domain_dim:int,ssp_dim: int=151, n_rotates:int=-1, n_scales:int=-1,
                  scale_min=0.1, scale_max=3,
                  domain_bounds=None, length_scale=1, **kwargs):
-        if (n_rotates==5) & (n_scales==5) & (ssp_dim!=151): # user wants to define ssp with total dim, not number of simplex rotates and scales
+        if (n_rotates<0) & (n_scales<0): # user wants to define ssp with total dim, not number of simplex rotates and scales
             n_rotates = int(np.sqrt((ssp_dim-1)/(2*(domain_dim+1))))
             n_scales = n_rotates
             ssp_dim = n_rotates*n_scales*(domain_dim+1)*2 + 1
@@ -702,3 +855,26 @@ def _Rd_sampling(n,d,seed=0.5):
         z[i] = seed + alpha*(i+1)
     z = z %1
     return z
+
+
+def _make_good_unitary(dim, eps=1e-3, rng=np.random):
+    a = rng.rand((dim - 1) // 2)
+    sign = rng.choice((-1, +1), len(a))
+    phi = sign * np.pi * (eps + a * (1 - 2 * eps))
+    assert np.all(np.abs(phi) >= np.pi * eps)
+    assert np.all(np.abs(phi) <= np.pi * (1 - eps))
+
+    fv = np.zeros(dim, dtype='complex64')
+    fv[0] = 1
+    fv[1:(dim + 1) // 2] = np.cos(phi) + 1j * np.sin(phi)
+    fv[-1:dim // 2:-1] = np.conj(fv[1:(dim + 1) // 2])
+    if dim % 2 == 0:
+        fv[dim // 2] = 1
+
+    assert np.allclose(np.abs(fv), 1)
+    v = np.fft.ifft(fv)
+
+    v = v.real
+    assert np.allclose(np.fft.fft(v), fv)
+    assert np.allclose(np.linalg.norm(v), 1)
+    return v

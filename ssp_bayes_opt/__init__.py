@@ -1,1 +1,3 @@
 from .bayesian_optimization import BayesianOptimization
+from .nengo_bayesian_optimization import NengoBayesianOptimization
+from .agents import *

@@ -170,7 +170,7 @@ def colville(x):
 
 def rastrigin(xs):
     A = 10
-    return -(A*len(xs) + sum(xs**2 - A*np.cos(2*np.pi*xs), axis=1))
+    return (A*len(xs) + np.sum(xs**2 - A*np.cos(2*np.pi*xs), axis=1))
 
 def ackley(xs):
     fval = -20*np.exp(-0.2*np.sqrt(0.5*(xs[:,0]**2 + xs[:,1]**2))) - np.exp(0.5*(np.cos(2*np.pi*xs[:,0]) + np.cos(2*np.pi*xs[:,1]))) + np.exp(1) + 20
@@ -194,7 +194,7 @@ def mccormick(xs):
     return -fval
 
 def styblinski_tang(xs):
-    return -np.sum(xs**4 - 16*xs**2 + 5*xs, axis=1)/2
+    return -np.sum(xs**4 - 16*xs**2 + 5*xs, axis=1)/2 # negative version bc we maximize instead of minimize
 
 
 if __name__=='__main__':

@@ -1,17 +1,21 @@
 import numpy as np
 
 class DiscretizedFunction:
-    def __init__(self, bounds, len_scale):
+    def __init__(self, bounds, length_scales, init_sum_f=0., init_sum_f2=1., pseudo_counts=1):
         self.bins = []
-        for b, l in zip(bounds, len_scale):
-            num_bins = np.maximum(1 + 2*int((b[1]-b[0]) / l), 10)
+        for b_idx, b in enumerate(bounds):
+            l = length_scales[b_idx]
+            num_bins = np.maximum(int((b[1]-b[0]) / l), 10)
 #             print('num bins', num_bins, l)
-            assert num_bins > 0, f'Error = {b}, {l}'
+            assert num_bins >= 10, f'Error = {b}, {l}'
             self.bins.append(np.linspace(b[0],b[1],num_bins))
 
-        self.sum_f = np.zeros(tuple([b.size-1 for b in self.bins]))
-        self.sum_f2 = np.ones(self.sum_f.shape)
-        self.counts = np.ones(self.sum_f.shape)
+
+        print(self.bins)
+
+        self.sum_f = init_sum_f * np.ones(tuple([b.size-1 for b in self.bins]))
+        self.sum_f2 = init_sum_f2 * np.ones(self.sum_f.shape)
+        self.counts = pseudo_counts * np.ones(self.sum_f.shape)
 
     def update(self, x, f):
         assert x.shape[0] == 1
