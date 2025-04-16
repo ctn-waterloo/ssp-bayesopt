@@ -123,7 +123,7 @@ class BayesianOptimization:
         '''
 
         #assert init_points > 1, f'Need to sample more than one point when initializing agents, got {init_points}'
-   
+        num_perimeter_samples = kwargs.pop('num_perimeter_samples',0) 
 
         if 'traj' in agent_type:
             logger.info('Creating Trajectory Domain')
@@ -163,6 +163,7 @@ class BayesianOptimization:
 
         # Initialize the agent
         logger.info(f'Creating {agent_type} agent')
+
         if agent_type=='ssp-hex':
             ssp_space = sspspace.HexagonalSSPSpace(self.data_dim, **kwargs)
             agt = agents.SSPAgent(init_xs, init_ys,ssp_space, **kwargs) 
@@ -202,6 +203,19 @@ class BayesianOptimization:
             init_ys = agt.init_ys
         else:
             raise NotImplementedError(f'{agent_type} agent not implemented')
+
+       
+
+        if num_perimeter_samples > 0:
+            perimeter_xs = []
+            for i in range(num_perimeter_samples):
+                idxs = np.random.choice(self.bounds.shape[1], 
+                                        size=(self.bounds.shape[0],))
+                perimeter_xs.append([self.bounds[r,c] for r,c in enumerate(idxs)])
+
+            perimeter_xs = np.squeeze(perimeter_xs)
+            perimeter_ys = np.zeros((perimeter_xs.shape[0],1))
+            agt.update(perimeter_xs, perimeter_ys, 0, 0)
         logger.info(f'{type(agt).__name__} Agent created')
         return agt, init_xs, init_ys
 
