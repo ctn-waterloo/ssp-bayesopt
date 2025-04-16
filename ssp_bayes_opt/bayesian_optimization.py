@@ -232,6 +232,7 @@ class BayesianOptimization:
 
         if num_perimeter_samples > 0:
             perimeter_xs = []
+            print("!!!!! ADDING PERIMETER SAMPLES TO PRIOR !!!!!")
             for i in range(num_perimeter_samples):
                 idxs = np.random.choice(self.bounds.shape[1], 
                                         size=(self.bounds.shape[0],))
