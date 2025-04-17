@@ -55,19 +55,20 @@ class SSPTrajectoryAgent(SSPAgent):
             self.ssp_t_space.update_lengthscale(optres[1])
         else:
             self.ssp_x_space.update_lengthscale(kwargs.get('length_scale', 4))
-            self.ssp_t_space.update_lengthscale(kwargs.get('length_scale', 10))
-        self.timestep_ssps = self.ssp_t_space.encode(
-                np.linspace(0,
-                            self.traj_len,
+            self.ssp_t_space.update_lengthscale(kwargs.get('time_length_scale', 1))
+
+        timesteps = np.linspace(1,
+                            self.traj_len+1,
                             self.traj_len
                             ).reshape(-1, 1)
-            )
+        self.timestep_ssps = self.ssp_t_space.encode(timesteps)
+        self.timestep_inv_ssps = self.ssp_t_space.encode(-timesteps)
 
         if (decoder_method == 'network') | (decoder_method == 'network-optim'):
             self.ssp_x_space.train_decoder_net();
             self.init_samples = None
         else:
-            self.init_samples = self.ssp_x_space.get_sample_pts_and_ssps(10000, 'length-scale')
+            self.init_samples = self.get_init_samples(self.ssp_x_space)
         self.decoder_method = decoder_method
 
     def length_scale(self):
@@ -130,7 +131,7 @@ class SSPTrajectoryAgent(SSPAgent):
 
         enc_x = enc_x.reshape(-1, self.traj_len, self.x_dim)
         for j in range(self.traj_len):
-            S += self.ssp_x_space.bind(self.timestep_ssps[j, :],
+            S = S + self.ssp_x_space.bind(self.timestep_ssps[j, :],
                                        self.ssp_x_space.encode(enc_x[:, j, :]))
         return S
 

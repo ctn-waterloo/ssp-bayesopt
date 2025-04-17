@@ -113,7 +113,7 @@ class SSPMCBOAgent(SSPAgent):
             if (decoder_method == 'network') | (decoder_method == 'network-optim'):
                 self.spaces['cont'].train_decoder_net();
             else:
-                self.init_samples['cont'] = self.spaces['cont'].get_sample_pts_and_ssps(2 ** 10, method='length-scale')
+                self.init_samples['cont'] = self.get_init_samples(self.spaces['cont'])
         if self.n_disc > 0:
             _int_list = []
             for n in search_space.disc_names:

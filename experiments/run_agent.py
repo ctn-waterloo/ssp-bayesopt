@@ -143,7 +143,7 @@ class SamplingTrial(pytry.Trial):
                                n_rotates=p.n_rotates,
                                length_scale=p.len_scale,
                                decoder_method='direct-optim',
-                               gamma_c=0.,
+                               gamma_c=p.gamma,
                                # decoder_method='network-optim',
                                beta_ucb=p.beta_ucb,
                                var_decay=var_decay
@@ -193,12 +193,12 @@ if __name__=='__main__':
 
     parser.add_argument('--func', dest='function_name', type=str, default='himmelblau')
     parser.add_argument('--agent', dest='agent_type', type=str, default='ssp-hex')
-    parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=55)
-    parser.add_argument('--n-scales', dest='n_scales', type=int, default=2)
-    parser.add_argument('--n-rotates', dest='n_rotates', type=int, default=2)
+    parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=97)
+    parser.add_argument('--n-scales', dest='n_scales', type=int, default=-1)
+    parser.add_argument('--n-rotates', dest='n_rotates', type=int, default=-1)
     parser.add_argument('--len-scale', dest='len_scale', type=float, default=-1)
-    parser.add_argument('--num-samples', dest='num_samples', type=int, default=100)
-    parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=0.1)
+    parser.add_argument('--num-samples', dest='num_samples', type=int, default=200)
+    parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=10)
     parser.add_argument('--gamma', dest='gamma', type=float, default=0.0)
     parser.add_argument('--num-trials', dest='num_trials', type=int, default=1)
     parser.add_argument('--data-dir', dest='data_dir', type=str, default='data')

@@ -139,7 +139,7 @@ class NengoBayesianOptimization(BayesianOptimization):
                 start = time.thread_time_ns()
             # get the functions to optimize
             ### TODO fix jacobian so it returns dx in x space
-            optim_func, jac_func = agt.acquisition_func()
+            # optim_func, jac_func = agt.acquisition_func()
 
             # Use optimization to find a sample location
             # for restart_idx in range(num_restarts):

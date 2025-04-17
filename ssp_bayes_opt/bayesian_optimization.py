@@ -356,8 +356,7 @@ class BayesianOptimization:
 #                     phi_init = np.copy(best_phi[restart_idx,:])
                     phi_init = agt.initial_guess()
                     start = time.thread_time_ns()
-                    soln = minimize(optim_func, phi_init.flatten(),
-                                    jac=jac_func, 
+                    soln = minimize(optim_func, phi_init.flatten(),# jac=jac_func,
                                     method='L-BFGS-B')
                     if hasattr(time, 'thread_time_ns'):
                         self.times[t] = time.thread_time_ns() - start

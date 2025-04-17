@@ -1,7 +1,7 @@
 # Project specific
 
-/data
-/experiments/data
+/data/*
+/experiments/data/*
 
 tests/data/
 util/plots/

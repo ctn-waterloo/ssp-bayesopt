@@ -60,9 +60,7 @@ class SSPAgent(Agent):
             self.ssp_space.train_decoder_net();
             self.init_samples = None
         else:
-            self.init_samples = self.ssp_space.get_sample_pts_and_ssps(
-                np.min([100,int(np.ceil((1e7/self.ssp_dim)**(1/self.data_dim)))]),
-            'grid')
+            self.init_samples = self.get_init_samples(self.ssp_space)
         self.decoder_method = decoder_method
 
     def length_scale(self):
@@ -87,6 +85,16 @@ class SSPAgent(Agent):
         lenscale = np.exp(fit_gp.kernel_.theta)
         return lenscale
     ### end _optimize_lengthscale
+
+    def get_init_samples(self, ssp_space):
+        n_ls_method = [2 * int(np.ceil((b[1] - b[0]) / ssp_space.length_scale[b_idx])) for b_idx, b in enumerate(ssp_space.domain_bounds)]
+        if np.prod(n_ls_method)*ssp_space.ssp_dim > 1e7:
+            samples = ssp_space.get_sample_pts_and_ssps(
+                    np.min([100,int(np.ceil((1e7/ssp_space.ssp_dim)**(1/ssp_space.domain_dim)))]),
+                'grid')
+        else:
+            samples = ssp_space.get_sample_pts_and_ssps(1,'length-scale')
+        return samples
 
     def eval(self, xs):
         phis = self.encode(xs)

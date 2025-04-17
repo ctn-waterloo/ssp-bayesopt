@@ -18,7 +18,9 @@ class SSPMultiAgent(SSPAgent):
                        decoder_method,
                        ssp_x_spaces=None, ssp_t_space=None,
                        seed=0,
-                       init_pos=None, **kwargs):
+                       init_pos=None,
+                       same_agt_x_space=True,
+                       **kwargs):
         assert n_agents > 0
         self.data_dim = x_dim * traj_len * n_agents
         self.n_agents = n_agents
@@ -27,19 +29,31 @@ class SSPMultiAgent(SSPAgent):
         self.traj_len = traj_len
 
         if ssp_x_spaces is None:
-            ssp_x_spaces=[]
-            for i in range(n_agents):
-                ssp_x_spaces.append( sspspace.HexagonalSSPSpace(x_dim,ssp_dim=kwargs.get('ssp_dim', 100),
-                                                                scale_min=0.1, scale_max=3,
-                                                                domain_bounds=domain_bounds[i*x_dim:(i+1)*x_dim,:],
-                                                                length_scale=1))
+            if same_agt_x_space:
+                ssp_x_space = sspspace.HexagonalSSPSpace(x_dim, ssp_dim=kwargs.get('ssp_dim', 100),
+                                                                   scale_min=0.1, scale_max=3,
+                                                                   domain_bounds=domain_bounds[:x_dim, :],
+                                                                   length_scale=1)
+                ssp_x_spaces = [ssp_x_space] * n_agents
+
+            else:
+                ssp_x_spaces=[]
+                for i in range(n_agents):
+                    ssp_x_spaces.append( sspspace.HexagonalSSPSpace(x_dim,ssp_dim=kwargs.get('ssp_dim', 100),
+                                                                    scale_min=0.1, scale_max=3,
+                                                                    domain_bounds=domain_bounds[i*x_dim:(i+1)*x_dim,:],
+                                                                    length_scale=1))
 
         if ssp_t_space is None:
             ssp_t_space = sspspace.RandomSSPSpace(1, ssp_dim=ssp_x_spaces[0].ssp_dim,
-                                                  domain_bounds=np.array([[0, self.traj_len]]), length_scale=1)
+                                                  domain_bounds=np.array([[0, self.traj_len+1]]), length_scale=1)
         self.ssp_dim = ssp_x_spaces[0].ssp_dim
         self.ssp_x_spaces = ssp_x_spaces
         self.ssp_t_space = ssp_t_space
+
+        agent_space = sspspace.SPSpace(n_agents, ssp_x_spaces[0].ssp_dim, seed=seed, make_quasi_ortho=True)
+        self.agent_sps = agent_space.vectors
+        self.agent_inv_sps = agent_space.inverse_vectors
 
         if not 'length_scale' in kwargs or np.any(np.array(kwargs.get('length_scale')) < 0):
             optres = self._optimize_lengthscale(self.init_xs, self.init_ys)
@@ -49,24 +63,27 @@ class SSPMultiAgent(SSPAgent):
         else:
             for i in range(n_agents):
                 self.ssp_x_spaces[i].update_lengthscale(kwargs.get('length_scale', 4))
-            self.ssp_t_space.update_lengthscale(kwargs.get('time_length_scale', 10))
-        self.timestep_ssps = self.ssp_t_space.encode(
-            np.linspace(0,
-                        self.traj_len,
+            self.ssp_t_space.update_lengthscale(kwargs.get('time_length_scale', 1))
+
+        timesteps = np.linspace(1,
+                        self.traj_len+1,
                         self.traj_len
                         ).reshape(-1, 1)
-        )
-        self.agent_sps = sspspace.SPSpace(n_agents,ssp_x_spaces[0].ssp_dim, seed).vectors # changed on mar 14 2025
+        self.timestep_ssps = self.ssp_t_space.encode(timesteps)
+        self.timestep_inv_ssps = self.ssp_t_space.encode(-timesteps)
 
         if (decoder_method == 'network') | (decoder_method == 'network-optim'):
             for i in range(n_agents):
                 self.ssp_x_spaces[i].train_decoder_net();
             self.init_samples = None
         else:
-            init_samples = []
-            for i in range(n_agents):
-                init_samples.append(self.ssp_x_spaces[i].get_sample_pts_and_ssps(2 ** 17, method='length-scale'))
-            self.init_samples = init_samples
+            if same_agt_x_space:
+                _init_samples = self.get_init_samples(self.ssp_x_spaces[0])
+                self.init_samples = [_init_samples] * n_agents
+            else:
+                self.init_samples = []
+                for i in range(n_agents):
+                    self.init_samples.append(self.get_init_samples(self.ssp_x_spaces[0]))
         self.decoder_method = decoder_method
 
     def length_scale(self):
@@ -133,22 +150,21 @@ class SSPMultiAgent(SSPAgent):
         for i in range(self.n_agents):
             Si = np.zeros((x.shape[0], self.ssp_dim))
             for j in range(self.traj_len):
-                #print(enc_x.shape)
-                #print(enc_x[:,i,j,:].shape)
-                #print(self.ssp_x_spaces[i].encode(enc_x[:,i,j,:]).shape)
-                Si += self.ssp_x_spaces[i].bind(timestep_ssps[j,:],
+                Si = Si + self.ssp_x_spaces[i].bind(timestep_ssps[j,:],
                                        self.ssp_x_spaces[i].encode(enc_x[:,i,j,:]))
-            S += self.ssp_x_spaces[i].bind(self.agent_sps[i,:], Si)
+            S = S + self.ssp_x_spaces[i].bind(self.agent_sps[i,:], Si)
         return S
     
         
     def decode(self,ssp,timestep_ssps=None):
         if timestep_ssps is None:
-            timestep_ssps=self.timestep_ssps
+            timestep_inv_ssps = self.timestep_inv_ssps
+        else:
+            timestep_inv_ssps = self.ssp_t_space.invert(timestep_ssps)
         decoded_traj = np.zeros((self.n_agents, self.traj_len,self.x_dim))
         for i in range(self.n_agents):
-            sspi = self.ssp_x_spaces[i].bind(self.ssp_x_spaces[i].invert(self.agent_sps[i,:]), ssp)
-            queries = self.ssp_x_spaces[i].bind(self.ssp_t_space.invert(timestep_ssps) , sspi)
+            sspi = self.ssp_x_spaces[i].bind(self.agent_inv_sps[i,:], ssp)
+            queries = self.ssp_x_spaces[i].bind(timestep_inv_ssps, sspi)
             decoded_traj[i,:,:] = self.ssp_x_spaces[i].decode(queries, 
                                                               method=self.decoder_method,
                                                               samples=self.init_samples[i])
