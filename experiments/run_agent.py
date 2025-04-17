@@ -81,7 +81,7 @@ class SamplingTrial(pytry.Trial):
 
         self.param('use nengo', nengo=False)
         self.param('nengo backend', backend='cpu')
-        self.param('num neurons', num_neurons=10)
+        self.param('num neurons', num_neurons=8)
         self.param('sim time', sim_time=2.5)
 
         self.param('use beta decay', decay=False)
@@ -193,22 +193,26 @@ if __name__=='__main__':
 
     parser.add_argument('--func', dest='function_name', type=str, default='himmelblau')
     parser.add_argument('--agent', dest='agent_type', type=str, default='ssp-hex')
+    parser.add_argument('--num-samples', dest='num_samples', type=int, default=200)
+    parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=10)
+    parser.add_argument('--gamma', dest='gamma', type=float, default=0.0)
+    parser.add_argument('--decay', action='store_true')
+
     parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=97)
     parser.add_argument('--n-scales', dest='n_scales', type=int, default=-1)
     parser.add_argument('--n-rotates', dest='n_rotates', type=int, default=-1)
     parser.add_argument('--len-scale', dest='len_scale', type=float, default=-1)
-    parser.add_argument('--num-samples', dest='num_samples', type=int, default=200)
-    parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=10)
-    parser.add_argument('--gamma', dest='gamma', type=float, default=0.0)
-    parser.add_argument('--num-trials', dest='num_trials', type=int, default=1)
+
+    parser.add_argument('--num-trials', dest='num_trials', type=int, default=10)
     parser.add_argument('--data-dir', dest='data_dir', type=str, default='data')
 
     parser.add_argument('--nengo', action='store_true')
-    parser.add_argument('--backend', dest='backend', type=str, default="cpu") # loihi-sim, loihi
-    parser.add_argument('--decay', action='store_true')
+    parser.add_argument('--backend', dest='backend', type=str, default="spinnaker") # loihi-sim, loihi
+    parser.add_argument('--num-neurons', dest='num_neurons', type=int, default=7) # 7 is max for spinnaker with d=97
+
     
     args = parser.parse_args()
-    # args.nengo = True
+    args.nengo = True
 
     # random.seed(1)
     seeds = [random.randint(1,100000) for _ in range(args.num_trials)]
@@ -237,6 +241,7 @@ if __name__=='__main__':
                   'backend':args.backend,
                   'n_scales':args.n_scales,
                   'n_rotates':args.n_rotates,
-                  'decay': args.decay
+                  'decay': args.decay,
+                  'num_neurons': args.num_neurons
                   }
         r = SamplingTrial().run(**params)
