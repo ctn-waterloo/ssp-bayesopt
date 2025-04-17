@@ -28,9 +28,9 @@ class SSPTrajectoryAgent(SSPAgent):
 
     def _set_ssp_space(self, x_dim, traj_len,
                        domain_bounds,
-                       decoder_method,
                        ssp_x_space=None, ssp_t_space=None,
-                       init_pos=None, **kwargs):
+                       init_pos=None, seed=0,
+                       **kwargs):
         self.data_dim = x_dim * traj_len
         self.x_dim = x_dim
         self.init_pos = None if init_pos is None else np.atleast_2d(init_pos)
@@ -40,11 +40,10 @@ class SSPTrajectoryAgent(SSPAgent):
                                       np.max(domain_bounds[:, 1]) * np.ones(x_dim)]).T
         if ssp_x_space is None:
             ssp_x_space = sspspace.HexagonalSSPSpace(x_dim, ssp_dim=kwargs.get('ssp_dim', 100),
-                                                     scale_min=0.1, scale_max=3,
-                                                     domain_bounds=domain_bounds, length_scale=1)
+                                                     domain_bounds=domain_bounds, length_scale=1, rng=seed)
         if ssp_t_space is None:
             ssp_t_space = sspspace.RandomSSPSpace(1, ssp_dim=ssp_x_space.ssp_dim,
-                                                  domain_bounds=np.array([[0, self.traj_len]]), length_scale=1)
+                                                  domain_bounds=np.array([[0, self.traj_len]]), length_scale=1, rng=seed)
         self.ssp_dim = ssp_x_space.ssp_dim
         self.ssp_x_space = ssp_x_space
         self.ssp_t_space = ssp_t_space
@@ -64,12 +63,11 @@ class SSPTrajectoryAgent(SSPAgent):
         self.timestep_ssps = self.ssp_t_space.encode(timesteps)
         self.timestep_inv_ssps = self.ssp_t_space.encode(-timesteps)
 
-        if (decoder_method == 'network') | (decoder_method == 'network-optim'):
+        if (self.decoder_method == 'network') | (self.decoder_method == 'network-optim'):
             self.ssp_x_space.train_decoder_net();
             self.init_samples = None
         else:
             self.init_samples = self.get_init_samples(self.ssp_x_space)
-        self.decoder_method = decoder_method
 
     def length_scale(self):
         return np.array([self.ssp_x_space.length_scale, self.ssp_t_space.length_scale])
