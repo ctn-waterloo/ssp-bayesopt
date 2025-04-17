@@ -213,11 +213,11 @@ if __name__ == '__main__':
     # rna_inverse_fold, decay, beta 100
     # ackley 501 dim, beta ~1
     parser.add_argument('--task-id', dest='task_id', type=str, default='pest')
-    parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=101)
+    parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=201)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=200)
     parser.add_argument('--num-init-samples', dest='num_init_samples', type=int, default=20)
     parser.add_argument('--beta-ucb', dest='beta_ucb', type=float,
-                        default=10.)  #10 # np.log(2/1e-6))#np.log(2/1e-6))#np.log(2/1e-6))
+                        default=1.)  #10 # np.log(2/1e-6))#np.log(2/1e-6))#np.log(2/1e-6))
     parser.add_argument('--gamma', dest='gamma', type=float, default=0.0)
     parser.add_argument('--len-scale', dest='len_scale', type=float, default=-1.0) # negative means optimize
     parser.add_argument('--data-dir', dest='data_dir', type=str, default='data')

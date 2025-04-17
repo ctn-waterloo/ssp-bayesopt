@@ -21,8 +21,9 @@ class SSPAgent(Agent):
         self.data_dim = data_dim
         self.init_xs = init_xs
         self.init_ys = init_ys
+        self.decoder_method = decoder_method
 
-        self._set_ssp_space(ssp_space=ssp_space, decoder_method=decoder_method,**kwargs)
+        self._set_ssp_space(ssp_space=ssp_space, **kwargs)
         # Encode the initial sample points
         init_phis = self.encode(init_xs)
 
@@ -38,12 +39,11 @@ class SSPAgent(Agent):
     ### end __init__
 
 
-    def _set_ssp_space(self, ssp_space, decoder_method, **kwargs):
+    def _set_ssp_space(self, ssp_space, seed=0, **kwargs):
         if ssp_space is None:
             ssp_space = sspspace.HexagonalSSPSpace(self.data_dim, ssp_dim=kwargs.get('ssp_dim', 100),
-                 scale_min=0.1, scale_max=3,
                  domain_bounds=kwargs.get('domain_bounds', None),
-                length_scale=kwargs.get('length_scale', 4))
+                length_scale=1, rng=seed)
 
         self.ssp_space = ssp_space
         self.ssp_dim = ssp_space.ssp_dim
@@ -56,12 +56,11 @@ class SSPAgent(Agent):
         ### end if
         print('Selected Lengthscale: ', ssp_space.length_scale)
 
-        if (decoder_method == 'network') | (decoder_method == 'network-optim'):
+        if (self.decoder_method == 'network') | (self.decoder_method == 'network-optim'):
             self.ssp_space.train_decoder_net();
             self.init_samples = None
         else:
             self.init_samples = self.get_init_samples(self.ssp_space)
-        self.decoder_method = decoder_method
 
     def length_scale(self):
         return self.ssp_space.length_scale
@@ -88,7 +87,7 @@ class SSPAgent(Agent):
 
     def get_init_samples(self, ssp_space):
         n_ls_method = [2 * int(np.ceil((b[1] - b[0]) / ssp_space.length_scale[b_idx])) for b_idx, b in enumerate(ssp_space.domain_bounds)]
-        if np.prod(n_ls_method)*ssp_space.ssp_dim > 1e7:
+        if (np.prod(n_ls_method)*ssp_space.ssp_dim > 1e7) or ('optim' not in self.decoder_method):
             samples = ssp_space.get_sample_pts_and_ssps(
                     np.min([100,int(np.ceil((1e7/ssp_space.ssp_dim)**(1/ssp_space.domain_dim)))]),
                 'grid')

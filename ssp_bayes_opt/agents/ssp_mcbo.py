@@ -22,8 +22,7 @@ class SSPMCBOAgent(SSPAgent):
     def _set_ssp_space(self,search_space,
                  ssp_dim=151,
                  length_scale=-1,
-                 decoder_method='direct-optim',
-                 conjunctive_w=0.1,**kwargs):
+                 conjunctive_w=0.1,seed=0,**kwargs):
 
         self.search_space = search_space
         self.param_names = np.array(list(search_space.params.keys()))
@@ -57,9 +56,8 @@ class SSPMCBOAgent(SSPAgent):
             # ls = 1.0#(self.domain_bounds[self.cont_idxs, 1] - self.domain_bounds[self.cont_idxs, 0])# / 10.
             self.spaces['cont'] = sspspace.HexagonalSSPSpace(self.n_cont,
                                                              ssp_dim=ssp_dim,
-                                                             scale_min=0.1, scale_max=3,
                                                              domain_bounds=domain_bounds[self.cont_idxs, :],
-                                                             length_scale=length_scale[self.cont_idxs].reshape(-1, 1))
+                                                             length_scale=length_scale[self.cont_idxs].reshape(-1, 1), rng=seed)
             ssp_dim = self.spaces['cont'].ssp_dim
 
         if search_space.disc_names:  # discrete params (integers, not categories)
@@ -69,7 +67,7 @@ class SSPMCBOAgent(SSPAgent):
             self.spaces['disc'] = sspspace.RandomSSPSpace(self.n_disc,
                                                           ssp_dim=ssp_dim,
                                                           domain_bounds=domain_bounds[self.disc_idxs, :],
-                                                          length_scale=length_scale[self.disc_idxs].reshape(-1, 1))
+                                                          length_scale=length_scale[self.disc_idxs].reshape(-1, 1), rng=seed)
 
         if search_space.nominal_names:  # unordered categories
             self.nominal_idxs = np.array(
@@ -78,7 +76,7 @@ class SSPMCBOAgent(SSPAgent):
             self.spaces['nominal_filler'] = defaultdict(None)
             self.nominal_names = search_space.nominal_names
             for i, p in enumerate(search_space.nominal_names):
-                self.spaces['nominal_filler'][p] = sspspace.SPSpace(search_space.params[p].num_uniqs, dim=ssp_dim)
+                self.spaces['nominal_filler'][p] = sspspace.SPSpace(search_space.params[p].num_uniqs, dim=ssp_dim, rng=seed)
 
         if search_space.ordinal_names:  # ordered categories
             self.ordinal_idxs = np.array(
@@ -87,13 +85,13 @@ class SSPMCBOAgent(SSPAgent):
             self.spaces['ordinal_filler'] = defaultdict(None)
             self.ordinal_names = search_space.ordinal_names
             for i, p in enumerate(search_space.ordinal_names):
-                self.spaces['ordinal_filler'][p] = sspspace.SPSpace(search_space.params[p].num_uniqs, dim=ssp_dim)
+                self.spaces['ordinal_filler'][p] = sspspace.SPSpace(search_space.params[p].num_uniqs, dim=ssp_dim, rng=seed)
 
         if search_space.perm_names:  # permutations
             raise NotImplementedError
 
-        self.spaces['slots'] = sspspace.SPSpace(4, dim=ssp_dim)
-        self.identity = self.spaces['slots'].identity()[None, :]
+        self.spaces['slots'] = sspspace.SPSpace(4, dim=ssp_dim, rng=seed)
+        self.identity = self.spaces['slots'].identity()
         self.bind = self.spaces['slots'].bind
         self.ssp_dim = ssp_dim
 
@@ -110,7 +108,7 @@ class SSPMCBOAgent(SSPAgent):
 
         self.init_samples = defaultdict(None)
         if self.n_cont > 0:
-            if (decoder_method == 'network') | (decoder_method == 'network-optim'):
+            if (self.decoder_method == 'network') | (self.decoder_method == 'network-optim'):
                 self.spaces['cont'].train_decoder_net();
             else:
                 self.init_samples['cont'] = self.get_init_samples(self.spaces['cont'])
@@ -121,7 +119,6 @@ class SSPMCBOAgent(SSPAgent):
             int_pts = np.vstack(np.meshgrid(*_int_list)).T
             int_ssps = self.spaces['disc'].encode(int_pts)
             self.init_samples['disc'] = (int_ssps, int_pts)
-        self.decoder_method = decoder_method
 
     def length_scale(self):
         return self.length_scales

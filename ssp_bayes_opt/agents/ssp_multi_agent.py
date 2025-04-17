@@ -15,7 +15,6 @@ class SSPMultiAgent(SSPAgent):
     def _set_ssp_space(self, n_agents,
                        x_dim, traj_len,
                        domain_bounds,
-                       decoder_method,
                        ssp_x_spaces=None, ssp_t_space=None,
                        seed=0,
                        init_pos=None,
@@ -31,22 +30,26 @@ class SSPMultiAgent(SSPAgent):
         if ssp_x_spaces is None:
             if same_agt_x_space:
                 ssp_x_space = sspspace.HexagonalSSPSpace(x_dim, ssp_dim=kwargs.get('ssp_dim', 100),
-                                                                   scale_min=0.1, scale_max=3,
                                                                    domain_bounds=domain_bounds[:x_dim, :],
-                                                                   length_scale=1)
+                                                                   length_scale=1, rng=seed)
                 ssp_x_spaces = [ssp_x_space] * n_agents
 
             else:
                 ssp_x_spaces=[]
                 for i in range(n_agents):
-                    ssp_x_spaces.append( sspspace.HexagonalSSPSpace(x_dim,ssp_dim=kwargs.get('ssp_dim', 100),
-                                                                    scale_min=0.1, scale_max=3,
-                                                                    domain_bounds=domain_bounds[i*x_dim:(i+1)*x_dim,:],
-                                                                    length_scale=1))
+                    # ssp_x_spaces.append( sspspace.HexagonalSSPSpace(x_dim,ssp_dim=kwargs.get('ssp_dim', 100),
+                    #                                                 scale_min=0.1, scale_max=3,
+                    #                                                 domain_bounds=domain_bounds[i*x_dim:(i+1)*x_dim,:],
+                    #                                                 length_scale=1,  rng=seed+i))
+                    ssp_x_spaces.append(sspspace.RandomSSPSpace(x_dim, ssp_dim=kwargs.get('ssp_dim', 100),
+                                                                   domain_bounds=domain_bounds[
+                                                                                 i * x_dim:(i + 1) * x_dim, :],
+                                                                   length_scale=1, rng=seed+i))
 
         if ssp_t_space is None:
             ssp_t_space = sspspace.RandomSSPSpace(1, ssp_dim=ssp_x_spaces[0].ssp_dim,
-                                                  domain_bounds=np.array([[0, self.traj_len+1]]), length_scale=1)
+                                                  domain_bounds=np.array([[0, self.traj_len+1]]),
+                                                  length_scale=1, rng=seed+n_agents)
         self.ssp_dim = ssp_x_spaces[0].ssp_dim
         self.ssp_x_spaces = ssp_x_spaces
         self.ssp_t_space = ssp_t_space
@@ -72,7 +75,7 @@ class SSPMultiAgent(SSPAgent):
         self.timestep_ssps = self.ssp_t_space.encode(timesteps)
         self.timestep_inv_ssps = self.ssp_t_space.encode(-timesteps)
 
-        if (decoder_method == 'network') | (decoder_method == 'network-optim'):
+        if (self.decoder_method == 'network') | (self.decoder_method == 'network-optim'):
             for i in range(n_agents):
                 self.ssp_x_spaces[i].train_decoder_net();
             self.init_samples = None
@@ -83,8 +86,7 @@ class SSPMultiAgent(SSPAgent):
             else:
                 self.init_samples = []
                 for i in range(n_agents):
-                    self.init_samples.append(self.get_init_samples(self.ssp_x_spaces[0]))
-        self.decoder_method = decoder_method
+                    self.init_samples.append(self.get_init_samples(self.ssp_x_spaces[i]))
 
     def length_scale(self):
         return np.array([space.length_scale for space in self.ssp_x_spaces] + [self.ssp_t_space.length_scale])
@@ -144,16 +146,18 @@ class SSPMultiAgent(SSPAgent):
         if timestep_ssps is None:
             timestep_ssps=self.timestep_ssps
         enc_x = np.atleast_2d(x)
-        S = np.zeros((x.shape[0], self.ssp_dim))
-        
+        S = np.zeros((enc_x.shape[0], self.ssp_dim))
+        S2 = np.zeros((enc_x.shape[0], self.ssp_dim))
         enc_x = enc_x.reshape(-1,self.n_agents,self.traj_len,self.x_dim)
         for i in range(self.n_agents):
-            Si = np.zeros((x.shape[0], self.ssp_dim))
+            Si = np.zeros((enc_x.shape[0], self.ssp_dim))
             for j in range(self.traj_len):
+                # S2 = S2 + self.ssp_x_spaces[i].encode(enc_x[:,i,j,:])
                 Si = Si + self.ssp_x_spaces[i].bind(timestep_ssps[j,:],
                                        self.ssp_x_spaces[i].encode(enc_x[:,i,j,:]))
             S = S + self.ssp_x_spaces[i].bind(self.agent_sps[i,:], Si)
-        return S
+        # S = S + 0.1*S2
+        return S/np.linalg.norm(S, axis=-1, keepdims=True)
     
         
     def decode(self,ssp,timestep_ssps=None):
@@ -161,14 +165,12 @@ class SSPMultiAgent(SSPAgent):
             timestep_inv_ssps = self.timestep_inv_ssps
         else:
             timestep_inv_ssps = self.ssp_t_space.invert(timestep_ssps)
-        decoded_traj = np.zeros((self.n_agents, self.traj_len,self.x_dim))
+        ssp = ssp/np.linalg.norm(ssp, axis=-1, keepdims=True)
+        decoded_traj = np.zeros((self.n_agents, self.traj_len, self.x_dim))
         for i in range(self.n_agents):
             sspi = self.ssp_x_spaces[i].bind(self.agent_inv_sps[i,:], ssp)
             queries = self.ssp_x_spaces[i].bind(timestep_inv_ssps, sspi)
-            decoded_traj[i,:,:] = self.ssp_x_spaces[i].decode(queries, 
+            decoded_traj[i,:,:] = self.ssp_x_spaces[i].decode(queries,
                                                               method=self.decoder_method,
                                                               samples=self.init_samples[i])
-            # for j in range(self.traj_len):
-            #     query = self.ssp_x_spaces[i].bind(self.ssp_t_space.invert(self.timestep_ssps[j,:]) , sspi)
-            #     decoded_traj[i,j,:] = self.ssp_x_spaces[i].decode(query, method=self.decoder_method,samples=self.init_samples[i])
         return decoded_traj.reshape(-1)

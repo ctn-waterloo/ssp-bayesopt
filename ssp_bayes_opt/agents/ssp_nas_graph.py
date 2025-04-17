@@ -40,7 +40,7 @@ class SSPNASGraphAgent(SSPAgent):
         # self.ssp_dim = self.sp_space.dim
 
         self.sp_space = sspspace.SPSpace(self.max_layers*2 + self.num_ops + 3,
-                                         dim=ssp_dim, seed=seed)
+                                         dim=ssp_dim, rng=seed)
         self.head_layer_sps = self.sp_space.vectors[:self.max_layers]
         self.tail_layer_sps = self.sp_space.vectors[self.max_layers:2*self.max_layers]
         self.inverse_head_layer_sps = self.sp_space.inverse_vectors[:self.max_layers]

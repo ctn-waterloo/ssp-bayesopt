@@ -81,7 +81,7 @@ class SamplingTrial(pytry.Trial):
 
         self.param('use nengo', nengo=False)
         self.param('nengo backend', backend='cpu')
-        self.param('num neurons', num_neurons=8)
+        self.param('num neurons', num_neurons=10)
         self.param('sim time', sim_time=2.5)
 
         self.param('use beta decay', decay=False)
@@ -208,7 +208,7 @@ if __name__=='__main__':
     parser.add_argument('--decay', action='store_true')
     
     args = parser.parse_args()
-    #args.nengo = True
+    # args.nengo = True
 
     # random.seed(1)
     seeds = [random.randint(1,100000) for _ in range(args.num_trials)]
