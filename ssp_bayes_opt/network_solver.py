@@ -66,7 +66,7 @@ def make_network(bo_soln_init, m, sigma, beta_inv, gamma_t,
             # Copy the output so that the above is collapsed as a passthrough
             solution_probe = nengo.Probe(solution_neurons.add_output(dt=dt)[0], synapse=tau_probe)
 
-    return model, solution_probe
+    return model, solution_probe, stim
 
 if __name__ == '__main__':
 

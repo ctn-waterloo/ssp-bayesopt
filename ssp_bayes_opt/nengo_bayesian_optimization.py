@@ -150,7 +150,7 @@ class NengoBayesianOptimization(BayesianOptimization):
             else: ## ssp agent
                 phi_init = agt.initial_guess()
                 start = time.thread_time_ns()
-                solver_net, soln_probe = network_solver.make_network(
+                solver_net, soln_probe, stim_node = network_solver.make_network(
                     bo_soln_init=phi_init.flatten(),
                     m= agt.blr.m.flatten(),
                     sigma=agt.blr.S,
@@ -163,6 +163,10 @@ class NengoBayesianOptimization(BayesianOptimization):
                     neuron_type=neuron_type,
                     rate=kwargs.get('rate',1.)
                 )
+                if 'spinnaker' in sim_type.__module__:
+                    import nengo_spinnaker
+                    nengo_spinnaker.add_spinnaker_params(solver_net.config)
+                    solver_net.config[stim_node].function_of_time = True
                 sim = sim_type(solver_net, **sim_args)
                 with sim:
                     sim.run(sim_time)
