@@ -249,6 +249,7 @@ class BayesianOptimization:
     def maximize(self, init_points: int =10, n_iter: int =100,
                  num_restarts: int = 5, agent_type='ssp-hex',
                  save_memory=True,
+                 use_ssp_jac=True,
                  **kwargs):
 
         '''
@@ -356,8 +357,9 @@ class BayesianOptimization:
 #                     phi_init = np.copy(best_phi[restart_idx,:])
                     phi_init = agt.initial_guess()
                     start = time.thread_time_ns()
-                    soln = minimize(optim_func, phi_init.flatten(),# jac=jac_func,
-                                    method='L-BFGS-B')
+                    soln = minimize(optim_func, phi_init.flatten(),
+                                    jac=jac_func if use_ssp_jac else None,
+                                    method='L-BFGS-B',)
                     if hasattr(time, 'thread_time_ns'):
                         self.times[t] = time.thread_time_ns() - start
                     # TODO: move this outside the num_restarts loop

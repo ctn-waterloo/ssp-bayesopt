@@ -182,7 +182,7 @@ class SamplingTrial(pytry.Trial):
             mus=None,
             variances=None,
             acquisition=None,
-            total_time = optimizer.total_time,
+            total_time=optimizer.total_time,
             params=p
         )
 
@@ -192,9 +192,9 @@ if __name__=='__main__':
     parser = ArgumentParser()
 
     parser.add_argument('--func', dest='function_name', type=str, default='himmelblau')
-    parser.add_argument('--agent', dest='agent_type', type=str, default='ssp-hex')
+    parser.add_argument('--agent', dest='agent_type', type=str, default='rff')
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=200)
-    parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=10)
+    parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=1)
     parser.add_argument('--gamma', dest='gamma', type=float, default=0.0)
     parser.add_argument('--decay', action='store_true')
 
