@@ -249,7 +249,7 @@ class BayesianOptimization:
     def maximize(self, init_points: int =10, n_iter: int =100,
                  num_restarts: int = 5, agent_type='ssp-hex',
                  save_memory=True,
-                 use_ssp_jac=True,
+                 use_jac=True,
                  **kwargs):
 
         '''
@@ -344,7 +344,7 @@ class BayesianOptimization:
                     x_init = np.random.uniform(low=lbounds, high=ubounds, size=(len(ubounds),))
                     # Do bounded optimization to ensure x stays in bound
                     soln = minimize(optim_func, x_init,
-                                    jac=jac_func, 
+                                    jac=jac_func if use_jac else None,
                                     method='L-BFGS-B',
                                     bounds=self.bounds)
                     self.times[t] = time.thread_time_ns() - start
@@ -358,7 +358,7 @@ class BayesianOptimization:
                     phi_init = agt.initial_guess()
                     start = time.thread_time_ns()
                     soln = minimize(optim_func, phi_init.flatten(),
-                                    jac=jac_func if use_ssp_jac else None,
+                                    jac=jac_func if use_jac else None,
                                     method='L-BFGS-B',)
                     if hasattr(time, 'thread_time_ns'):
                         self.times[t] = time.thread_time_ns() - start

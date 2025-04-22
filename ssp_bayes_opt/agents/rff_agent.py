@@ -10,7 +10,7 @@ from .agent import Agent
 class RFFAgent(Agent):
     def __init__(self, init_xs, init_ys,
                  ssp_dim,
-                 kernel_type='matern',
+                 kernel_type='rbf',
                  gamma_c=1.0,
                  beta_ucb=np.log(2/1e-6),
                  var_decay=0.,
@@ -48,6 +48,7 @@ class RFFAgent(Agent):
         fit_gp.fit(self.init_xs, self.init_ys)
         lengthscales = fit_gp.kernel_.k2.length_scale
         scaling = fit_gp.kernel_.k1.constant_value
+        print('Selected Lengthscale: ', lengthscales)
 
 
         #From https://github.com/michaelosthege/pyrff/blob/8f5c3b57f5a74a449a55c01e3b2f214792f8a6ea/pyrff/rff.py
