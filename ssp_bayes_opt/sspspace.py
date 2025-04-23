@@ -763,8 +763,7 @@ class HexagonalSSPSpace(SSPSpace):
         self.n_scales = n_scales
         self.n_rotates = n_rotates
 
-        if domain_dim == 1:
-            n_scales = n_scales * n_rotates
+
         irrational_base = (1 + np.sqrt(5)) / 2
         if domain_dim == 1:
             n_scales = n_scales * n_rotates
