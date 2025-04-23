@@ -755,7 +755,7 @@ class HexagonalSSPSpace(SSPSpace):
         phases_hex = np.hstack([np.sqrt(1 + 1 / domain_dim) * np.identity(domain_dim) - (domain_dim ** (-3 / 2)) * (
                     np.sqrt(domain_dim + 1) + 1),
                     (domain_dim ** (-1 / 2)) * np.ones((domain_dim, 1))]).T
-        self.phases_hex = phases_hex
+        # self.phases_hex = phases_hex
         self.grid_basis_dim = domain_dim + 1  # number of simplex vertices
         self.num_grids = n_rotates * n_scales
         self.scale_min = scale_min
@@ -794,8 +794,8 @@ class HexagonalSSPSpace(SSPSpace):
             R_mats = special_ortho_group.rvs(domain_dim, size=n_rotates, random_state=self.rng)
             phases_scaled_rotated = (R_mats @ phases_scaled.T).transpose(0, 2, 1).reshape(-1, domain_dim)
 
-        self.scales = scales
-        self.rot_mats = R_mats
+        # self.scales = scales
+        # self.rot_mats = R_mats
         phase_matrix = conjsym(phases_scaled_rotated)
         ssp_dim = phase_matrix.shape[0]
 

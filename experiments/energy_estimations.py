@@ -12,7 +12,7 @@ import numpy as np
 import nengo
 from run_agent import get_args, neuron_types, sim_types
 import functions
-
+import pandas as pd
 import ssp_bayes_opt
 
 import importlib
@@ -35,7 +35,7 @@ DEVICES = {
 
     # https://www.researchgate.net/publication/322548911_Loihi_A_Neuromorphic_Manycore_Processor_with_On-Chip_Learning
     # 'loihi': dict(spiking=True, energy_per_synop=(23.6 + 3.5) * 1e-12, energy_per_neuron=81e-12), # why 3.5? that's the time per spike???
-    'loihi': dict(spiking=True, energy_per_synop=23.6 * 1e-12, energy_per_neuron=81e-12),
+    'loihi1': dict(spiking=True, energy_per_synop=23.6 * 1e-12, energy_per_neuron=81e-12),
     # why 3.5? that's the time per spike???
 
     # https://arxiv.org/abs/1903.08941
@@ -110,6 +110,7 @@ def energy_estimation(model,
     if spiking_model:
         # -- In spiking model the neuron energy must be multiplied by the number of timesteps
         neuron_energy *= n_timesteps
+        ## Not currently using this, though it should be more accurate because I'm not 100% sore what active/inactive #s meant and don't have those for the other backends
         for ens in all_ensembles:
             probe = all_probes[np.where([ens == p.target.ensemble for p in all_probes if
                                          (p.target.__module__ == 'nengo.ensemble') and (p.attr == 'output')])[0][0]]
@@ -199,7 +200,7 @@ if __name__ == '__main__':
     args.num_neurons = 8 # 7
     sim_time = 2.5
     target, pbounds, _ = functions.factory(args.function_name)
-    budget = 10 # don't need to fully run it, just want reasonable mu and Sigma
+    budget = 50 # don't need to fully run it, just want reasonable mu and Sigma
     init_points = 10
     tau = 0.05
     neuron_type = neuron_types['lif']
@@ -253,12 +254,18 @@ if __name__ == '__main__':
     # --- Get the energy usage
     snn_synop_energy_dict, snn_neuron_energy_dict, snn_total_energy_dict = energy_estimation(solver_net,
                                                                   sim, spiking_model = True,
-                                                                  device_list=['loihi', 'spinnaker'],
+                                                                  device_list=['loihi1', 'spinnaker'],
                                                                   verbose=True)
     nn_synop_energy_dict, nn_neuron_energy_dict, nn_total_energy_dict = energy_estimation(solver_net,
                                                                                              sim, spiking_model=False,
                                                                                              device_list=['cpu',
                                                                                                           'gpu'],
                                                                                              verbose=True)
-
+    nn_synop_energy_dict.update(snn_synop_energy_dict)
+    nn_neuron_energy_dict.update(snn_neuron_energy_dict)
+    nn_total_energy_dict.update(snn_total_energy_dict)
+    data_dict = {'Synop energy (J)': nn_synop_energy_dict,
+                'Neuron energy (J)': nn_neuron_energy_dict,
+                'Total energy (J)': nn_total_energy_dict}
+    df = pd.concat({k: pd.DataFrame.from_dict(v, 'index') for k, v in data_dict.items()}, axis=0)
 
