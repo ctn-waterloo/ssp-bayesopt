@@ -108,6 +108,7 @@ class NengoBayesianOptimization(BayesianOptimization):
             self.xs = np.zeros((n_iter + init_points, init_xs.shape[1]))
             self.ys = np.zeros((n_iter + init_points,))
             self.times = np.zeros((n_iter,))
+            self.sim_times = np.zeros((n_iter,))
             self.full_times = np.zeros((n_iter,))
             for row_idx, (x,y) in enumerate(zip(init_xs, init_ys)):
                 self.xs[row_idx] = x
@@ -168,8 +169,12 @@ class NengoBayesianOptimization(BayesianOptimization):
                     nengo_spinnaker.add_spinnaker_params(solver_net.config)
                     solver_net.config[stim_node].function_of_time = True
                 sim = sim_type(solver_net, **sim_args)
+                if hasattr(time, 'thread_time_ns'):
+                    start2 = time.thread_time_ns()
                 with sim:
                     sim.run(sim_time)
+                if hasattr(time, 'thread_time_ns'):
+                    self.sim_times[t] = time.thread_time_ns() - start2
 
                 if hasattr(time, 'thread_time_ns'):
                     self.times[t] = time.thread_time_ns() - start
