@@ -47,8 +47,8 @@ neuron_types = {
 
 #'progress_bar':False
 sim_types = {
-    'cpu': (nengo.Simulator, {}),#'gpu': (nengo_ocl.Simulator, {'progress_bar':False}),
-    'loihi-sim': (loihi_sim, {'target':'sim'}),
+    'cpu': (nengo.Simulator, {'progress_bar':False}),#'gpu': (nengo_ocl.Simulator, {'progress_bar':False}),
+    'loihi-sim': (loihi_sim, {'target':'sim','progress_bar':False}),
     'loihi': (loihi_sim,
                {'target':'loihi','precompute':True,
                  'hardware_options':{
@@ -127,6 +127,7 @@ class SamplingTrial(pytry.Trial):
                                partitions=None
                                )
             elapsed_time = time.thread_time_ns() - start
+            sim_times = optimizer.sim_times
         else:
             optimizer = ssp_bayes_opt.BayesianOptimization(f=target,
                                                        bounds=pbounds, 
@@ -149,6 +150,7 @@ class SamplingTrial(pytry.Trial):
                                var_decay=var_decay
                                )
             elapsed_time = time.thread_time_ns() - start
+            sim_times = None
         
 
         vals = np.zeros((p.num_init_samples + budget,))
@@ -176,6 +178,7 @@ class SamplingTrial(pytry.Trial):
             elapsed_time=elapsed_time,
             times = optimizer.times,#selected_len_scale = optimizer.length_scale,
             full_times= optimizer.full_times,
+            sim_times=sim_times,
             memory = optimizer.memory,
             budget=budget,
             vals=vals,
@@ -192,7 +195,7 @@ if __name__=='__main__':
     parser = ArgumentParser()
 
     parser.add_argument('--func', dest='function_name', type=str, default='himmelblau')
-    parser.add_argument('--agent', dest='agent_type', type=str, default='rff')
+    parser.add_argument('--agent', dest='agent_type', type=str, default='ssp-hex')
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=200)
     parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=1)
     parser.add_argument('--gamma', dest='gamma', type=float, default=0.0)
@@ -207,7 +210,7 @@ if __name__=='__main__':
     parser.add_argument('--data-dir', dest='data_dir', type=str, default='data')
 
     parser.add_argument('--nengo', action='store_true')
-    parser.add_argument('--backend', dest='backend', type=str, default="spinnaker") # loihi-sim, loihi
+    parser.add_argument('--backend', dest='backend', type=str, default="cpu") # loihi-sim, loihi
     parser.add_argument('--num-neurons', dest='num_neurons', type=int, default=7) # 7 is max for spinnaker with d=97
 
     
