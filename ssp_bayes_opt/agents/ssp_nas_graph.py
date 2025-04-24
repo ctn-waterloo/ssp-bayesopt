@@ -26,33 +26,33 @@ class SSPNASGraphAgent(SSPAgent):
         # self.fixed_ops = ['input', 'output']
 
 
-        # self.sp_space = sspspace.SPSpace(self.max_layers + self.num_ops + 3,
-        #                                  dim=ssp_dim, seed=seed)
-        # self.layer_sps = self.sp_space.vectors[:self.max_layers]
-        # self.inverse_layer_sps = self.sp_space.inverse_vectors[:self.max_layers]
-        # self.ops_sps = self.sp_space.vectors[self.max_layers:self.max_layers + self.num_ops]
-        # self.inverse_ops_sps = self.sp_space.inverse_vectors[self.max_layers:self.max_layers + self.num_ops]
-        # self.op_slot_sp = self.sp_space.vectors[self.max_layers + self.num_ops].reshape(1, -1)
-        # self.inverse_op_slot_sp = self.sp_space.inverse_vectors[self.max_layers + self.num_ops].reshape(1, -1)
-        # self.target_slot_sp = self.sp_space.vectors[self.max_layers + self.num_ops + 1].reshape(1, -1)
-        # self.inverse_target_slot_sp = self.sp_space.inverse_vectors[self.max_layers + self.num_ops + 1].reshape(1, -1)
-        # self.other_sp = self.sp_space.vectors[self.max_layers + self.num_ops + 2].reshape(1, -1)
-        # self.ssp_dim = self.sp_space.dim
-
-        self.sp_space = sspspace.SPSpace(self.max_layers*2 + self.num_ops + 3,
-                                         dim=ssp_dim, rng=seed)
-        self.head_layer_sps = self.sp_space.vectors[:self.max_layers]
-        self.tail_layer_sps = self.sp_space.vectors[self.max_layers:2*self.max_layers]
-        self.inverse_head_layer_sps = self.sp_space.inverse_vectors[:self.max_layers]
-        self.inverse_tail_layer_sps = self.sp_space.inverse_vectors[self.max_layers:2*self.max_layers]
-        self.ops_sps = self.sp_space.vectors[2*self.max_layers:2*self.max_layers + self.num_ops]
-        self.inverse_ops_sps = self.sp_space.inverse_vectors[2*self.max_layers:2*self.max_layers + self.num_ops]
-        self.op_slot_sp = self.sp_space.vectors[2*self.max_layers + self.num_ops].reshape(1, -1)
-        self.inverse_op_slot_sp = self.sp_space.inverse_vectors[2*self.max_layers + self.num_ops].reshape(1, -1)
-        self.target_slot_sp = self.sp_space.vectors[2*self.max_layers + self.num_ops + 1].reshape(1, -1)
-        self.inverse_target_slot_sp = self.sp_space.inverse_vectors[2*self.max_layers + self.num_ops + 1].reshape(1, -1)
-        self.other_sp = self.sp_space.vectors[2*self.max_layers + self.num_ops + 2].reshape(1, -1)
+        self.sp_space = sspspace.SPSpace(self.max_layers + self.num_ops + 3,
+                                         dim=ssp_dim, seed=seed)
+        self.layer_sps = self.sp_space.vectors[:self.max_layers]
+        self.inverse_layer_sps = self.sp_space.inverse_vectors[:self.max_layers]
+        self.ops_sps = self.sp_space.vectors[self.max_layers:self.max_layers + self.num_ops]
+        self.inverse_ops_sps = self.sp_space.inverse_vectors[self.max_layers:self.max_layers + self.num_ops]
+        self.op_slot_sp = self.sp_space.vectors[self.max_layers + self.num_ops].reshape(1, -1)
+        self.inverse_op_slot_sp = self.sp_space.inverse_vectors[self.max_layers + self.num_ops].reshape(1, -1)
+        self.target_slot_sp = self.sp_space.vectors[self.max_layers + self.num_ops + 1].reshape(1, -1)
+        self.inverse_target_slot_sp = self.sp_space.inverse_vectors[self.max_layers + self.num_ops + 1].reshape(1, -1)
+        self.other_sp = self.sp_space.vectors[self.max_layers + self.num_ops + 2].reshape(1, -1)
         self.ssp_dim = self.sp_space.dim
+
+        # self.sp_space = sspspace.SPSpace(self.max_layers*2 + self.num_ops + 3,
+        #                                  dim=ssp_dim, rng=seed)
+        # self.head_layer_sps = self.sp_space.vectors[:self.max_layers]
+        # self.tail_layer_sps = self.sp_space.vectors[self.max_layers:2*self.max_layers]
+        # self.inverse_head_layer_sps = self.sp_space.inverse_vectors[:self.max_layers]
+        # self.inverse_tail_layer_sps = self.sp_space.inverse_vectors[self.max_layers:2*self.max_layers]
+        # self.ops_sps = self.sp_space.vectors[2*self.max_layers:2*self.max_layers + self.num_ops]
+        # self.inverse_ops_sps = self.sp_space.inverse_vectors[2*self.max_layers:2*self.max_layers + self.num_ops]
+        # self.op_slot_sp = self.sp_space.vectors[2*self.max_layers + self.num_ops].reshape(1, -1)
+        # self.inverse_op_slot_sp = self.sp_space.inverse_vectors[2*self.max_layers + self.num_ops].reshape(1, -1)
+        # self.target_slot_sp = self.sp_space.vectors[2*self.max_layers + self.num_ops + 1].reshape(1, -1)
+        # self.inverse_target_slot_sp = self.sp_space.inverse_vectors[2*self.max_layers + self.num_ops + 1].reshape(1, -1)
+        # self.other_sp = self.sp_space.vectors[2*self.max_layers + self.num_ops + 2].reshape(1, -1)
+        # self.ssp_dim = self.sp_space.dim
 
         self.identity = self.sp_space.identity()[None, :]
     
@@ -92,18 +92,16 @@ class SSPNASGraphAgent(SSPAgent):
                     target_bundle = target_bundle/np.linalg.norm(target_bundle)
                     _S += self.sp_space.bind(self.target_slot_sp, target_bundle)
                 _S = self.sp_space.bind(self.layer_sps[i][None, :], _S).flatten()
-
-
-                S[n, :] += _S
+                S[n, :] = S[n,:] + _S
                 # S2 = self.sp_space.bind(S2, self.layer_sps[i][None, :],
                 #                         target_bundle)#, self.ops_sps[op_i][None, :])
-                # S2 = self.sp_space.bind(S2, _S)
+                S2 = self.sp_space.bind(S2, _S)
 
             #     if np.sum(layer_i) > 0:
             #         S2 += self.sp_space.bind(self.sp_space.bind(self.layer_sps[i][None, :],
             #                                                                   self.ops_sps[op_i][None, :]),
             #                                                target_bundle)
-            # # S[n, :] += 0.1 * S2.flatten()
+            S[n, :] += 0.1 * S2.flatten()
             # S[n, :] += 0.1 * self.sp_space.bind(self.other_sp, S2).flatten()
 
                 # S2 = self.sp_space.bind(S2, S[n, :])

@@ -13,6 +13,10 @@ from . import sspspace
 from scipy.optimize import minimize, Bounds
 from typing import Callable
 
+# from pymanopt import Problem
+# from pymanopt.manifolds import Sphere
+# from pymanopt.optimizers import SteepestDescent
+
 try:
     from guppy import hpy
 except ImportError:
@@ -349,23 +353,30 @@ class BayesianOptimization:
                                     bounds=self.bounds)
                     self.times[t] = time.thread_time_ns() - start
                     solnx = np.copy(soln.x)
+                    solnfun = soln.fun
                 elif agent_type=='disc-domain':
                     soln = agt.sample()
                     self.times[t] = time.thread_time_ns() - start
                     solnx = np.copy(soln.x)
+                    solnfun=soln.fun
                 else: ## ssp agent
-#                     phi_init = np.copy(best_phi[restart_idx,:])
                     phi_init = agt.initial_guess()
                     start = time.thread_time_ns()
                     soln = minimize(optim_func, phi_init.flatten(),
                                     jac=jac_func if use_jac else None,
                                     method='L-BFGS-B',)
-                    if hasattr(time, 'thread_time_ns'):
+                    solnx = soln.x
+                    solnfun = soln.fun
+                    # optim_problem = Problem(manifold=Sphere(agt.ssp_dim), cost=optim_func, euclidean_gradient=jac_func if use_jac else None)
+                    # solver = SteepestDescent(verbosity=0)
+                    # soln = solver.run(optim_problem, initial_point=phi_init.flatten())
+                    # solnx = soln.point
+                    # solnfun = soln.cost[0]
+                if hasattr(time, 'thread_time_ns'):
                         self.times[t] = time.thread_time_ns() - start
-                    # TODO: move this outside the num_restarts loop
-                    solnx = agt.decode(np.copy(np.atleast_2d(soln.x)))
+                solnx = agt.decode(np.copy(np.atleast_2d(solnx)))
 
-                vals[restart_idx] = -soln.fun
+                vals[restart_idx] = -solnfun
                 solns[restart_idx] = solnx
 #             if hasattr(time, 'thread_time_ns'):
 #                 self.times[t] = time.thread_time_ns() - start

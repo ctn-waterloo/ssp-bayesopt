@@ -174,17 +174,28 @@ function_maximum_value = {
 
 # folder = os.path.abspath(os.path.join(os.getcwd(), os.pardir)) + '/data/test-funcs/'
 funcs = ["himmelblau" , "branin-hoo", "goldstein-price",]
-#
-folders = [os.path.join(os.getcwd(), "data/new_ucb_beta0.1")]
-# agts=[ "ssp-hex","ssp-rand" ,"gp-sinc", "gp-matern"]
-# labels=['SSP-BO-Hex','SSP-BO-Rand','GP-MI-sinc', 'GP-MI-Matern']
-# folder = '/run/media/furlong/Data/ssp-bayesopt/memory-test/'
-agts=[ "ssp-hex","ssp-rand" ,"gp-sinc", "gp-matern", "rff"]#,
-    # "ssp-hex_nengo-loihi-sim"]
-     #  ]
-labels=['SSP-BO-Hex','SSP-BO-Rand','GP-sinc', 'GP-Matern', 'RFF-BO', 'SSP-BO-Hex (Loihi)']
-cols = [utils.blues[0], utils.oranges[0], utils.greens[0],  utils.reds[0], utils.blues[2]]
-linestys = ['-','--',':','-.', (0, (3, 1, 1, 1, 1, 1))]
+folders = [os.path.join(os.getcwd(), "data3")]
+agts = ["ssp-hex","ssp-rand" , "gp-sinc", "gp-matern", "rff"]
+    # "ssp-hex_nengo-loihi-sim", "ssp-hex_nengo-spinnaker"
+labels ={"ssp-hex": 'SSP-BO-Hex', "ssp-rand" : 'SSP-BO-Rand',
+         "gp-sinc": 'GP (sinc)', "gp-matern": 'GP (Mat\'ern)',
+         "rff": 'RFF-BO',
+         "ssp-hex_nengo-loihi-sim": "SSP-BO-Hex (Loihi 1$^*$)",
+         "ssp-hex_nengo-spinnaker": "SSP-BO-Hex (Spinnaker)",
+         "ssp-hex_nengo-loihi": "SSP-BO-Hex (Loihi 2)"}
+cols ={"ssp-hex": utils.blues[0], "ssp-rand" : utils.oranges[0],
+         "gp-sinc": utils.greens[0], "gp-matern": utils.reds[0],
+         "rff": utils.yellows[2],
+         "ssp-hex_nengo-loihi-sim": utils.blues[1],
+         "ssp-hex_nengo-spinnaker": utils.blues[2],
+         "ssp-hex_nengo-loihi": utils.blues[1]}
+
+linestys = {"ssp-hex": '-', "ssp-rand": '--',
+         "gp-sinc": ':', "gp-matern": '-.',
+         "rff": (0, (3, 1, 1, 1, 1, 1)),
+         "ssp-hex_nengo-loihi-sim": '-.',
+         "ssp-hex_nengo-spinnaker": ':',
+         "ssp-hex_nengo-loihi": '--'}
 
 max_num_trials = 30
 
@@ -207,11 +218,15 @@ for i,func in enumerate(funcs):
         else:
             folder = folders[j]
         data = pd.DataFrame(read(os.path.join(folder,func,agt)))
+
+        good_runs = np.where([ data['params'][k] is not np.nan for k in range(len(data['params']))])[0]
+        # for k in data.keys():
+        #     data[k] = data[k][good_runs]
         if 'regret' in data.keys():
-            regrets = np.array([data['regret'][k] for k in range(len(data['regret']))])
+            regrets = np.array([data['regret'][k] for k in range(len(data['regret'])) if k in good_runs])
         elif 'vals' in data.keys():
-            vals = np.array([data['vals'][k] for k in range(len(data['vals']))])
-            regrets=true_max_val - vals
+            vals = np.array([data['vals'][k] for k in range(len(data['vals'])) if k in good_runs])
+            regrets = true_max_val - vals
         else:
             print(data.keys())
         if regrets.shape[0]>max_num_trials:
@@ -231,9 +246,11 @@ for j,agt in enumerate(agts):
     else:
         folder = folders[j]
 
-    data = pd.DataFrame(read(os.path.join(folder,func,agt)))
+    data = pd.DataFrame(read(os.path.join(folder,time_func,agt)))
+    good_runs = np.where([data['params'][k] is not np.nan for k in range(len(data['params']))])[0]
+
     # times= np.array([data['times'][k] for k in range(len(data['times']))])* 1e-9
-    times = np.array([data['full_times'][k] for k in range(len(data['full_times']))]) * 1e-9
+    times = np.array([data['times'][k] for k in range(len(data['times'])) if k in good_runs]) * 1e-9
     if times.shape[0] > max_num_trials:
         times = times[:max_num_trials, :]
 
@@ -253,22 +270,22 @@ for i,func in enumerate(funcs):
     for j,agt in enumerate(agts):
         budget = len(plt_datas[i][j]["mean"])
         plt_data = plt_datas[i][j].copy()
-        axs[i].fill_between(np.arange(1,budget+1), plt_data["upper_bound"], plt_data["lower_bound"], alpha=.2, color=cols[j])
-        axs[i].plot(np.arange(1,budget+1), plt_data["mean"], color=cols[j], label=labels[j], linestyle=linestys[j])
+        axs[i].fill_between(np.arange(1,budget+1), plt_data["upper_bound"], plt_data["lower_bound"], alpha=.2, color=cols[agt])
+        axs[i].plot(np.arange(1,budget+1), plt_data["mean"], color=cols[agt], label=labels[agt], linestyle=linestys[agt])
         
     axs[i].set_xlabel("Sample Number ($n$)", fontsize=fontsize)
-    axs[i].set_ylabel("Average Regret", fontsize=fontsize)
+    axs[i].set_ylabel("$\\leftarrow$ Average Regret", fontsize=fontsize)
     axs[i].tick_params(axis='both', which='major', labelsize=fontsize)
 axs[1].legend(fontsize=fontsize)
     
 axs[-1].set_title(letters[-1] + 'Sample Selection Time: ' + time_func.title(), fontsize=fontsize)
 for j,agt in enumerate(agts):
-    if True:#"ssp" not in agt:
+    if "nengo" not in agt:
         # times = timess[j][:,10:]
         plt_data = t_plt_datas[j]
         times = np.arange(1,len(plt_data["mean"])+1)
-        axs[-1].fill_between(times, plt_data["upper_bound"], plt_data["lower_bound"], alpha=.2, color=cols[j])
-        axs[-1].plot(times, plt_data["mean"], color=cols[j], label=labels[j], linestyle=linestys[j])
+        axs[-1].fill_between(times, plt_data["upper_bound"], plt_data["lower_bound"], alpha=.2, color=cols[agt])
+        axs[-1].plot(times, plt_data["mean"], color=cols[agt], label=labels[agt], linestyle=linestys[agt])
 axs[-1].set_xlabel("Sample Number ($n$)", fontsize=fontsize)
 axs[-1].set_ylabel("Sample Selection Time (sec)", fontsize=fontsize)
 axs[-1].tick_params(axis='both', which='major', labelsize=fontsize)
@@ -279,8 +296,8 @@ axs[-1].tick_params(axis='both', which='major', labelsize=fontsize)
 # fig.text(0.03,0.49, '\\textbf{C}', size=12, va="baseline", ha="left")
 # fig.text(0.5,0.49, '\\textbf{D}', size=12, va="baseline", ha="left")
 
-utils.save(fig, 'test-func_regret-new.pdf')
-utils.save(fig, 'test-func_regret-new.png')
+utils.save(fig, 'test-func_regret-beta01_2.pdf')
+utils.save(fig, 'test-func_regret-beta01_2.png')
 
 # plt.show()
 fig
