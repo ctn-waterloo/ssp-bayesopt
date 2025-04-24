@@ -8,6 +8,11 @@ import os.path
 import random
 import nengo
 
+import ssp_bayes_opt
+
+import importlib
+importlib.reload(ssp_bayes_opt)
+
 try:
     import nengo_loihi
     loihi_lif = nengo_loihi.LoihiLIF()
@@ -60,10 +65,32 @@ sim_types = {
     'spinnaker': (spinnaker_sim, {}),
 }
 
-import ssp_bayes_opt
 
-import importlib
-importlib.reload(ssp_bayes_opt)
+
+def get_args():
+    parser = ArgumentParser()
+
+    parser.add_argument('--func', dest='function_name', type=str, default='himmelblau')
+    parser.add_argument('--agent', dest='agent_type', type=str, default='ssp-hex')
+    parser.add_argument('--num-samples', dest='num_samples', type=int, default=200)
+    parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=1)
+    parser.add_argument('--gamma', dest='gamma', type=float, default=0.0)
+    parser.add_argument('--decay', action='store_true')
+
+    parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=97)
+    parser.add_argument('--n-scales', dest='n_scales', type=int, default=-1)
+    parser.add_argument('--n-rotates', dest='n_rotates', type=int, default=-1)
+    parser.add_argument('--len-scale', dest='len_scale', type=float, default=-1)
+
+    parser.add_argument('--num-trials', dest='num_trials', type=int, default=1)
+    parser.add_argument('--data-dir', dest='data_dir', type=str, default='data')
+
+    parser.add_argument('--nengo', action='store_true')
+    parser.add_argument('--backend', dest='backend', type=str, default="loihi-sim")  # loihi-sim, loihi
+    parser.add_argument('--num-neurons', dest='num_neurons', type=int,
+                        default=7)  # 7 is max for spinnaker with d=97, 8 for loihi
+
+    return parser.parse_args()
 
 class SamplingTrial(pytry.Trial):
     def params(self):
@@ -171,6 +198,7 @@ class SamplingTrial(pytry.Trial):
         regrets = true_max_val - vals
         print(optimizer.max)
         print(regrets[-1])
+        print(np.mean(optimizer.times) * 1e-9)
         
         return dict(
             regret=regrets,
@@ -192,29 +220,7 @@ class SamplingTrial(pytry.Trial):
 
 
 if __name__=='__main__':
-    parser = ArgumentParser()
-
-    parser.add_argument('--func', dest='function_name', type=str, default='himmelblau')
-    parser.add_argument('--agent', dest='agent_type', type=str, default='ssp-hex')
-    parser.add_argument('--num-samples', dest='num_samples', type=int, default=200)
-    parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=1)
-    parser.add_argument('--gamma', dest='gamma', type=float, default=0.0)
-    parser.add_argument('--decay', action='store_true')
-
-    parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=97)
-    parser.add_argument('--n-scales', dest='n_scales', type=int, default=-1)
-    parser.add_argument('--n-rotates', dest='n_rotates', type=int, default=-1)
-    parser.add_argument('--len-scale', dest='len_scale', type=float, default=-1)
-
-    parser.add_argument('--num-trials', dest='num_trials', type=int, default=10)
-    parser.add_argument('--data-dir', dest='data_dir', type=str, default='data')
-
-    parser.add_argument('--nengo', action='store_true')
-    parser.add_argument('--backend', dest='backend', type=str, default="cpu") # loihi-sim, loihi
-    parser.add_argument('--num-neurons', dest='num_neurons', type=int, default=7) # 7 is max for spinnaker with d=97
-
-    
-    args = parser.parse_args()
+    args = get_args()
     # args.nengo = True
 
     # random.seed(1)
