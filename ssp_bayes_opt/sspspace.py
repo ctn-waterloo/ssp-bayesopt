@@ -621,26 +621,26 @@ class RandomSSPSpace(SSPSpace):
                  scale_min: Optional[float] = 1.,
                  scale_max: Optional[float] = np.pi,
                  length_scale: Optional[Union[float, list, np.ndarray]] = 1,
-                 sampler: Optional[str] = 'norm', # unif or 'nomr'
+                 sampler: Optional[str] = 'unif', # unif or 'norm'
                  norm_scale: Optional[float] = None,
                  rng: Optional[Union[int, np.random.Generator]] = None,
                  **kwargs):
         self.rng = _get_rng(rng)
         if sampler == 'unif':
             # # Uniform sampling from hyper-sphere shell (in domain_dim space) of radius scale_max, with min size scale_min
-            n_samples = (ssp_dim - 1) // 2
-            samples = self.rng.normal(size=(n_samples, domain_dim))
-            ssq = np.sum(samples ** 2, axis=1)
-            u = gammainc(domain_dim / 2, ssq / 2)
-            scaled_radius = (scale_min ** domain_dim + (scale_max ** domain_dim - scale_min ** domain_dim) * u) ** (1 / domain_dim)
-            fr = scaled_radius / np.sqrt(ssq)
-            frtiled = np.tile(fr.reshape(n_samples, 1), (1, domain_dim))
-            phases = np.multiply(samples, frtiled)
+            # n_samples = (ssp_dim - 1) // 2
+            # samples = self.rng.normal(size=(n_samples, domain_dim))
+            # ssq = np.sum(samples ** 2, axis=1)
+            # u = gammainc(domain_dim / 2, ssq / 2)
+            # scaled_radius = (scale_min ** domain_dim + (scale_max ** domain_dim - scale_min ** domain_dim) * u) ** (1 / domain_dim)
+            # fr = scaled_radius / np.sqrt(ssq)
+            # frtiled = np.tile(fr.reshape(n_samples, 1), (1, domain_dim))
+            # phases = np.multiply(samples, frtiled)
 
             # # Uniform sampling from box (in domain_dim) with length scale_max, and min size scale_min
-            # a = rng.uniform(0, 1, (ssp_dim - 1) // 2)
-            # sign = rng.choice((-1, +1), len(a))
-            # phases = sign * scale_max * (scale_min + a * (1 - 2 * scale_min))
+            a = self.rng.uniform(0, 1, ((ssp_dim - 1) // 2, domain_dim))
+            sign = self.rng.choice((-1, +1), a.shape)
+            phases = sign * scale_max * (scale_min + a * (1 - 2 * scale_min))
 
         elif sampler == 'norm':
             if norm_scale is None:
