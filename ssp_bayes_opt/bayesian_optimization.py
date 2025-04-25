@@ -354,11 +354,15 @@ class BayesianOptimization:
                     self.times[t] = time.thread_time_ns() - start
                     solnx = np.copy(soln.x)
                     solnfun = soln.fun
+                    if hasattr(time, 'thread_time_ns'):
+                            self.times[t] = time.thread_time_ns() - start
                 elif agent_type=='disc-domain':
                     soln = agt.sample()
                     self.times[t] = time.thread_time_ns() - start
                     solnx = np.copy(soln.x)
                     solnfun=soln.fun
+                    if hasattr(time, 'thread_time_ns'):
+                            self.times[t] = time.thread_time_ns() - start
                 else: ## ssp agent
                     phi_init = agt.initial_guess()
                     start = time.thread_time_ns()
@@ -372,9 +376,11 @@ class BayesianOptimization:
                     # soln = solver.run(optim_problem, initial_point=phi_init.flatten())
                     # solnx = soln.point
                     # solnfun = soln.cost[0]
-                if hasattr(time, 'thread_time_ns'):
-                        self.times[t] = time.thread_time_ns() - start
-                solnx = agt.decode(np.copy(np.atleast_2d(solnx)))
+                    if hasattr(time, 'thread_time_ns'):
+                            self.times[t] = time.thread_time_ns() - start
+                    solnx = agt.decode(np.copy(np.atleast_2d(solnx)))
+                    if hasattr(time, 'thread_time_ns'):
+                            self.full_times[t] = time.thread_time_ns() - start
 
                 vals[restart_idx] = -solnfun
                 solns[restart_idx] = solnx
@@ -399,7 +405,7 @@ class BayesianOptimization:
             update_start = time.thread_time_ns()
             agt.update(x_t, y_t, var_t, step_num=t + init_xs.shape[0])
             self.times[t] += time.thread_time_ns() - update_start
-            self.full_times[t] = time.thread_time_ns() - start
+            self.full_times[t] += time.thread_time_ns() - update_start
 
             if save_memory:
                 self.memory[t,0] = get_memory_usage(heap)
