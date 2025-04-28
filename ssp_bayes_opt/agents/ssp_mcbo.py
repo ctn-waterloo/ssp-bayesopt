@@ -116,8 +116,8 @@ class SSPMCBOAgent(SSPAgent):
                 self.init_samples['cont'] = self.get_init_samples(self.spaces['cont'])
         if self.n_disc > 0:
             _int_list = []
-            for n in search_space.disc_names:
-                _int_list.append(np.arange(search_space.params[n].lb, search_space.params[n].ub + 1))
+            for n in self.search_space.disc_names:
+                _int_list.append(np.arange(self.search_space.params[n].lb, self.search_space.params[n].ub + 1))
             int_pts = np.vstack(np.meshgrid(*_int_list)).T
             int_ssps = self.spaces['disc'].encode(int_pts)
             self.init_samples['disc'] = (int_ssps, int_pts)
