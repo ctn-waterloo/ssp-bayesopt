@@ -106,6 +106,8 @@ class SSPMCBOAgent(SSPAgent):
             elif (self.n_disc>0):
                 self.spaces['disc'].update_lengthscale(ls)
 
+
+    def _set_decoder(self):
         self.init_samples = defaultdict(None)
         if self.n_cont > 0:
             if (self.decoder_method == 'network') | (self.decoder_method == 'network-optim'):
@@ -122,7 +124,6 @@ class SSPMCBOAgent(SSPAgent):
 
     def length_scale(self):
         return self.length_scales
-
 
 
     def _optimize_lengthscale(self, init_xs, init_ys):

@@ -5,7 +5,7 @@ from .ssp_agent import SSPAgent
 
 from .. import sspspace
 from .. import blr
-
+from .domains import MultiTrajectoryDomain
 
 class SSPMultiAgent(SSPAgent):
     def __init__(self, init_xs, init_ys, **kwargs):
@@ -26,6 +26,8 @@ class SSPMultiAgent(SSPAgent):
         self.x_dim = x_dim
         self.init_pos = None if init_pos is None else np.atleast_2d(init_pos)
         self.traj_len = traj_len
+        self.same_agt_x_space = same_agt_x_space
+        self.domain_bounds=domain_bounds
 
         if ssp_x_spaces is None:
             if same_agt_x_space:
@@ -47,6 +49,9 @@ class SSPMultiAgent(SSPAgent):
                                                                    length_scale=1, rng=seed+i))
 
         if ssp_t_space is None:
+            # ssp_t_space = sspspace.HexagonalSSPSpace(1, n_scales=(ssp_x_spaces[0].ssp_dim-1)//4,n_rotates=1,
+            #                                                 domain_bounds=np.array([[0, self.traj_len+1]]),
+            #                                                     length_scale=1, rng=seed)
             ssp_t_space = sspspace.RandomSSPSpace(1, ssp_dim=ssp_x_spaces[0].ssp_dim,
                                                   domain_bounds=np.array([[0, self.traj_len+1]]),
                                                   length_scale=1, rng=seed+n_agents)
@@ -54,7 +59,7 @@ class SSPMultiAgent(SSPAgent):
         self.ssp_x_spaces = ssp_x_spaces
         self.ssp_t_space = ssp_t_space
 
-        agent_space = sspspace.SPSpace(n_agents, ssp_x_spaces[0].ssp_dim, seed=seed, make_quasi_ortho=True)
+        agent_space = sspspace.SPSpace(n_agents, ssp_x_spaces[0].ssp_dim, seed=seed)#, make_quasi_ortho=True)
         self.agent_sps = agent_space.vectors
         self.agent_inv_sps = agent_space.inverse_vectors
 
@@ -75,17 +80,25 @@ class SSPMultiAgent(SSPAgent):
         self.timestep_ssps = self.ssp_t_space.encode(timesteps)
         self.timestep_inv_ssps = self.ssp_t_space.encode(-timesteps)
 
-        if (self.decoder_method == 'network') | (self.decoder_method == 'network-optim'):
-            for i in range(n_agents):
+    def _set_decoder(self):
+        if self.decoder_method == 'regression': # special case
+            from sklearn.linear_model import RidgeCV
+            domain = MultiTrajectoryDomain(self.n_agents, self.traj_len, self.x_dim, self.domain_bounds)
+            ex_xs = domain.sample(1000)
+            ex_phis = self.encode(ex_xs)
+            self.ridge_reg_decoder = RidgeCV(alphas=[1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 10, 100]).fit(ex_phis, ex_xs)
+
+        elif (self.decoder_method == 'network') | (self.decoder_method == 'network-optim'):
+            for i in range(self.n_agents):
                 self.ssp_x_spaces[i].train_decoder_net();
             self.init_samples = None
         else:
-            if same_agt_x_space:
+            if self.same_agt_x_space:
                 _init_samples = self.get_init_samples(self.ssp_x_spaces[0])
-                self.init_samples = [_init_samples] * n_agents
+                self.init_samples = [_init_samples] * self.n_agents
             else:
                 self.init_samples = []
-                for i in range(n_agents):
+                for i in range(self.n_agents):
                     self.init_samples.append(self.get_init_samples(self.ssp_x_spaces[i]))
 
     def length_scale(self):
@@ -161,16 +174,20 @@ class SSPMultiAgent(SSPAgent):
     
         
     def decode(self,ssp,timestep_ssps=None):
-        if timestep_ssps is None:
-            timestep_inv_ssps = self.timestep_inv_ssps
+        if self.decoder_method == 'regression':
+            decoded_traj = self.ridge_reg_decoder.predict(np.atleast_2d(ssp))
+            decoded_traj = np.clip(decoded_traj, self.domain_bounds[:,0], self.domain_bounds[:,1])
         else:
-            timestep_inv_ssps = self.ssp_t_space.invert(timestep_ssps)
-        ssp = ssp/np.linalg.norm(ssp, axis=-1, keepdims=True)
-        decoded_traj = np.zeros((self.n_agents, self.traj_len, self.x_dim))
-        for i in range(self.n_agents):
-            sspi = self.ssp_x_spaces[i].bind(self.agent_inv_sps[i,:], ssp)
-            queries = self.ssp_x_spaces[i].bind(timestep_inv_ssps, sspi)
-            decoded_traj[i,:,:] = self.ssp_x_spaces[i].decode(queries,
-                                                              method=self.decoder_method,
-                                                              samples=self.init_samples[i])
+            if timestep_ssps is None:
+                timestep_inv_ssps = self.timestep_inv_ssps
+            else:
+                timestep_inv_ssps = self.ssp_t_space.invert(timestep_ssps)
+            ssp = ssp/np.linalg.norm(ssp, axis=-1, keepdims=True)
+            decoded_traj = np.zeros((self.n_agents, self.traj_len, self.x_dim))
+            for i in range(self.n_agents):
+                sspi = self.ssp_x_spaces[i].bind(self.agent_inv_sps[i,:], ssp)
+                queries = self.ssp_x_spaces[i].bind(timestep_inv_ssps, sspi)
+                decoded_traj[i,:,:] = self.ssp_x_spaces[i].decode(queries,
+                                                                  method=self.decoder_method,
+                                                                  samples=self.init_samples[i])
         return decoded_traj.reshape(-1)

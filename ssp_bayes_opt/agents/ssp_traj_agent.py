@@ -6,7 +6,7 @@ from .. import sspspace
 from .. import blr
 
 from .ssp_agent import SSPAgent
-
+from .domains import TrajectoryDomain
 
 class SSPTrajectoryAgent(SSPAgent):
     def __init__(self, init_xs, init_ys, **kwargs):
@@ -63,7 +63,15 @@ class SSPTrajectoryAgent(SSPAgent):
         self.timestep_ssps = self.ssp_t_space.encode(timesteps)
         self.timestep_inv_ssps = self.ssp_t_space.encode(-timesteps)
 
-        if (self.decoder_method == 'network') | (self.decoder_method == 'network-optim'):
+
+    def _set_decoder(self):
+        if self.decoder_method == 'regression': # special case
+            from sklearn.linear_model import RidgeCV
+            domain = TrajectoryDomain(self.traj_len, self.x_dim, self.ssp_x_space.domain_bounds)
+            ex_xs = domain.sample(1000)
+            ex_phis = self.encode(ex_xs)
+            self.ridge_reg_decoder = RidgeCV(alphas=[1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 10, 100]).fit(ex_phis, ex_xs)
+        elif (self.decoder_method == 'network') | (self.decoder_method == 'network-optim'):
             self.ssp_x_space.train_decoder_net();
             self.init_samples = None
         else:
@@ -134,8 +142,12 @@ class SSPTrajectoryAgent(SSPAgent):
         return S
 
     def decode(self, ssp):
-        quries = self.ssp_x_space.bind(self.ssp_t_space.invert(self.timestep_ssps), ssp)
-        decoded_traj = self.ssp_x_space.decode(quries,
+        if self.decoder_method == 'regression':
+            decoded_traj = self.ridge_reg_decoder.predict(np.atleast_2d(ssp))
+            decoded_traj = np.clip(decoded_traj, self.domain_bounds[:, 0], self.domain_bounds[:, 1])
+        else:
+            quries = self.ssp_x_space.bind(self.ssp_t_space.invert(self.timestep_ssps), ssp)
+            decoded_traj = self.ssp_x_space.decode(quries,
                                                method=self.decoder_method,
                                                samples=self.init_samples)
         return decoded_traj.reshape(-1)

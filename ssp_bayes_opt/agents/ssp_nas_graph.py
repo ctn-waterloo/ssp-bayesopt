@@ -55,6 +55,9 @@ class SSPNASGraphAgent(SSPAgent):
         # self.ssp_dim = self.sp_space.dim
 
         self.identity = self.sp_space.identity()[None, :]
+
+    def _set_decoder(self):
+        pass
     
     def length_scale(self):
         return None

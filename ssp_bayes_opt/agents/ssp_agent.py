@@ -5,8 +5,11 @@ from .. import sspspace
 from .. import blr
 from .kernels import SincKernel
 
+# from pymanopt.function import numpy as function_decorator
+# from pymanopt.manifolds import Sphere
 
 from .agent import Agent
+
 
 class SSPAgent(Agent):
     def __init__(self, init_xs, init_ys, ssp_space,
@@ -23,7 +26,10 @@ class SSPAgent(Agent):
         self.init_ys = init_ys
         self.decoder_method = decoder_method
 
+        # Set-up the space and decoder: these are action space dependent
         self._set_ssp_space(ssp_space=ssp_space, **kwargs)
+        self._set_decoder()
+
         # Encode the initial sample points
         init_phis = self.encode(init_xs)
 
@@ -56,6 +62,8 @@ class SSPAgent(Agent):
         ### end if
         print('Selected Lengthscale: ', ssp_space.length_scale)
 
+
+    def _set_decoder(self):
         if (self.decoder_method == 'network') | (self.decoder_method == 'network-optim'):
             self.ssp_space.train_decoder_net();
             self.init_samples = None
@@ -139,6 +147,7 @@ class SSPAgent(Agent):
 
         optim_norm_margin = 4
 
+        # @function_decorator(Sphere(self.ssp_dim))
         def min_func(phi, m=self.blr.m,
                         sigma=self.blr.S,
                         gamma=self.gamma_t,
@@ -153,7 +162,7 @@ class SSPAgent(Agent):
             mi = self.var_weight * np.sqrt(gamma + beta_inv + phi.T @ sigma @ phi) - np.sqrt(gamma)
             return -(val + mi).flatten()
 
-
+        # @function_decorator(Sphere(self.ssp_dim))
         def gradient(phi, m=self.blr.m,
                       sigma=self.blr.S,
                       gamma=self.gamma_t,
