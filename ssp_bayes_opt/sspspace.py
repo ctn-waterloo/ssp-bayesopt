@@ -741,6 +741,7 @@ class HexagonalSSPSpace(SSPSpace):
                  length_scale: Optional[Union[float, list, np.ndarray]] = 1,
                  scale_sampling: Optional[str] = 'lin',
                  rng: Optional[Union[int, np.random.Generator]] = None,
+                 rand_pad: Optional[bool] = False,
                  **kwargs):
         assert ssp_dim > 0, 'ssp_dim must be positive'
         assert ssp_dim > 2*(domain_dim+1) + 1
@@ -795,9 +796,13 @@ class HexagonalSSPSpace(SSPSpace):
 
         # self.scales = scales
         # self.rot_mats = R_mats
+        actual_ssp_dim = 2*phases_scaled_rotated.shape[0]+1
+        if rand_pad and (actual_ssp_dim < ssp_dim):
+            phase_matrix_pad = RandomSSPSpace(domain_dim, ssp_dim-actual_ssp_dim).phase_matrix[1:1+(ssp_dim-actual_ssp_dim)//2]
+            phases_scaled_rotated = np.vstack([phases_scaled_rotated, phase_matrix_pad])
         phase_matrix = conjsym(phases_scaled_rotated)
-        ssp_dim = phase_matrix.shape[0]
 
+        ssp_dim = phase_matrix.shape[0]
         super().__init__(domain_dim, ssp_dim, phase_matrix=phase_matrix,
                          domain_bounds=domain_bounds, length_scale=length_scale, rng=self.rng)
 
