@@ -618,7 +618,7 @@ class RandomSSPSpace(SSPSpace):
     def __init__(self, domain_dim: int,
                  ssp_dim: int,
                  domain_bounds: Optional[np.ndarray] = None,
-                 scale_min: Optional[float] = 0.1,
+                 scale_min: Optional[float] = 1e-6,
                  scale_max: Optional[float] = np.pi,
                  length_scale: Optional[Union[float, list, np.ndarray]] = 1,
                  sampler: Optional[str] = 'unif', # unif or 'norm'
