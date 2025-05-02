@@ -618,7 +618,7 @@ class RandomSSPSpace(SSPSpace):
     def __init__(self, domain_dim: int,
                  ssp_dim: int,
                  domain_bounds: Optional[np.ndarray] = None,
-                 scale_min: Optional[float] = 1e-6,
+                 scale_min: Optional[float] = 1e-3,
                  scale_max: Optional[float] = np.pi,
                  length_scale: Optional[Union[float, list, np.ndarray]] = 1,
                  sampler: Optional[str] = 'unif', # unif or 'norm'
@@ -743,8 +743,7 @@ class HexagonalSSPSpace(SSPSpace):
                  rng: Optional[Union[int, np.random.Generator]] = None,
                  rand_pad: Optional[bool] = False,
                  **kwargs):
-        assert ssp_dim > 0, 'ssp_dim must be positive'
-        assert ssp_dim > 2*(domain_dim+1) + 1
+        assert ssp_dim >= 2*(domain_dim+1) + 1
 
         self.rng = _get_rng(rng)
         # user wants to define ssp with total dim, not number of simplex rotates and scales
