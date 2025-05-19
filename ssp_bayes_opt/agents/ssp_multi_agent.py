@@ -82,11 +82,23 @@ class SSPMultiAgent(SSPAgent):
 
     def _set_decoder(self):
         if self.decoder_method == 'regression': # special case
-            from sklearn.linear_model import RidgeCV
             domain = MultiTrajectoryDomain(self.n_agents, self.traj_len, self.x_dim, self.domain_bounds)
-            ex_xs = domain.sample(1000)
-            ex_phis = self.encode(ex_xs)
-            self.ridge_reg_decoder = RidgeCV(alphas=[1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 10, 100]).fit(ex_phis, ex_xs)
+
+            #from sklearn.linear_model import RidgeCV
+            print('!!! Training regression decoder !!!''')
+            from sklearn.neural_network import MLPRegressor
+            num_epochs = 200
+            self.reg_decoder = MLPRegressor(
+                    hidden_layer_sizes=(2000,),
+                    early_stopping=True,
+                    alpha=1e-4,
+                    learning_rate_init=1e-4,
+                    warm_start=True,
+                    )
+            for epoch in range(num_epochs):
+                ex_xs = domain.sample(1000)
+                ex_phis = self.encode(ex_xs)
+                self.reg_decoder.fit(ex_phis, ex_xs)
 
         elif (self.decoder_method == 'network') | (self.decoder_method == 'network-optim'):
             for i in range(self.n_agents):
@@ -175,7 +187,7 @@ class SSPMultiAgent(SSPAgent):
         
     def decode(self,ssp,timestep_ssps=None):
         if self.decoder_method == 'regression':
-            decoded_traj = self.ridge_reg_decoder.predict(np.atleast_2d(ssp))
+            decoded_traj = self.reg_decoder.predict(np.atleast_2d(ssp))
             decoded_traj = np.clip(decoded_traj, self.domain_bounds[:,0], self.domain_bounds[:,1])
         else:
             if timestep_ssps is None:

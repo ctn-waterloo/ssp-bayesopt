@@ -69,6 +69,7 @@ class SSPTrajectoryAgent(SSPAgent):
             #from sklearn.linear_model import RidgeCV
             print('!!! Training regression decoder !!!''')
             from sklearn.neural_network import MLPRegressor
+            num_epochs=200
             self.reg_decoder = MLPRegressor(
                     hidden_layer_sizes=(2000,),
                     early_stopping=True,
