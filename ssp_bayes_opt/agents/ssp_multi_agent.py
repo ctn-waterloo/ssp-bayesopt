@@ -173,13 +173,13 @@ class SSPMultiAgent(SSPAgent):
         enc_x = np.atleast_2d(x)
         S = np.zeros((enc_x.shape[0], self.ssp_dim))
         S2 = np.zeros((enc_x.shape[0], self.ssp_dim))
-        enc_x = enc_x.reshape(-1,self.n_agents,self.traj_len,self.x_dim)
+        enc_x = enc_x.reshape(-1,self.traj_len,self.n_agents,self.x_dim)
         for i in range(self.n_agents):
             Si = np.zeros((enc_x.shape[0], self.ssp_dim))
             for j in range(self.traj_len):
                 # S2 = S2 + self.ssp_x_spaces[i].encode(enc_x[:,i,j,:])
                 Si = Si + self.ssp_x_spaces[i].bind(timestep_ssps[j,:],
-                                       self.ssp_x_spaces[i].encode(enc_x[:,i,j,:]))
+                                       self.ssp_x_spaces[i].encode(enc_x[:,j,i,:]))
             S = S + self.ssp_x_spaces[i].bind(self.agent_sps[i,:], Si)
         # S = S + 0.1*S2
         return S/np.linalg.norm(S, axis=-1, keepdims=True)
@@ -195,11 +195,11 @@ class SSPMultiAgent(SSPAgent):
             else:
                 timestep_inv_ssps = self.ssp_t_space.invert(timestep_ssps)
             ssp = ssp/np.linalg.norm(ssp, axis=-1, keepdims=True)
-            decoded_traj = np.zeros((self.n_agents, self.traj_len, self.x_dim))
+            decoded_traj = np.zeros((self.traj_len, self.n_agents, self.x_dim))
             for i in range(self.n_agents):
                 sspi = self.ssp_x_spaces[i].bind(self.agent_inv_sps[i,:], ssp)
                 queries = self.ssp_x_spaces[i].bind(timestep_inv_ssps, sspi)
-                decoded_traj[i,:,:] = self.ssp_x_spaces[i].decode(queries,
+                decoded_traj[:,i,:] = self.ssp_x_spaces[i].decode(queries,
                                                                   method=self.decoder_method,
                                                                   samples=self.init_samples[i])
         return decoded_traj.reshape(-1)
