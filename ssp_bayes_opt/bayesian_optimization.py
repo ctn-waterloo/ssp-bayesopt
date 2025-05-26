@@ -184,37 +184,36 @@ class BayesianOptimization:
         elif agent_type == 'ssp-custom':
             assert 'ssp_space' in kwargs
             agt = agents.SSPAgent(init_xs, init_ys,kwargs.get('ssp_space'))
-        elif agent_type == 'gp':
-            agt = agents.GPAgent(init_xs, init_ys,**kwargs) 
-        elif agent_type == 'static-gp':
-            agt = agents.GPAgent(init_xs, init_ys, updating=False, **kwargs) 
-        elif agent_type == 'gp-matern':
-            agt = agents.GPAgent(init_xs, init_ys, 
-                                kernel_type='matern', 
-                                updating=False, **kwargs) 
-        elif agent_type == 'gp-sinc':
-            agt = agents.GPAgent(init_xs, init_ys, 
-                                kernel_type='sinc', 
-                                updating=False, **kwargs) 
-        elif agent_type=='disc-domain':
+        elif 'gp' in agent_type:
+            if 'static' in agent_type:
+                agt = agents.GPAgent(init_xs, init_ys, updating=False, **kwargs) 
+            elif 'ucb-matern' in agent_type:
+                agt = agents.GPUCBAgent(init_xs, init_ys, 
+                                    kernel_type='matern', 
+                                    updating=False, **kwargs) 
+            elif 'ucb-sinc' in agent_type:
+                agt = agents.GPUCBAgent(init_xs, init_ys, 
+                                    kernel_type='sinc', 
+                                    updating=False, **kwargs)
+            elif 'matern' in agent_type:
+                agt = agents.GPAgent(init_xs, init_ys, 
+                                    kernel_type='matern', 
+                                    updating=False, **kwargs) 
+            elif 'sinc' in agent_type:
+                agt = agents.GPAgent(init_xs, init_ys, 
+                                    kernel_type='sinc', 
+                                    updating=False, **kwargs) 
+            else:
+                agt = agents.GPAgent(init_xs, init_ys,**kwargs) 
+        elif 'disc-domain' in agent_type:
             agt = agents.DiscretizedDomainAgent(
                     init_xs, 
                     init_ys, 
                     bounds=self.bounds, 
                     **kwargs,
                     )
-        elif agent_type == 'gp-ucb-matern':
-            agt = agents.GPUCBAgent(init_xs, init_ys, 
-                                kernel_type='matern', 
-                                updating=False, **kwargs) 
-        elif agent_type == 'gp-ucb-sinc':
-            agt = agents.GPUCBAgent(init_xs, init_ys, 
-                                kernel_type='sinc', 
-                                updating=False, **kwargs)
-        elif agent_type == 'rff':
+        elif 'rff' in agent_type:
             agt = agents.RFFAgent(init_xs, init_ys, **kwargs)
-        elif agent_type == 'disc-domain':
-            agt = agents.DiscretizedDomainAgent(init_xs, init_ys, bounds=self.bounds, **kwargs)
         elif agent_type == 'ssp-traj':
             agt = agents.SSPTrajectoryAgent(init_xs, init_ys, **kwargs) 
             init_xs = agt.init_xs
@@ -344,7 +343,7 @@ class BayesianOptimization:
             # Use optimization to find a sample location
             for restart_idx in range(num_restarts):
                 start = time.thread_time_ns()
-                if (agent_type in gp_agent_types) or ('rff' in agent_type):
+                if ('gp' in agent_type) or ('rff' in agent_type):
                     x_init = np.random.uniform(low=lbounds, high=ubounds, size=(len(ubounds),))
                     # Do bounded optimization to ensure x stays in bound
                     soln = minimize(optim_func, x_init,
@@ -363,7 +362,7 @@ class BayesianOptimization:
                     solnfun=soln.fun
                     if hasattr(time, 'thread_time_ns'):
                             self.times[t] = time.thread_time_ns() - start
-                else: ## ssp agent
+                elif 'ssp' in agent_type: ## ssp agent
                     phi_init = agt.initial_guess()
                     start = time.thread_time_ns()
                     soln = minimize(optim_func, phi_init.flatten(),
@@ -381,6 +380,8 @@ class BayesianOptimization:
                     solnx = agt.decode(np.copy(np.atleast_2d(solnx)))
                     if hasattr(time, 'thread_time_ns'):
                             self.full_times[t] = time.thread_time_ns() - start
+                else:
+                    raise NotImplementedError(f'{agent_type} agent not implemented')
 
                 vals[restart_idx] = -solnfun
                 solns[restart_idx] = solnx
