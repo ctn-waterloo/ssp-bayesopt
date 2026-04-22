@@ -53,6 +53,24 @@ def test_rand_from_set_decode():
     recov_x = rand_ssp_space.decode(S0, method='from-set', num_samples=300)
     assert np.all(np.isclose(test_x, recov_x, atol=1e-1))
 
+def test_hex_tf_decode():
+    test_x = np.atleast_2d(np.array([1.3,-3.4]))
+    ssp_space = make_hex_space()
+    ssp_space.train_decoder_net()
+
+    S0 = ssp_space.encode(test_x)
+    assert S0.shape == (1, ssp_space.ssp_dim)
+    recov_x = ssp_space.decode(S0, method='network-optim')
+    assert np.all(np.isclose(test_x, recov_x))
+
+def test_rand_tf_decode():
+    test_x = np.atleast_2d(np.array([1.3,-3.4]))
+    rand_ssp_space = make_rand_space()
+    rand_ssp_space.train_decoder_net()
+    S0 = rand_ssp_space.encode(test_x)
+    assert S0.shape == (1, rand_ssp_space.ssp_dim)
+    recov_x = rand_ssp_space.decode(S0, method='network-optim')
+    assert np.all(np.isclose(test_x, recov_x))
 
 def test_hex_direct_optim_decode():
     test_x = np.atleast_2d(np.array([1.3,-3.4]))

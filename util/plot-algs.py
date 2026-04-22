@@ -17,7 +17,7 @@ import os.path
 
 
 from argparse import ArgumentParser
-import best
+# import best
 
 def get_data(data_frame):
     regret = np.vstack(data_frame['regret'].values)
@@ -58,6 +58,7 @@ if __name__ == '__main__':
     parser = ArgumentParser(description='Plot results in folders')
     parser.add_argument('--alg', action='append', metavar=('name', 'dir'), nargs=2)
     parser.add_argument('--save', action='store_true')
+    parser.add_argument('--no_legend', action='store_true')
 
     args = parser.parse_args()
     names, folders = zip(*args.alg)
@@ -86,6 +87,7 @@ if __name__ == '__main__':
         head, func = os.path.split(head)
 
         alg_data = pytry.read(func_dir)
+        print(alg_name, alg_data)
         alg_regret, avg_alg_regret, alg_time = zip(*[get_dict_data(f) for f in alg_data])
 
         alg_regret = np.array(alg_regret).squeeze()
@@ -117,7 +119,7 @@ if __name__ == '__main__':
         plt.fill_between(regret_steps, 
                          avg_regret_mu - avg_regret_ste,
                          avg_regret_mu + avg_regret_ste, alpha=0.3)
-        plt.plot(regret_steps, avg_regret_mu, label=k[1], ls=line_styles[idx])
+        plt.plot(regret_steps, avg_regret_mu, label=k[1], ls=line_styles[idx%4])
         func_name = k[0]
 
     # Get rid of spines
@@ -127,14 +129,15 @@ if __name__ == '__main__':
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False) 
 
-    plt.legend(fontsize=24)
+    if not args.no_legend:
+        plt.legend(fontsize=24)
     plt.ylabel('Average Regret (a.u.)', fontsize=24)
-    plt.xlabel('Sample Number', fontsize=24)
+    plt.xlabel(r'Sample Number ($n$)', fontsize=24)
     plt.title(f'Average Regret: {func_name.title()}', fontsize=24)
     plt.tight_layout()
 
     if args.save:
-        plt.savefig(f'{func_name}-regret.{plot_filetype}')
+        plt.savefig(f'{func_name}-regret-legend-{not args.no_legend}.{plot_filetype}')
     else:
         plt.show()
 

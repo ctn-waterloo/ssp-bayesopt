@@ -7,7 +7,7 @@ import matplotlib as mpl
 
 from argparse import ArgumentParser
 
-display = True
+display = False 
 if not display:
     mpl.use('pgf')
     mpl.rcParams.update({
@@ -107,7 +107,7 @@ if __name__=='__main__':
         line_style = 'dashed'
 
     plt.fill_between(x_unique, mu-sem, mu+sem, alpha=0.3, color=color)
-    plt.plot(x_unique, mu, label=f'{alg_type} SSP', c=color, ls=line_style)
+    plt.plot(x_unique, mu, label=f'SSP-BO-{alg_type}', c=color, ls=line_style)
     plt.scatter([151], mu[-2], color='tab:blue', zorder=10)
     
     matern_mu = 8.22
@@ -121,14 +121,14 @@ if __name__=='__main__':
             (sinc_mu + sinc_ste) * np.ones(x_unique.shape),
             alpha=0.3, color='tab:green')
     plt.plot(x_unique, sinc_mu * np.ones(x_unique.shape), 
-            label='GP-Sinc', ls='dotted', color='tab:green')
+            label='GP-MI-Sinc', ls='dotted', color='tab:green')
 
     plt.fill_between(x_unique,
             (matern_mu - matern_ste) * np.ones(x_unique.shape),
             (matern_mu + matern_ste) * np.ones(x_unique.shape),
             alpha=0.3, color='tab:red')
     plt.plot(x_unique, matern_mu * np.ones(x_unique.shape), 
-            label='GP-Matern', ls='dashdot', color='tab:red')
+            label='GP-MI-Matern', ls='dashdot', color='tab:red')
 
 
     plt.gca().spines['left'].set_position(('outward', 10))
@@ -139,8 +139,8 @@ if __name__=='__main__':
 
     plt.legend(fontsize=18)
     plt.ylabel('Terminal Average Regret (a.u.)', fontsize=18)
-    plt.xlabel('SSP Dimension', fontsize=18)
-    plt.title(f'Terminal Average Regret vs SSP Dimension\n(Branin-Hoo, N=30, ' + r'$\beta = ' + f'{np.mean(coeffs[:,0]):.3f}'+'$)', fontsize=18)
+    plt.xlabel(r'SSP Dimension ($d$)', fontsize=18)
+    plt.title(f'Terminal Average Regret vs SSP Dimension\n(Branin-Hoo, 30 trials, ' + r'$\beta = ' + f'{np.mean(coeffs[:,0]):.3f}'+'$)', fontsize=18)
     plt.tight_layout()
 
     if args.save:

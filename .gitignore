@@ -1,10 +1,43 @@
 # Project specific
 
-tests/data/
-util/plots/
-*.npy
-*.swp
+# Data directories (anywhere in the repo)
+data/
+**/data/
+experiments/**/*data*/
 
+# Data files
+*.json
+*.pkl
+*.pickle
+*.npy
+*.npz
+
+# Images and reports
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.svg
+*.gif
+
+# Keep images under the images/ folder
+!images/
+!images/*
+
+# ML model files
+*.h5
+*.pt
+*.pth
+*.onnx
+
+# Experiment shell scripts
+scripts/
+
+# Misc
+*.swp
+*.DS_Store
+**/.DS_Store
+.idea/
 
 
 # Byte-compiled / optimized / DLL files
