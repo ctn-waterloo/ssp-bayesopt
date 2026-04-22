@@ -20,6 +20,10 @@ experiments/**/*data*/
 *.svg
 *.gif
 
+# Keep images under the images/ folder
+!images/
+!images/*
+
 # ML model files
 *.h5
 *.pt
