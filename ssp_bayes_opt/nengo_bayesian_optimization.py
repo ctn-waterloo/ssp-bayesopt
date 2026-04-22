@@ -145,6 +145,9 @@ class NengoBayesianOptimization(BayesianOptimization):
             # Use optimization to find a sample location
             # for restart_idx in range(num_restarts):
 
+            if t==100:
+                t
+
             if (agent_type in gp_agent_types) or (agent_type=='disc-domain'):
                 print('Agent type not implemented in nengo', agent_type)
                 exit(1)
@@ -175,6 +178,35 @@ class NengoBayesianOptimization(BayesianOptimization):
                     sim.run(sim_time)
                 if hasattr(time, 'thread_time_ns'):
                     self.sim_times[t] = time.thread_time_ns() - start2
+
+                # plotting stuff
+                # import matplotlib.pyplot as plt
+                # import figure_utils as utils
+                # optim_func, jac_func = agt.acquisition_func()
+                # enc_sims =  sim.data[solver_net.all_ensembles[0]].scaled_encoders @ sim.data[solver_net.all_ensembles[0]].scaled_encoders[0,:]
+                # scaled_encoders = sim.data[solver_net.all_ensembles[0]].scaled_encoders[np.argsort(enc_sims),:]
+                # weights = sim.data[solver_net.all_connections[1]].weights[:,np.argsort(enc_sims)]
+                # W = scaled_encoders @ weights
+                # sim_path = agt.decode(sim.data[soln_probe][::10,:])
+                # _sample_ssps, _sample_points = agt.ssp_space.get_sample_pts_and_ssps(50, method='grid')
+                # fss = np.zeros(_sample_ssps.shape[0])
+                # for jj in range(_sample_ssps.shape[0]):
+                #     fss[jj] = -optim_func(_sample_ssps[jj])
+                # # for jj in range(W.shape[0]):
+                # #     W[jj,jj]=np.nan
+                # fig, axs = plt.subplots(1,2, figsize=(6,2.2))
+                # axs[0].imshow(W,  rasterized=False)
+                # axs[0].set_axis_off()
+                # cm=axs[1].contourf(_sample_points[:,0].reshape(50,50),_sample_points[:,1].reshape(50,50),
+                #                 fss.reshape(50,50), cmap='Blues', rasterized=False)
+                # axs[1].scatter(sim_path[:,0],sim_path[:,1], s=4, color='k')
+                # axs[1].set_xlabel('$x_1$')
+                # axs[1].set_ylabel('$x_2$')
+                # cb=fig.colorbar(cm, ax=axs[1])
+                # cb.set_label('$\psi_{n}(\mathbf{x})$')
+                # utils.save(fig, 'network_optimstep.pdf')
+
+
 
                 if hasattr(time, 'thread_time_ns'):
                     self.times[t] = time.thread_time_ns() - start

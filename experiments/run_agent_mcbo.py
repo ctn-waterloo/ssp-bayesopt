@@ -1,9 +1,18 @@
+"""Run Bayesian optimization trials on MCBO mixed-variable benchmarks.
+
+Requires the MCBO package (https://github.com/huawei-noah/HEBO/tree/master/MCBO).
+Results are saved as .npz files via pytry.
+
+Usage:
+    python run_agent_mcbo.py --task-id pest --num-samples 200
+"""
 import time
-import torch
 from argparse import ArgumentParser
 import os.path
+import torch
 import random
 import ssp_bayes_opt
+import pandas as pd
 from pandas import DataFrame
 import numpy as np
 from mcbo.utils.experiment_utils import get_task_from_id
@@ -37,6 +46,7 @@ from run_agent import neuron_types, sim_types
 #                        "seq_operators_pattern_id": "basic_w_post_map"}
 # Change "sin" to "epfl_arithmetic"
 # Same for "aig_optimization_hyp"
+
 
 
 class MCBO_task:
@@ -92,7 +102,7 @@ class SamplingTrial(pytry.Trial):
         self.param('task_id', task_id='xgboost_opt')
         self.param('num initial samples', num_init_samples=10)
         self.param('number of sample points', num_samples=100)
-        self.param('ssp length scale', len_scale=4)
+        self.param('ssp length scale', len_scale=-1)
         self.param('UCB Beta', beta_ucb=1.0)
         self.param('MI gamma_c', gamma=0.0)
         self.param('ssp dim', ssp_dim=201)
@@ -109,10 +119,9 @@ class SamplingTrial(pytry.Trial):
         num_init_samples = p.num_init_samples
         budget = p.num_samples
         target = MCBO_task(task_id=p.task_id)
-        print(args)
         pbounds = target.bounds
 
-        conjunctive_w=0.1
+        conjunctive_w = 0.1
         if p.decay:
             var_decay = -p.beta_ucb / budget
         else:
@@ -142,7 +151,7 @@ class SamplingTrial(pytry.Trial):
                                neurons_per_dim=p.num_neurons,
                                neuron_type=neuron_type,
                                sim_type=sim_type, sim_args=sim_args,
-                               sim_time=sim_time, tau=0.05, rate=1.,
+                               sim_time=sim_time, tau=0.05,
                                )
             elapsed_time = time.thread_time_ns() - start
         else:
@@ -166,6 +175,8 @@ class SamplingTrial(pytry.Trial):
                                conjunctive_w=conjunctive_w,
                                decoder_method='direct-optim',
                                save_memory=False,
+                               same_nominal_space=False,
+                               use_jac=True
                                )
             elapsed_time = time.thread_time_ns() - start
 
@@ -185,7 +196,11 @@ class SamplingTrial(pytry.Trial):
         # model_spec=target(samples) #test
         # ssp_samples = optimizer.agt.encode(samples)
         # samples_hat = optimizer.agt.decode(ssp_samples)
-        print(-np.max(vals[num_init_samples:]))
+        print(f'Min func value {-np.max(vals[num_init_samples:])}')
+
+        # start = time.thread_time_ns()
+        # target(sample_locs[0])
+        # elapsed_time = time.thread_time_ns() - start
 
         return dict(
             regret=regrets,
@@ -200,28 +215,21 @@ class SamplingTrial(pytry.Trial):
             variances=None,
             acquisition=None,
             total_time=optimizer.total_time,
-            args=args
         )
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-
-#pest, no decay, beta 1
-    # pest,  decay, beta 10
-    #rna_inverse_fold, no decay, beta 30
-    # rna_inverse_fold, no decay, beta 1.
-    # rna_inverse_fold, decay, beta 100
-    # ackley 501 dim, beta ~1
-    parser.add_argument('--task-id', dest='task_id', type=str, default='pest')
+# # OR ackley aig_optimization antibody_design mig_optimization pest rna_inverse_fold ackley-53 xgboost_opt aig_optimization_hyp svm_opt
+    parser.add_argument('--task-id', dest='task_id', type=str, default='xgboost_opt')
     parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=201)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=200)
     parser.add_argument('--num-init-samples', dest='num_init_samples', type=int, default=20)
     parser.add_argument('--beta-ucb', dest='beta_ucb', type=float,
-                        default=1.)  #10 # np.log(2/1e-6))#np.log(2/1e-6))#np.log(2/1e-6))
+                        default=1)  #10 # np.log(2/1e-6))#np.log(2/1e-6))#np.log(2/1e-6))
     parser.add_argument('--gamma', dest='gamma', type=float, default=0.0)
-    parser.add_argument('--len-scale', dest='len_scale', type=float, default=-1.0) # negative means optimize
+    parser.add_argument('--len-scale', dest='len_scale', type=float, default=0.3) # negative means optimize
     parser.add_argument('--data-dir', dest='data_dir', type=str, default='data')
-    parser.add_argument('--num-trials', dest='num_trials', type=int, default=1)
+    parser.add_argument('--num-trials', dest='num_trials', type=int, default=10)
     parser.add_argument('--nengo', action='store_true')
     parser.add_argument('--decay', action='store_true')
     parser.add_argument('--backend', dest='backend', type=str, default="cpu")  # loihi-sim, loihi, cpu

@@ -11,8 +11,6 @@ class DiscretizedFunction:
             self.bins.append(np.linspace(b[0],b[1],num_bins))
 
 
-        print(self.bins)
-
         self.sum_f = init_sum_f * np.ones(tuple([b.size-1 for b in self.bins]))
         self.sum_f2 = init_sum_f2 * np.ones(self.sum_f.shape)
         self.counts = pseudo_counts * np.ones(self.sum_f.shape)
@@ -47,11 +45,7 @@ class DiscretizedFunction:
         try:
             max_val = np.max(acq_vals)
         except ValueError as ve:
-            print(ve)
-            print(acq_vals)
-            print(mean_arr)
-            print(self.bins)
-            exit()
+            raise RuntimeError(f'acq_func returned unusable values: {ve}') from ve
         idxs = np.where(acq_vals == max_val)
         choice_idx = np.random.choice(np.arange(len(idxs[0])))
         xs = np.squeeze([np.mean(self.bins[dim_idx][l[choice_idx]:l[choice_idx]+2]) for dim_idx, l in enumerate(idxs)])

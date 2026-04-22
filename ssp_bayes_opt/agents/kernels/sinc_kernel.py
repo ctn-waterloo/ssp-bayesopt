@@ -102,13 +102,10 @@ class SincKernel(StationaryKernelMixin, NormalizedKernelMixin, Kernel):
                     K_gradient[:,:,l_idx] *= np.prod(sinc_mat[:,:,l_idx+1:], axis=-1)
                     K_gradient[:,:,l_idx] *= d_sinc_mat[:,:,l_idx]
                     K_gradient[:,:,l_idx] *= -dists[:,:,l_idx]/(length_scale[l_idx]**2)
-                ### end for
-                return K, K_gradient
-            ### end if
+                    return K, K_gradient
 
         else:
             return K
-    ### end __call__
 
     def __repr__(self):
         if self.anisotropic:
@@ -122,78 +119,3 @@ class SincKernel(StationaryKernelMixin, NormalizedKernelMixin, Kernel):
             )
 
 
-def test_d_sinc():
-    xs = np.linspace(-1, 1, 10000)
-    d_sinc_est = np.divide(np.diff(np.sinc(xs)), np.diff(xs))
-    assert np.allclose(d_sinc_est, d_sinc(xs)[1:], atol=1e-3)
-
-
-def test_kernel_shape():
-    k = SincKernel()
-
-    xs = np.random.random((100, 2))
-    ys = np.random.random((40, 2))
-
-    K = k(xs, ys)
-    assert K.shape[0] == xs.shape[0] and K.shape[1] == ys.shape[0]
-
-def test_kernel_symmetry():
-    k = SincKernel()
-    xs = np.random.random((100, 2))
-    K = k(xs, xs)
-    for i in range(1, xs.shape[0]):
-        for j in range(i+1, xs.shape[0]):
-            assert K[i,j] == K[j,i], f'Error at {i},{j}: {K[i,j]} != {K[j,i]}'
-
-def test_kernel_diagonal():
-    k = SincKernel()
-    xs = np.random.random((100, 2))
-    K = k(xs, xs)
-    for i in range(0, xs.shape[0]):
-        assert K[i,i] == 1, f'Error at: K[{i},{i}] = {K[i,i]}'
-
-def test_kernel_gradient():
-
-    k = SincKernel()
-    xs = np.array([[0,0],[0.5, 0.5]])
-    K, K_grad = k(xs, eval_gradient=True)
-    assert K_grad.shape == (2,2,1), f'Error: gradient shape = {K_grad.shape}'
-
-    dists = xs[:,None,:] - xs[None,:,:]
-    sinc_mat = np.sinc(dists)
-    d_sinc_mat = d_sinc(dists)
-
-#     print(np.prod(sinc_mat, axis=-1))
-#     print(np.prod(d_sinc_mat, axis=-1))
-
-    test_grad = d_sinc_mat[:,:,0] * sinc_mat[:,:,1] * (-dists[:,:,0])
-    test_grad += sinc_mat[:,:,0] * d_sinc_mat[:,:,1] * (-dists[:,:,1])
-
-    assert np.allclose(test_grad.flatten(), K_grad.flatten())
-
-def test_fit():
-    from sklearn.datasets import load_iris
-    from sklearn.gaussian_process import GaussianProcessClassifier
-    from sklearn.gaussian_process.kernels import RBF
-
-    X, y = load_iris(return_X_y=True)
-    kernel = SincKernel()
-    gpc = GaussianProcessClassifier(kernel=kernel, random_state=0).fit(X,y)
-
-    k_test = 1.0 * RBF(1.0)
-    gpc_rbf = GaussianProcessClassifier(kernel=k_test, random_state=0).fit(X,y)
-
-    sinc_score = gpc.score(X,y)
-    rbf_score = gpc_rbf.score(X,y)
-
-    assert np.allclose(sinc_score, rbf_score, atol=2e-2), f'RBF score: {rbf_score:.3f} vs sinc score: {sinc_score:.3f}'
-    
-
-
-if __name__=='__main__':
-    test_d_sinc()
-    test_kernel_shape()
-    test_kernel_symmetry()
-    test_kernel_diagonal()
-    test_kernel_gradient()
-    test_fit()

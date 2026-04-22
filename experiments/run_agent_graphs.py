@@ -1,3 +1,12 @@
+"""Run Bayesian optimization on the NASBench-101 neural architecture search benchmark.
+
+Requires nasbench (https://github.com/google-research/nasbench) and
+nasbench_only108.tfrecord + generated_graphs.json in --nas-data-dir.
+Results are saved as .npz files via pytry.
+
+Usage:
+    python run_agent_graphs.py --nas-data-dir ./nas_data --num-samples 150
+"""
 from nasbench import api
 import json
 import time
@@ -5,11 +14,16 @@ from argparse import ArgumentParser
 import os
 import os.path
 import random
+import sys
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+
 import ssp_bayes_opt
 
 import numpy as np
 import pytry
 from run_agent import neuron_types, sim_types
+
+
 
 # Requires installing NAS-bench: https://github.com/google-research/nasbench
 # and downloading nasbench_only108.tfrecord
@@ -142,19 +156,17 @@ class NASBench:
         matrices = []
         opts = []
         for n, input_graph in enumerate(input_graphs):
-
-            matrix = np.zeros((self.max_layers, self.max_layers),dtype=int)
-            op = [None] * target.max_layers
+            matrix = np.zeros((self.max_layers, self.max_layers), dtype=int)
+            op = [None] * self.max_layers
             for i in range(self.max_layers - 1):
                 layer_i = np.concatenate([np.zeros(i + 1),
                                           input_graph[int((self.max_layers - 1 + 0.5 * (1 - i)) * i):int(
                                               (self.max_layers - 1 - 0.5 * i) * (i + 1))]])
-                op[i] = int(input_graph[self.rolled_len+i])
+                op[i] = int(input_graph[self.rolled_len + i])
                 matrix[i, :] = layer_i > 0
             op[0] = 0
             op[-1] = 4
-
-            matrix, operations = self.remove_disconnected(matrix,operations)
+            matrix, op = self.remove_disconnected(matrix, op)
             matrices.append(matrix)
             opts.append(op)
         return outputs
@@ -278,14 +290,14 @@ class SamplingTrial(pytry.Trial):
 
             regrets = self.target.best_final_accuracy - test_vals
 
-            print(np.max(train_vals[args.num_init_samples:]))
-            print(np.max(test_vals[args.num_init_samples:]))
+            print(np.max(train_vals[num_init_samples:]))
+            print(np.max(test_vals[num_init_samples:]))
 
             return dict(
                 regret=regrets,
                 sample_locs=sample_locs,
                 elapsed_time=elapsed_time,
-                times=optimizer.times,  # selected_len_scale = optimizer.length_scale,
+                times=optimizer.times,
                 full_times=optimizer.full_times,
                 memory=optimizer.memory,
                 budget=budget,
@@ -298,68 +310,14 @@ class SamplingTrial(pytry.Trial):
                 total_time=optimizer.total_time
             )
 
-            # best_vals = np.maximum.accumulate(test_vals)
-            #
-            #
-
-            # import json
-            # import pickle
-            # def save_graphs(self, optim_samples, n_samples=500):
-            #     samples = self.sample(n_samples)
-            #     samples = np.vstack([optim_samples,
-            #                         samples])
-            #     outs = []
-            #     outs2 = []
-            #     for n, input_graph in enumerate(samples):
-            #         ssp_graph = optimizer.agt.encode(input_graph)
-            #
-            #         matrix = np.zeros((self.max_layers, self.max_layers),dtype=int)
-            #         operations = np.zeros(self.max_layers)
-            #         for i in range(self.max_layers - 1):
-            #             layer_i = np.concatenate([np.zeros(i + 1),
-            #                                       input_graph[int((self.max_layers - 1 + 0.5 * (1 - i)) * i):int(
-            #                                           (self.max_layers - 1 - 0.5 * i) * (i + 1))]])
-            #             operations[i] = int(input_graph[self.rolled_len+i]) + 1
-            #
-            #             matrix[i, :] = layer_i > 0
-            #         operations[0] = 1
-            #         operations[-1] = 0
-            #         matrix, operations = self.remove_disconnected(matrix, operations)
-            #
-            #
-            #         mat_str = " ".join(list(matrix.flatten().astype('str')))
-            #         op_str = " ".join(np.array(operations).astype('int').astype('str'))
-            #         outs.append((mat_str,op_str))
-            #         outs2.append((matrix, operations, ssp_graph))
-            #     with open("nas_graph_plot_data.json", "w") as f:
-            #         json.dump(outs, f)
-            #
-            #     # with open("nas_full_plot_data.json", "w") as f:
-            #     #     json.dump(outs2, f)
-            #     with open("nas_full_plot_data.pkl", "wb") as f:
-            #         pickle.dump(outs2, f)
-            #     return outs
-            # #
-            # #
-            # # # sample_locs = np.array(sample_locs)
-            # # # outs = save_graphs(target, sample_locs[np.argsort(test_vals)[-50:]], n_samples=950)
-            # # outs = save_graphs(target, sample_locs[np.argmax(test_vals)].reshape(1,-1), n_samples=500)
-            #
-            # # samples_ssps = np.array([optimizer.agt.encode(sam) for sam in sample_locs]).squeeze()
-            # # sam_sims = samples_ssps @ samples_ssps[np.argmax(test_vals), :]
-            # # sam_sims = sam_sims/sam_sims[np.argmax(test_vals)]
-            # # sample_locs = np.array(sample_locs)
-            # # outs = save_graphs(target, sample_locs[np.argsort(sam_sims)[-5:]], n_samples=1000)
-            # outs = save_graphs(target, sample_locs[np.argmax(test_vals)].reshape(1, -1), n_samples=1000)
-
 
 if __name__ == '__main__':
     parser = ArgumentParser()
 
-    parser.add_argument('--nas-data-dir', dest='nas_data_dir', type=str, default='./nas_data')
+    parser.add_argument('--nas-data-dir', dest='nas_data_dir', type=str, default='./experiments/nas_data')
     parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=201)
-    parser.add_argument('--num-samples', dest='num_samples', type=int, default=200)
-    parser.add_argument('--num-init-samples', dest='num_init_samples', type=int, default=20)
+    parser.add_argument('--num-samples', dest='num_samples', type=int, default=150)
+    parser.add_argument('--num-init-samples', dest='num_init_samples', type=int, default=10)
     parser.add_argument('--beta-ucb', dest='beta_ucb', type=float,
                         default=10.0)  # np.log(2/1e-6))#np.log(2/1e-6))#np.log(2/1e-6))
     parser.add_argument('--gamma', dest='gamma', type=float, default=0.0)

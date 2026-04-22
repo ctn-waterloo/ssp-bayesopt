@@ -1,3 +1,8 @@
+"""Shared matplotlib styling utilities for SSP-BO experiment plots.
+
+Provides color palettes, figure width constants, and helpers for saving
+PDFs via Ghostscript (font subsetting + tight crop).
+"""
 import sys, os
 
 import numpy as np
@@ -116,7 +121,7 @@ def remove_frame(ax):
     ax.set_xticks([], minor=True)
     ax.set_yticks([], minor=True)
 
-def add_frame(self, ax):
+def add_frame(ax):
     for spine in ["left", "right", "top", "bottom"]:
         ax.spines[spine].set_visible(True)
 

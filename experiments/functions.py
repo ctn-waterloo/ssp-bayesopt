@@ -1,7 +1,13 @@
+"""Benchmark objective functions for SSP-BO experiments.
+
+Provides factory() to look up a function by name, plus standalone
+implementations of himmelblau, branin_hoo, goldstein_price, etc.
+All functions are negated so maximization equals minimization of the
+original benchmark.
+"""
 import numpy as np
 import pickle
 from scipy.interpolate import griddata
-#from util.generate_gp import sample_gp2, sample_gp4, sample_gmm
 import re
 from typing import Tuple
 from collections.abc import Callable
@@ -27,25 +33,25 @@ def factory(function_name: str) -> Tuple[Callable, dict, int]:
     elif function_name == 'colville':
         return colville, np.array([[-10,10], [-10,10], [-10,10], [-10,10]]), 500
     elif function_name == 'gp_2d':
-        raise NotImplemented('TODO: fix location of cached values')
+        raise NotImplementedError('TODO: fix location of cached values')
         domain = np.array([[-1, 1], [-1,1]])
         data = pickle.load(open('./gp2d.pkl', 'rb')) 
         return InterpolatedFunction('gp_2d', data['xs'], data['ys'], domain), domain, 250
     elif function_name == 'gp_4d':
-        raise NotImplemented('TODO: fix location of cached values')
+        raise NotImplementedError('TODO: fix location of cached values')
         domain = np.array([[-1, 1], [-1,1], [-1, 1], [-1, 1]])
         return Function('gp_4d', sample_gp4, domain), domain, 500
     elif function_name == 'gmm':
-        raise NotImplemented('TODO: fix location of cached values')
+        raise NotImplementedError('TODO: fix location of cached values')
         domain = np.array([[0, 1], [0,1]])
         data = pickle.load(open('./gmm2d.pkl', 'rb')) 
         return InterpolatedFunction('gmm', data['xs'], data['ys'], domain), domain, 1000
 #         return Function('gmm', sample_gmm, domain)
     elif function_name == 'mackey-glass':
-        raise NotImplemented('TODO: Implement the Mackey Glass function')
+        raise NotImplementedError('TODO: Implement the Mackey Glass function')
         return None, None, 1000
     elif function_name == 'tsunamis':
-        raise NotImplemented('Need to implement the tsunami function')
+        raise NotImplementedError('Need to implement the tsunami function')
         return None, None, 500
     elif re.match('rastrigin', function_name): ## Looking for names like rastrigin1, rastrigin3 etc
         num = re.search('\d+', function_name)
@@ -62,7 +68,7 @@ def factory(function_name: str) -> Tuple[Callable, dict, int]:
     elif function_name=='beale':
         return beale, np.array([[-4.5,4.5], [-4.5,4.5]]), 500
     elif function_name=='easom':
-        return easom, np.aray([[-10,10], [-10,10]]), 500
+        return easom, np.array([[-10,10], [-10,10]]), 500
     elif function_name=='mccormick':
         return mccormick, np.array([[-1.5,4],[-3,4]]), 500
     elif re.match('styblinski-tang', function_name):
@@ -101,7 +107,6 @@ class Function:
         self._name = name
         self.f = f
         self._domain = domain
-    ### end if
 
     def __call__(self, **kwargs):
         return self.f(**kwargs)
@@ -119,7 +124,7 @@ class InterpolatedFunction:
         self._xs = xs
         self._ys = ys
         self._domain = domain
-    ### end if
+
 
     def __call__(self, **kwargs):
         x = np.array([kwargs[kw] for kw in kwargs])
@@ -197,38 +202,14 @@ def styblinski_tang(xs):
     return -np.sum(xs**4 - 16*xs**2 + 5*xs, axis=1)/2 # negative version bc we maximize instead of minimize
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     import matplotlib.pyplot as plt
-
-#     xs = np.linspace(-5, 5,100)
-#     ys = np.linspace(-5, 5,100)
-#     X, Y = np.meshgrid(xs, ys)
-#     zs = himmelblau(np.stack((X, Y), axis=1))
-# 
-#     print(himmelblau(np.array([[-3.779310, -3.283186]])))
-#     plt.contour(X,Y,zs)
-#     plt.colorbar()
-#     exit()
-
-#     xs = np.linspace(-5, 10,100)
-#     ys = np.linspace(0, 15,100)
-#     X, Y = np.meshgrid(ys, xs)
-#     zs = branin_hoo(np.stack((X, Y), axis=1))
-# 
-#     print('Branin-Hoo: f(x*) = 0.397887') 
-#     print(-branin_hoo(np.array([[-np.pi, 12.275],[np.pi, 2.275], [9.42478, 2.475]])))
-#     fig, ax = plt.subplots(subplot_kw={'projection':'3d'})
-#     surf = ax.plot_surface(X, Y, -zs)
-#     fig.colorbar(surf)
-
     xs = np.linspace(-2, 2, 100)
     ys = np.linspace(-2, 2, 100)
     X, Y = np.meshgrid(ys, xs)
     zs = goldstein_price(np.stack((X, Y), axis=1))
-
     print('Goldstein-Price: f(x*) = 3')
-    print(-goldstein_price(np.array([[0,-1]])))
-    fig, ax = plt.subplots(subplot_kw={'projection':'3d'})
-    surf = ax.plot_surface(X, Y, -zs)
-    fig.colorbar(surf)
+    print(-goldstein_price(np.array([[0, -1]])))
+    fig, ax = plt.subplots(subplot_kw={'projection': '3d'})
+    ax.plot_surface(X, Y, -zs)
     plt.show()

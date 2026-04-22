@@ -1,3 +1,11 @@
+"""Run a single Bayesian optimization trial using pytry.
+
+Supports SSP-hex, SSP-rand, GP, and RFF agents. Optional nengo/loihi/spinnaker
+backends for neuromorphic execution. Results are saved as .npz files via pytry.
+
+Usage:
+    python run_agent.py --func himmelblau --agent ssp-hex --num-samples 200
+"""
 import numpy as np
 import pytry
 import time
@@ -9,9 +17,6 @@ import random
 import nengo
 
 import ssp_bayes_opt
-
-import importlib
-importlib.reload(ssp_bayes_opt)
 
 try:
     import nengo_loihi
@@ -70,25 +75,25 @@ sim_types = {
 def get_args():
     parser = ArgumentParser()
 
-    parser.add_argument('--func', dest='function_name', type=str, default='himmelblau')
+    parser.add_argument('--func', dest='function_name', type=str, default='branin-hoo')
     parser.add_argument('--agent', dest='agent_type', type=str, default='ssp-hex')
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=200)
-    parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=1)
+    parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=1.)
     parser.add_argument('--gamma', dest='gamma', type=float, default=0.0)
     parser.add_argument('--decay', action='store_true')
 
-    parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=97)
+    parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=7)
     parser.add_argument('--n-scales', dest='n_scales', type=int, default=-1)
     parser.add_argument('--n-rotates', dest='n_rotates', type=int, default=-1)
-    parser.add_argument('--len-scale', dest='len_scale', type=float, default=-1)
+    parser.add_argument('--len-scale', dest='len_scale', type=float, default=4)
 
     parser.add_argument('--num-trials', dest='num_trials', type=int, default=1)
     parser.add_argument('--data-dir', dest='data_dir', type=str, default='data')
 
     parser.add_argument('--nengo', action='store_true')
-    parser.add_argument('--backend', dest='backend', type=str, default="loihi-sim")  # loihi-sim, loihi
+    parser.add_argument('--backend', dest='backend', type=str, default="cpu")  # loihi-sim, loihi
     parser.add_argument('--num-neurons', dest='num_neurons', type=int,
-                        default=7)  # 7 is max for spinnaker with d=97, 8 for loihi
+                        default=10)  # 7 is max for spinnaker with d=97, 8 for loihi
 
     return parser.parse_args()
 
@@ -174,7 +179,8 @@ class SamplingTrial(pytry.Trial):
                                gamma_c=p.gamma,
                                # decoder_method='network-optim',
                                beta_ucb=p.beta_ucb,
-                               var_decay=var_decay
+                               var_decay=var_decay,
+                               rand_pad=False,use_jac=True
                                )
             elapsed_time = time.thread_time_ns() - start
             sim_times = None
@@ -196,8 +202,9 @@ class SamplingTrial(pytry.Trial):
         else:
             true_max_val = function_maximum_value[p.function_name] 
         regrets = true_max_val - vals
+        cum_reg = np.divide(np.cumsum(regrets), np.arange(1,p.num_init_samples+budget+1))
         print(optimizer.max)
-        print(regrets[-1])
+        print(cum_reg[-1])
         print(np.mean(optimizer.times) * 1e-9)
         
         return dict(

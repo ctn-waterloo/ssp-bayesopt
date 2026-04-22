@@ -4,7 +4,6 @@ from scipy.stats import special_ortho_group
 from scipy.optimize import minimize
 from scipy.special import gammainc
 from typing import Optional, Union, List
-
 def _get_rng(rng: Optional[Union[int, np.random.Generator]] = None):
     if rng is None:
         rng = np.random.default_rng()  # New generator for each call
@@ -186,15 +185,6 @@ class SPSpace:
         a = np.atleast_2d(a)
         return a[:, -np.arange(self.dim)]
 
-    def get_binding_matrix(self, v):
-        """
-        Maps input vector to a matrix that, when multiplied with another vecotr, will bind vectors
-        """
-        C = np.zeros((self.dim, self.dim))
-        for i in range(self.dim):
-            for j in range(self.dim):
-                C[i, j] = v[:, (i - j) % self.dim]
-        return C
 
 
 
@@ -627,17 +617,6 @@ class RandomSSPSpace(SSPSpace):
                  **kwargs):
         self.rng = _get_rng(rng)
         if sampler == 'unif':
-            # # Uniform sampling from hyper-sphere shell (in domain_dim space) of radius scale_max, with min size scale_min
-            # n_samples = (ssp_dim - 1) // 2
-            # samples = self.rng.normal(size=(n_samples, domain_dim))
-            # ssq = np.sum(samples ** 2, axis=1)
-            # u = gammainc(domain_dim / 2, ssq / 2)
-            # scaled_radius = (scale_min ** domain_dim + (scale_max ** domain_dim - scale_min ** domain_dim) * u) ** (1 / domain_dim)
-            # fr = scaled_radius / np.sqrt(ssq)
-            # frtiled = np.tile(fr.reshape(n_samples, 1), (1, domain_dim))
-            # phases = np.multiply(samples, frtiled)
-
-            # # Uniform sampling from box (in domain_dim) with length scale_max, and min size scale_min
             a = self.rng.uniform(0, 1, ((ssp_dim - 1) // 2, domain_dim))
             sign = self.rng.choice((-1, +1), a.shape)
             phases = sign * scale_max * (scale_min + a * (1 - 2 * scale_min))
@@ -846,42 +825,6 @@ def conjsym(K, even=False):
     F[1:(d + 1), :] = K
     F[(d + 1):, :] = -np.flip(K, axis=0)
     return F.real
-
-
-def _get_sub_FourierSSP(n, N, sublen=3):
-    tot_len = 2 * sublen * N + 1
-    FA = np.zeros((2 * sublen + 1, tot_len))
-    FA[0:sublen, sublen * n:sublen * (n + 1)] = np.eye(sublen)
-    FA[sublen, sublen * N] = 1
-    FA[sublen + 1:, tot_len - np.arange(sublen * (n + 1), sublen * n, -1)] = np.eye(sublen)
-    return FA
-
-
-def _get_sub_SSP(n, N, sublen=3):
-    tot_len = 2 * sublen * N + 1
-    FA = _get_sub_FourierSSP(n, N, sublen=sublen)
-    W = np.fft.fft(np.eye(tot_len))
-    invW = np.fft.ifft(np.eye(2 * sublen + 1))
-    A = invW @ np.fft.ifftshift(FA) @ W
-    return A.real
-
-
-def _proj_sub_FourierSSP(n, N, sublen=3):
-    tot_len = 2 * sublen * N + 1
-    FB = np.zeros((2 * sublen + 1, tot_len))
-    FB[0:sublen, sublen * n:sublen * (n + 1)] = np.eye(sublen)
-    FB[sublen, sublen * N] = 1 / N  # all sub vectors have a "1" zero freq term so scale it so full vector will have 1
-    FB[sublen + 1:, tot_len - np.arange(sublen * (n + 1), sublen * n, -1)] = np.eye(sublen)
-    return FB.T
-
-
-def _proj_sub_SSP(n, N, sublen=3):
-    tot_len = 2 * sublen * N + 1
-    FB = _proj_sub_FourierSSP(n, N, sublen=sublen)
-    invW = np.fft.ifft(np.eye(tot_len))
-    W = np.fft.fft(np.eye(2 * sublen + 1))
-    B = invW @ np.fft.ifftshift(FB) @ W
-    return B.real
 
 
 def _Rd_sampling(n, d, seed=0.5):

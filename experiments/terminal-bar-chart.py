@@ -1,15 +1,25 @@
+"""Violin plot of terminal average regret with Wilcoxon significance bars.
+
+Reads .npz result files saved by run_agent.py and produces per-function
+violin plots comparing all agents. Data folder defaults to
+experiments/data/d151_v2; override with --data-dir.
+
+Usage:
+    python terminal-bar-chart.py --data-dir experiments/data/d151_v2
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import figure_utils as utils
 import numpy.matlib as matlib
-
 from matplotlib.markers import TICKDOWN
-
 from scipy.stats import sem
 import pandas as pd
-import os, zipfile
+import os
+import zipfile
 from scipy.stats import wilcoxon
+from argparse import ArgumentParser
+
 
 def read(path):
     data = []
@@ -21,23 +31,24 @@ def read(path):
                 for name in z.namelist():
                     try:
                         if name.endswith('.txt'):
-                            data.append(text(z.open(name)))
+                            data.append(_read_text(z.open(name)))
                         elif name.endswith('.npz'):
-                            data.append(npz(z.open(name)))
-                    except:
+                            data.append(_read_npz(z.open(name)))
+                    except Exception:
                         print('Error reading file "%s" in "%s"' % (name, fn))
                 z.close()
             else:
                 try:
                     if fn.endswith('.txt'):
-                        data.append(text(fn))
+                        data.append(_read_text(fn))
                     elif fn.endswith('.npz'):
-                        data.append(npz(fn))
-                except:
+                        data.append(_read_npz(fn))
+                except Exception:
                     print('Error reading file "%s"' % fn)
     return data
 
-def text(fn):
+
+def _read_text(fn):
     if not hasattr(fn, 'read'):
         with open(fn) as f:
             text = f.read()
@@ -53,146 +64,100 @@ def text(fn):
     exec(text, d)
     del d['__builtins__']
     if numpy is not None:
-        if d['array'] is numpy.array:
+        if d.get('array') is numpy.array:
             del d['array']
-        if d['nan'] is numpy.nan:
+        if d.get('nan') is numpy.nan:
             del d['nan']
     return d
 
 
-def npz(fn):
-    import numpy as np
+def _read_npz(fn):
     d = {}
-    f = np.load(fn,allow_pickle=True)
+    f = np.load(fn, allow_pickle=True)
     for k in f.files:
-        if k!='ssp_space':
+        if k != 'ssp_space':
             d[k] = f[k]
             if d[k].shape == ():
                 d[k] = d[k].item()
     return d
 
-def significance_bar(ax, start,end,height,displaystring,
-                     linewidth = 1.1,
-                     markersize = 6,
-                     boxpad  =0.2,fontsize = 11,color = 'k'):
-    # draw a line with downticks at the ends
-    ax.plot([start,end],[height]*2,'-',color =color,
-             lw=linewidth,
-             marker = TICKDOWN,
-             markeredgewidth=linewidth,
-             markersize = markersize)
-    # draw the text with a bounding box covering up the line
-    ax.text(0.5*(start+end),height,displaystring,
-             ha = 'center',va='center',
-             bbox=dict(facecolor='1.', edgecolor='none',
-                       boxstyle='Square,pad='+str(boxpad)),
-             size = fontsize)
 
-    
-
-cols = [utils.blues[0], utils.oranges[0], utils.greens[0],  utils.reds[0]]
-funcs = ["himmelblau" , "goldstein-price","branin-hoo"]
-agts=[ "ssp-hex","ssp-rand" ,"gp-sinc", "gp-matern"]
-labels=['SSP-BO-Hex','SSP-BO-Rand','GP-MI-Sinc', 'GP-MI-Matern']
-
-def do_plot(ax,regrets):
-    plots = ax.violinplot(regrets)
-    # Set the color of the violin patches
-    for pc, color in zip(plots['bodies'], cols):
-        pc.set_facecolor(color)
-    
-    # Set the color of the median lines
-    plots['cbars'].set_colors(cols)
-    plots['cmaxes'].set_colors(cols)
-    plots['cmins'].set_colors(cols)
-#         plt.bar(range(len(labels)), mus, yerr=sems)#, tick_label=labels)
-#         plt.gca().set_xticklabels(labels, rotation=75)
-    # plt.gca().spines['left'].set_position(('outward', 10))
-    # plt.gca().spines['bottom'].set_position(('outward', 10))
-
-    # plt.gca().spines['top'].set_visible(False)
-    # plt.gca().spines['right'].set_visible(False) 
-    return np.max(regrets,axis=0)
+def significance_bar(ax, start, end, height, displaystring,
+                     linewidth=1.1, markersize=6, boxpad=0.2, fontsize=11, color='k'):
+    ax.plot([start, end], [height] * 2, '-', color=color,
+            lw=linewidth, marker=TICKDOWN, markeredgewidth=linewidth, markersize=markersize)
+    ax.text(0.5 * (start + end), height, displaystring,
+            ha='center', va='center',
+            bbox=dict(facecolor='1.', edgecolor='none', boxstyle='Square,pad=' + str(boxpad)),
+            size=fontsize)
 
 
-starsym = '$\\ast$'
-folder = os.path.abspath(os.path.join(os.getcwd(), os.pardir)) + '/data/test-funcs/'
-fig, axs = plt.subplots(1,3, figsize=(7.1,3.3))
-axs = axs.reshape(-1)
-for i,func in enumerate(funcs):
-    all_regrets = []
-    axs[i].set_title(funcs[i].title())
-    for j,agt in enumerate(agts):
-        data = pd.DataFrame(read(folder + func + '/' + agt))
-        regrets= np.array([data['regret'][k] for k in range(len(data['regret']))])
-        budget=regrets.shape[1]
-        num_trials=regrets.shape[0]
-        regrets = np.divide(np.cumsum(regrets, axis=1), matlib.repmat(range(1,budget+1), num_trials,1))[:,-1]
-        all_regrets.append(regrets)
-    max_vals = do_plot(axs[i], np.array(all_regrets).T)
-    axs[i].set_xticks(range(1,len(labels)+1), labels, rotation=45, fontsize=9)
-    for j in range(1,len(agts)):
-        mval = np.max([max_vals[0],max_vals[j]])
-        pvalue = wilcoxon(all_regrets[0],all_regrets[j], alternative='less').pvalue
-        starstr = starsym*3 if pvalue<0.0001 else starsym*2 if pvalue<0.001  else starsym if pvalue<0.05 else ''
-        if pvalue > 0.05:
-            break
-        significance_bar(axs[i], 1,j+1,1.1*mval, starstr)
-    if func=='branin-hoo':
-        mvals = np.max(max_vals) + np.array([0, 7, 4, 0])
-        for j in np.arange(len(agts)-2,0,-1):
-            mval = mvals[j]
-            pvalue = wilcoxon(all_regrets[-1],all_regrets[j], alternative='less').pvalue
-            starstr = starsym*3 if pvalue<0.0001 else starsym*2 if pvalue<0.001  else starsym if pvalue<0.05 else ''
-            if pvalue > 0.05:
-                break
-            significance_bar(axs[i], len(agts),j+1,mval, starstr)
+if __name__ == '__main__':
+    parser = ArgumentParser()
+    parser.add_argument('--data-dir', dest='data_dir', type=str,
+                        default=os.path.join(os.getcwd(), 'experiments', 'data', 'd151_v2'))
+    args = parser.parse_args()
 
-#     plt.title(f'Average Regret: {func_name.title()}', fontsize=24)
-axs[0].set_ylabel('Terminal Regret (a.u.)')
-fig.tight_layout()
-utils.save(fig, 'test-func-terminal.pdf')
+    funcs = ["himmelblau", "goldstein-price", "branin-hoo"]
+    agts = ["ssp-hex", "ssp-rand", "gp-sinc", "gp-matern", 'rff']
+    labels = {"ssp-hex": 'SSP-BO-Hex', "ssp-rand": 'SSP-BO-Rand',
+              "gp-sinc": 'GP (sinc)', "gp-matern": 'GP (Mat\u00e9rn)',
+              "rff": 'RFF-BO',
+              "ssp-hex_nengo-loihi-sim": "SSP-BO-Hex (Loihi 1$^*$)",
+              "ssp-hex_nengo-spinnaker": "SSP-BO-Hex (Spinnaker)",
+              "ssp-hex_nengo-loihi": "SSP-BO-Hex (Loihi 2)"}
+    cols = {"ssp-hex": utils.blues[0], "ssp-rand": utils.oranges[0],
+            "gp-sinc": utils.greens[0], "gp-matern": utils.reds[0],
+            "rff": utils.purples[0],
+            "ssp-hex_nengo-loihi-sim": utils.blues[1],
+            "ssp-hex_nengo-spinnaker": utils.blues[2],
+            "ssp-hex_nengo-loihi": utils.blues[1]}
 
+    def do_plot(ax, regrets):
+        ordered_regrets = {k: v for k, v in sorted(regrets.items(), key=lambda item: np.mean(item[1]))}
+        ordered_regret_keys = list(ordered_regrets.keys())
+        ordered_regrets_arr = np.array(list(ordered_regrets.values())).T
+        plots = ax.violinplot(ordered_regrets_arr)
+        for pc, k in zip(plots['bodies'], ordered_regret_keys):
+            pc.set_facecolor(cols[k])
+        plots['cbars'].set_colors([cols[k] for k in ordered_regret_keys])
+        plots['cmaxes'].set_colors([cols[k] for k in ordered_regret_keys])
+        plots['cmins'].set_colors([cols[k] for k in ordered_regret_keys])
+        return np.max(ordered_regrets_arr, axis=0), [labels[k] for k in ordered_regret_keys]
 
-    
+    letters = ["\\textbf{a}", "\\textbf{b}", "\\textbf{c}", "\\textbf{d}"]
+    letters = [l + " $\\quad$ " for l in letters]
+    fontsize = 9
+    starsym = '$\\ast$'
+    fig, axs = plt.subplots(1, 3, figsize=(utils.doublecolwidth, 3.))
+    axs = axs.reshape(-1)
+    shift = [0.2, 0.05, 5]
+    for i, func in enumerate(funcs):
+        all_regrets = {}
+        axs[i].set_title(letters[i] + func.title(), fontsize=fontsize)
+        for j, agt in enumerate(agts):
+            data = pd.DataFrame(read(os.path.join(args.data_dir, func, agt)))
+            regrets = np.array([data['regret'][k] for k in range(len(data['regret']))])
+            budget = regrets.shape[1]
+            num_trials = regrets.shape[0]
+            regrets = np.divide(np.cumsum(regrets, axis=1),
+                                matlib.repmat(range(1, budget + 1), num_trials, 1))[:, -1]
+            all_regrets[agt] = regrets
+        max_vals, ordered_regrets = do_plot(axs[i], all_regrets)
+        axs[i].set_xticks(range(1, len(ordered_regrets) + 1), ordered_regrets, rotation=45, fontsize=fontsize)
+        drawn_maxs = []
+        for j in range(1, len(agts)):
+            mval = np.max([max_vals[ordered_regrets.index(labels['ssp-hex'])], max_vals[j]] + drawn_maxs)
+            pvalue = wilcoxon(all_regrets['ssp-hex'], all_regrets[agts[j]], alternative='less').pvalue
+            starstr = (starsym * 3 if pvalue < 0.0001 else starsym * 2 if pvalue < 0.001
+                       else starsym if pvalue < 0.01 else 'n.s' if pvalue >= 0.05 else None)
+            if starstr is None:
+                continue
+            drawn_maxs.append(mval + shift[i])
+            significance_bar(axs[i], ordered_regrets.index(labels['ssp-hex']) + 1, j + 1,
+                             mval + shift[i], starstr,
+                             fontsize=fontsize - 2 if pvalue >= 0.01 else 11)
 
-#     plt.ylabel('Terminal Regret (a.u.)', fontsize=24)
-#     plt.title('Himmelblau',fontsize=16)
-
-#     plt.subplot(1,3,2) # Branin-Hoo
-
-#     branin_mus = [8.22,14.13,11.48,8.30]
-#     branin_sems = [0.32,1.72,1.25,0.51]
-
-# #     do_plot(tick_labels, branin_mus, branin_sems)
-#     max_vals = do_plot(tick_labels, branin_files)
-
-# #     significance_bar(1,2,np.max(max_vals)+10, '****')
-# #     significance_bar(1,3,np.max(max_vals)+14,'*')
-# # #     significance_bar(1,4,np.max(max_vals[[0,3]])+0.3,'****')
-# #     significance_bar(2,3,np.max(max_vals)+3,'*')
-# #     significance_bar(2,4,np.max(max_vals)+6,'****')
-
-#     plt.xticks(range(1,len(tick_labels)+1), tick_labels, rotation=45, fontsize=16)
-#     plt.title('Branin-Hoo',fontsize=16)
-
-#     plt.subplot(1,3,3) # Goldstein-Price
-
-#     goldstein_mus = [0.11,0.11,0.09,0.07]
-#     goldstein_sems = [0.01,0.02,0.01,0.01]
-# #     do_plot(tick_labels, goldstein_mus, goldstein_sems)
-#     max_vals = do_plot(tick_labels, goldstein_files)
-
-# #     significance_bar(1,2,np.max(max_vals)+0.15,'****')
-#     significance_bar(1,3,np.max(max_vals)+0.15,'***')
-#     significance_bar(1,4,np.max(max_vals)+0.2,'****')
-#     significance_bar(2,3,np.max(max_vals)+0.05,'*')
-#     significance_bar(2,4,np.max(max_vals)+0.1,'****')
-
-#     plt.xticks(range(1,len(tick_labels)+1), tick_labels, rotation=45, fontsize=16)
-#     plt.title('Goldstein-Price',fontsize=16)
-
-#     if save:
-#         plt.savefig(f'terminal-regret.{plot_filetype}')
-#     else:
-#         plt.show()
+    axs[0].set_ylabel('$\\leftarrow$ Terminal Regret', fontsize=fontsize)
+    fig.tight_layout()
+    utils.save(fig, 'test-func-terminal.pdf')

@@ -1,24 +1,47 @@
-import pytest
 import numpy as np
+import pytest
 
-import ssp_bayes_opt 
+import ssp_bayes_opt
 
-def target_func(**kwargs):
-    return sum(kwargs.values())
+BOUNDS = np.array([[-5.0, 5.0], [-5.0, 5.0]])
 
-bounds = np.array([[-5, 5], [-5, 5]])
+
+def himmelblau(x):
+    return -((x[:, 0] ** 2 + x[:, 1] - 11) ** 2
+             + (x[:, 0] + x[:, 1] ** 2 - 7) ** 2) / 100
+
 
 def test_init():
-    optimizer = ssp_bayes_opt.BayesianOptimization(f=target_func,bounds=bounds,random_state=1)
+    optimizer = ssp_bayes_opt.BayesianOptimization(
+        f=himmelblau, bounds=BOUNDS, random_state=1)
+    optimizer.maximize(init_points=5, n_iter=0, num_restarts=3,
+                       agent_type='ssp-hex', ssp_dim=51,
+                       length_scale=1.0, decoder_method='from-set')
+    assert optimizer.xs is not None
+    assert optimizer.ys is not None
 
-    optimizer.maximize(init_points = 0, n_iter=0, num_restarts=10)
 
-    print(optimizer.max())
+def test_max_property():
+    optimizer = ssp_bayes_opt.BayesianOptimization(
+        f=himmelblau, bounds=BOUNDS, random_state=2)
+    optimizer.maximize(init_points=5, n_iter=2, num_restarts=2,
+                       agent_type='ssp-hex', ssp_dim=51,
+                       length_scale=1.0,
+                       decoder_method='from-set')
+    result = optimizer.max
+    assert 'target' in result
+    assert 'params' in result
+    assert np.isfinite(result['target'])
 
 
-if __name__ == '__main__':
-    r"""
-    CommandLine:
-        python tests/test_bayesian_optimization.py
-    """
-    pytest.main([__file__])
+def test_res_property():
+    optimizer = ssp_bayes_opt.BayesianOptimization(
+        f=himmelblau, bounds=BOUNDS, random_state=3)
+    optimizer.maximize(init_points=5, n_iter=1, num_restarts=2,
+                       agent_type='ssp-hex', ssp_dim=51,
+                       length_scale=1.0,
+                       decoder_method='from-set')
+    res = optimizer.res
+    assert isinstance(res, list)
+    assert len(res) > 0
+    assert 'target' in res[0]

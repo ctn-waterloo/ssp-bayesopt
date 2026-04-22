@@ -2,8 +2,6 @@ import numpy as np
 from scipy.optimize import minimize
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import KFold
-import warnings
-
 
 from .. import sspspace
 from .. import blr
@@ -13,41 +11,32 @@ import warnings
 
 from scipy.stats import qmc
 
-# def factory(agent_type, init_xs, init_ys, **kwargs):
-# 
-#     data_dim = init_xs.shape[1]
-#     # Initialize the agent
-#     agt = None
-#     if agent_type=='ssp-hex':
-#         ssp_space = sspspace.HexagonalSSPSpace(data_dim, **kwargs)
-#         agt = SSPAgent(init_xs, init_ys,ssp_space) 
-#     elif agent_type=='ssp-rand':
-#         ssp_space = sspspace.RandomSSPSpace(data_dim, **kwargs)
-#         agt = SSPAgent(init_xs, init_ys,ssp_space) 
-#     elif agent_type == 'gp':
-#         agt = GPAgent(init_xs, init_ys)
-#     elif agent_type == 'static-gp':
-#         agt = GPAgent(init_xs, init_ys, updating=True, **kwargs)
-#     else:
-#         raise RuntimeWarning(f'Undefined agent type {agent_type}')
-#     return agt
-
 
 class Agent:
+    """Abstract base class for all BO agents.
+
+    Subclasses must override eval(), update(), and acquisition_func().
+    """
+
     def __init__(self):
         pass
 
     def eval(self, xs):
+        """Evaluate the surrogate at xs, returning (mu, var, acquisition_value)."""
         pass
 
     def update(self, x_t, y_t, sigma_t, step_num=0):
+        """Incorporate a new observation (x_t, y_t) into the surrogate."""
         pass
 
     def untrusted(self, x, badness=None):
+        """Mark region x as untrusted (penalise in acquisition function)."""
         pass
 
     def acquisition_func(self):
+        """Return (objective_fn, jacobian_fn) suitable for scipy.optimize.minimize."""
         pass
 
     def length_scale(self):
+        """Return the current length scale(s) used by the surrogate."""
         pass
