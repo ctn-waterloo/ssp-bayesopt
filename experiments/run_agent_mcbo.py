@@ -31,21 +31,6 @@ from run_agent import neuron_types, sim_types
 # pip install -e .
 # chmod u+x ./bbox_setup.sh
 # ./bbox_setup.sh
-#
-# Test:
-# task_id = 'ackley-53' # try different ones, e.g
-# # OR ackley aig_optimization antibody_design mig_optimization pest rna_inverse_fold ackley-53 xgboost_opt aig_optimization_hyp svm_opt
-# task = get_task_from_id(task_id)
-# search_space = task.get_search_space()
-# print(search_space.params)
-#
-# I found that the aig_optimization and aig_optimization_hyp did not work.
-# Got to MCBO/mcbo/utils/experiment_utils.py
-# Ctrl-f "aig_optimization", you should see
-# task_kwargs = {'designs_group_id': "sin", "operator_space_id": "basic", "objective": "both",
-#                        "seq_operators_pattern_id": "basic_w_post_map"}
-# Change "sin" to "epfl_arithmetic"
-# Same for "aig_optimization_hyp"
 
 
 
@@ -219,15 +204,14 @@ class SamplingTrial(pytry.Trial):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-# # OR ackley aig_optimization antibody_design mig_optimization pest rna_inverse_fold ackley-53 xgboost_opt aig_optimization_hyp svm_opt
-    parser.add_argument('--task-id', dest='task_id', type=str, default='xgboost_opt')
+    parser.add_argument('--task-id', dest='task_id', type=str, default='pest')
     parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=201)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=200)
     parser.add_argument('--num-init-samples', dest='num_init_samples', type=int, default=20)
     parser.add_argument('--beta-ucb', dest='beta_ucb', type=float,
-                        default=1)  #10 # np.log(2/1e-6))#np.log(2/1e-6))#np.log(2/1e-6))
+                        default=1) 
     parser.add_argument('--gamma', dest='gamma', type=float, default=0.0)
-    parser.add_argument('--len-scale', dest='len_scale', type=float, default=0.3) # negative means optimize
+    parser.add_argument('--len-scale', dest='len_scale', type=float, default=-1) # negative means optimize
     parser.add_argument('--data-dir', dest='data_dir', type=str, default='data')
     parser.add_argument('--num-trials', dest='num_trials', type=int, default=10)
     parser.add_argument('--nengo', action='store_true')
@@ -236,10 +220,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    # args.nengo=True #
-    # args.decay=True
-
-    # random.seed(1)
     seeds = [random.randint(1, 100000) for _ in range(args.num_trials)]
 
     if args.nengo:
