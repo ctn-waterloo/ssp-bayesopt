@@ -206,9 +206,9 @@ class SSPAgent(Agent):
         self.blr.update(phi, y_val)
 
         if isinstance(self.var_decay, (int, float)):
-            self.var_weight = self.var_weight * self.var_decay
+            self.var_weight = self.var_weight + self.var_decay
         elif callable(self.var_decay):
-            self.var_weight = self.var_weight * self.var_decay(step_num)
+            self.var_weight = self.var_weight + self.var_decay(step_num)
         else:
             msg = f'unable to use {self.var_weight}, expected number or callable'
             print(msg)

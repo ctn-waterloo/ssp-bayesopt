@@ -227,7 +227,7 @@ def broken_axis_plot(Gs, y_starts, y_ends, height_ratios=None, **kwargs):
 
 if __name__ == '__main__':
     data_save_name = "data_mcbo"
-    ALL_RES_COMB_PATH = os.path.join(RESULTS_DIR, "data", data_save_name, "all_res_comb.csv")
+    ALL_RES_COMB_PATH = os.path.join(RESULTS_DIR, "data", data_save_name, "all_res_comb.csv") # from the mcbo repo 
     # SSP-BO results relative to experiments/; adjust this path as needed.
     ssp_data_file_name = 'data/mcbo_beta1/d201'
 

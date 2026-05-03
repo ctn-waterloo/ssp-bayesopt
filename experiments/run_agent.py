@@ -75,7 +75,7 @@ sim_types = {
 def get_args():
     parser = ArgumentParser()
 
-    parser.add_argument('--func', dest='function_name', type=str, default='himmelblau')
+    parser.add_argument('--func', dest='function_name', type=str, default='branin-hoo')
     parser.add_argument('--agent', dest='agent_type', type=str, default='ssp-hex')
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=200)
     parser.add_argument('--beta-ucb', dest='beta_ucb', type=float, default=1.)

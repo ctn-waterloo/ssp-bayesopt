@@ -268,7 +268,7 @@ class BayesianOptimization:
                     if hasattr(time, 'thread_time_ns'):
                         self.times[t] = time.thread_time_ns() - start
                 elif 'ssp' in agent_type:
-                    phi_init = np.ones(agt.ssp_dim) * (1 / agt.ssp_dim)
+                    phi_init = agt.initial_guess()
                     start = time.thread_time_ns()
                     soln = minimize(optim_func, phi_init.flatten(),
                                     jac=jac_func if use_jac else None,
