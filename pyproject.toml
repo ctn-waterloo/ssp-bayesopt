@@ -119,3 +119,6 @@ conflicts = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["ssp_bayes_opt"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
