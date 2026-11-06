@@ -82,10 +82,10 @@ def get_args():
     parser.add_argument('--gamma', dest='gamma', type=float, default=0.0)
     parser.add_argument('--decay', action='store_true')
 
-    parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=7)
+    parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=97)
     parser.add_argument('--n-scales', dest='n_scales', type=int, default=-1)
     parser.add_argument('--n-rotates', dest='n_rotates', type=int, default=-1)
-    parser.add_argument('--len-scale', dest='len_scale', type=float, default=4)
+    parser.add_argument('--len-scale', dest='len_scale', type=float, default=-1)
 
     parser.add_argument('--num-trials', dest='num_trials', type=int, default=1)
     parser.add_argument('--data-dir', dest='data_dir', type=str, default='data')
