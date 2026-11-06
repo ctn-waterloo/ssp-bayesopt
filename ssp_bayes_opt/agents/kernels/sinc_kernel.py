@@ -102,7 +102,7 @@ class SincKernel(StationaryKernelMixin, NormalizedKernelMixin, Kernel):
                     K_gradient[:,:,l_idx] *= np.prod(sinc_mat[:,:,l_idx+1:], axis=-1)
                     K_gradient[:,:,l_idx] *= d_sinc_mat[:,:,l_idx]
                     K_gradient[:,:,l_idx] *= -dists[:,:,l_idx]/(length_scale[l_idx]**2)
-                    return K, K_gradient
+                return K, K_gradient
 
         else:
             return K
