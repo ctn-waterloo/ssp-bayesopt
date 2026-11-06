@@ -72,7 +72,8 @@ class MCBO_task:
         return samples
 
     def __call__(self, x, info=None):
-        df = DataFrame(data=x, columns=self.param_names)
+        # copy x: pandas may otherwise write the inverse-transformed columns back into the caller's array
+        df = DataFrame(data=np.array(x, dtype=float, copy=True), columns=self.param_names)
         for p in self.param_names:
             if p not in self.search_space.disc_names:
                 df[p] = self.search_space.params[p].inverse_transform(torch.tensor(df[p]))
@@ -91,6 +92,7 @@ class SamplingTrial(pytry.Trial):
         self.param('UCB Beta', beta_ucb=1.0)
         self.param('MI gamma_c', gamma=0.0)
         self.param('ssp dim', ssp_dim=201)
+        self.param('conjunctive weight', conjunctive_w=0.1)
         self.param('trial number', trial_num=None)
 
         self.param('use beta decay', decay=False)
@@ -106,7 +108,7 @@ class SamplingTrial(pytry.Trial):
         target = MCBO_task(task_id=p.task_id)
         pbounds = target.bounds
 
-        conjunctive_w = 0.1
+        conjunctive_w = p.conjunctive_w
         if p.decay:
             var_decay = -p.beta_ucb / budget
         else:
@@ -206,6 +208,7 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--task-id', dest='task_id', type=str, default='pest')
     parser.add_argument('--ssp-dim', dest='ssp_dim', type=int, default=201)
+    parser.add_argument('--conjunctive-w', dest='conjunctive_w', type=float, default=0.1)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=200)
     parser.add_argument('--num-init-samples', dest='num_init_samples', type=int, default=20)
     parser.add_argument('--beta-ucb', dest='beta_ucb', type=float,
@@ -238,6 +241,7 @@ if __name__ == '__main__':
                   'seed': seed,
                   'verbose': False,
                   'ssp_dim': args.ssp_dim,
+                  'conjunctive_w': args.conjunctive_w,
                   'len_scale': args.len_scale,
                   'beta_ucb': args.beta_ucb,
                   'gamma': args.gamma,

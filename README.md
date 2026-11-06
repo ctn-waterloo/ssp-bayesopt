@@ -12,9 +12,9 @@
 
 ## About
 
-**SSP-BO** is a sample-, memory-, and time-efficient Bayesian optimization (BO) library built on compositional neurosymbolic representations — Spatial Semantic Pointers (SSPs). It replaces the Gaussian process surrogate of standard BO with a **Bayesian linear regression (BLR)** model over fixed-dimensional vector-symbolic embeddings.
+**SSP-BO** is a sample, memory, and time efficient Bayesian optimization (BO) library built on compositional neurosymbolic representations, Spatial Semantic Pointers (SSPs). It replaces the Gaussian process surrogate of standard BO with a **Bayesian linear regression (BLR)** model over fixed-dimensional vector-symbolic embeddings.
 
-Standard BO requires *O(n³)* time and *O(n²)* memory as the number of observations *n* grows. SSP-BO reduces this to *O(d³)* and *O(d²)* in the fixed embedding dimension *d* — giving **constant** time and memory per sample-selection step, independent of how many samples have been collected. On standard benchmarks, this yields up to **60–200× faster** sample selection with no loss in accuracy.
+Standard BO requires *O(n³)* time and *O(n²)* memory as the number of observations *n* grows. SSP-BO reduces this to *O(d³)* and *O(d²)* in the fixed embedding dimension *d*, giving **constant** time and memory per sample-selection step, independent of how many samples have been collected. On standard benchmarks, this yields up to **60–200× faster** sample selection with no loss in accuracy.
 
 <div align="center">
 <img src="images/bosspoverview.png" width="750" alt="Schematic overview of SSP-BO"/>
@@ -37,12 +37,12 @@ Standard BO requires *O(n³)* time and *O(n²)* memory as the number of observat
 
 At each step the agent:
 1. **Encodes** candidate locations as fixed-size SSP vectors `φ(x) ∈ ℝᵈ`.
-2. **Updates** a BLR posterior over the embedded space via a rank-one update — *O(d²)*, no matrix inversion needed.
+2. **Updates** a BLR posterior over the embedded space via a rank-one update, *O(d²)*, no matrix inversion needed.
 3. **Optimizes** the UCB acquisition function directly in embedding space via gradient ascent or neural dynamics:
    `θ* = argmax [ mᵀθ + λ √(β⁻¹ + θᵀΣθ) ]`
 4. **Decodes** `θ*` back to an action: `x* = argmax φ(x)·θ*`
 
-Because the BLR parameters `(m, Σ)` have fixed size *d* regardless of how many samples have been collected, steps 1–4 have cost that is entirely independent of *n* — the key to SSP-BO's scalability.
+Because the BLR parameters `(m, Σ)` have fixed size *d* regardless of how many samples have been collected, steps 1–4 have cost that is entirely independent of *n*, the key to SSP-BO's scalability.
 
 ---
 
@@ -60,8 +60,8 @@ pip install -e .
 
 | Extra | Purpose |
 |---|---|
-| `basic` | matplotlib, pandas, torch, GPyTorch, BoTorch, Optuna — needed for GP/RFF baselines and plotting |
-| `nengo` | Nengo SNN stack (Nengo ≥ 4, nengo-spa, nengo-ocl) — needed for neuromorphic experiments |
+| `basic` | matplotlib, pandas, torch, GPyTorch, BoTorch, Optuna: needed for GP/RFF baselines and plotting |
+| `nengo` | Nengo SNN stack (Nengo ≥ 4, nengo-spa, nengo-ocl): needed for neuromorphic experiments |
 | `spinnaker` | SpiNNaker backend (requires Nengo < 3; **incompatible** with `nengo`) |
 | `mcbo` | Mixed-variable / combinatorial tasks via MCBO |
 | `nas` | NAS-Bench neural architecture search tasks |
@@ -135,10 +135,18 @@ ssp_bayes_opt/
 If you use SSP-BO in your research, please cite:
 
 ```bibtex
-@article{furlong2025,
-  author  = {P Michael Furlong and Nicole Dumont and Rika Antonova and Jeff Orchard and Chris Eliasmith},
-  title   = {Compositional Neurosymbolic Representations Enable Efficient Active Exploration},
-  journal = {Nature Communications},
-  year    = {In press},
-}
+@article{furlong2026,
+	author = {Furlong, P. Michael and Dumont, Nicole S. -Y. and Antonova, Rika and Orchard, Jeff and Eliasmith, Chris},
+	date = {2026/08/22},
+	doi = {10.1038/s41467-026-75703-4},
+	isbn = {2041-1723},
+	journal = {Nature Communications},
+	number = {1},
+	pages = {10055},
+	title = {Compositional neurosymbolic representations enable efficient active exploration},
+	url = {https://doi.org/10.1038/s41467-026-75703-4},
+	volume = {17},
+	year = {2026},
+	bdsk-url-1 = {https://doi.org/10.1038/s41467-026-75703-4}}
+
 ```
